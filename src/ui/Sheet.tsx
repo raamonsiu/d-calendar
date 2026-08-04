@@ -11,7 +11,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Label } from '@/theme/Text';
 import { useDuration } from '@/theme/prefs';
-import { OVERLAY_OPACITY, color, duration, radius } from '@/theme/tokens';
+import {
+  OVERLAY_OPACITY,
+  color,
+  duration,
+  layer,
+  radius,
+} from '@/theme/tokens';
 import { XIcon } from './icons';
 import { usePanelTransition } from './usePanelTransition';
 
@@ -133,7 +139,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   if (!mounted) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View
+      style={[StyleSheet.absoluteFill, styles.layer]}
+      pointerEvents="box-none">
       <Pressable
         accessibilityLabel="Cerrar"
         onPress={onClose}
@@ -173,6 +181,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
 }
 
 const styles = StyleSheet.create({
+  layer: { zIndex: layer.panel },
   overlay: { backgroundColor: color.scrim },
   sheet: {
     position: 'absolute',

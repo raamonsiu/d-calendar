@@ -148,6 +148,24 @@ export const EASE_OUT = [0.2, 0.8, 0.2, 1] as const;
 export const OVERLAY_OPACITY = 0.55;
 
 /**
+ * Stacking order of the layers that overlap on a screen.
+ *
+ * `zIndex` only orders siblings, but Android leaves out of the view tree any
+ * `View` carrying layout props alone, so a raised child ends up competing
+ * against its parent's siblings. Anything that lifts itself over the rest of the
+ * screen takes its value from here, so the comparison holds whichever level it
+ * is flattened into.
+ */
+export const layer = {
+  /** Screen header, over the box that follows it. */
+  header: 2,
+  /** Side menu and bottom sheets, together with their overlay. */
+  panel: 30,
+  /** Toasts, over the panels as well. */
+  toast: 40,
+} as const;
+
+/**
  * Accent tint levels. Handoff §6 does not allow the accent as a solid fill: it
  * always goes tinted over the surface.
  */

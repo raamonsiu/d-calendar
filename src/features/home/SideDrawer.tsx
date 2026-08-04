@@ -26,6 +26,7 @@ import {
   color,
   duration,
   hitSlopFor,
+  layer,
   radius,
 } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
@@ -151,7 +152,9 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
   if (!mounted) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View
+      style={[StyleSheet.absoluteFill, styles.layer]}
+      pointerEvents="box-none">
       <Pressable
         accessibilityLabel="Cerrar menú"
         onPress={onClose}
@@ -390,6 +393,7 @@ function CalendarRow({
 }
 
 const styles = StyleSheet.create({
+  layer: { zIndex: layer.panel },
   overlay: { backgroundColor: color.scrim },
   panel: {
     position: 'absolute',

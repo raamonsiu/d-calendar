@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { color, duration, radius } from '@/theme/tokens';
+import { color, duration, layer, radius } from '@/theme/tokens';
 
 type ToastMessage = { message: string; onUndo?: () => void };
 
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 0,
-    zIndex: 40,
+    zIndex: layer.toast,
   },
   bar: {
     minHeight: 46,

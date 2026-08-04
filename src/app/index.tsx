@@ -43,7 +43,7 @@ import {
 import { useAppStore } from '@/store/useAppStore';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { color, radius, size, space } from '@/theme/tokens';
+import { color, layer, radius, size, space } from '@/theme/tokens';
 import { Cta, IconButton } from '@/ui/controls';
 import { ListIcon, PlusIcon } from '@/ui/icons';
 
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
     paddingHorizontal: 6,
-    zIndex: 2,
+    zIndex: layer.header,
   },
   menuButton: { marginLeft: -5 },
   /**
