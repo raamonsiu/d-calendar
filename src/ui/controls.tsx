@@ -8,16 +8,25 @@ import {
 } from 'react-native';
 
 import { groupRadius } from '@/lib/groupRadius';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { alpha, color, hitSlopFor, radius } from '@/theme/tokens';
+import { alpha, color, hitSlopFor, radius, size, tint } from '@/theme/tokens';
 import { CaretRightIcon, CheckIcon } from './icons';
 
-/** Botón cuadrado de icono. Siempre con 44px de área táctil. */
+/**
+ * Pressable controls shared by every screen. None of them decides colours on
+ * its own: the accent comes in through `useAccent()` and everything else from
+ * the tokens.
+ */
+
+/**
+ * Square icon button. The icon goes in as a child, and `hitSlop` always
+ * completes the 44px touch area even when the button is drawn smaller.
+ */
 export function IconButton({
   onPress,
   children,
-  size = 28,
+  size: buttonSize = 28,
   label,
   style,
 }: {
@@ -31,15 +40,13 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={hitSlopFor(size)}
+      hitSlop={hitSlopFor(buttonSize)}
       onPress={onPress}
       style={({ pressed }) => [
+        styles.iconButton,
         {
-          width: size,
-          height: size,
-          borderRadius: 10,
-          alignItems: 'center',
-          justifyContent: 'center',
+          width: buttonSize,
+          height: buttonSize,
           backgroundColor: pressed ? color.hairline : 'transparent',
         },
         style,
@@ -49,19 +56,25 @@ export function IconButton({
   );
 }
 
-/** La barra de 54px de abajo. `primary` la pinta con el acento. */
+/**
+ * The bottom action bar. `primary` draws it with the accent border and tint;
+ * without `primary` it is a neutral control. Disabled, it lowers its opacity
+ * and stops responding.
+ */
 export function Cta({
   label,
   onPress,
   primary,
   icon,
   disabled,
+  height = size.cta,
 }: {
   label: string;
   onPress: () => void;
   primary?: boolean;
   icon?: ReactNode;
   disabled?: boolean;
+  height?: number;
 }) {
   const accent = useAccent();
   return (
@@ -72,36 +85,43 @@ export function Cta({
       onPress={onPress}
       style={({ pressed }) => [
         styles.cta,
+        { height },
         primary
           ? {
               borderColor: accent,
-              backgroundColor: alpha(accent, pressed ? 0.14 : 0.07),
+              backgroundColor: alpha(
+                accent,
+                pressed ? tint.fillPressed : tint.fill,
+              ),
             }
           : {
               borderColor: pressed ? accent : color.borderStrong,
-              backgroundColor: pressed ? '#131315' : '#0e0e10',
+              backgroundColor: pressed ? color.sunkenHover : color.sunken,
             },
-        disabled && { opacity: 0.45 },
+        disabled && styles.disabled,
       ]}>
       {icon}
-      <T
+      <AppText
         style={{
           fontSize: 10,
           letterSpacing: 2,
-          color: primary ? color.text : '#c9c9d0',
+          color: primary ? color.text : color.textStrong,
         }}>
         {label}
-      </T>
+      </AppText>
     </Pressable>
   );
 }
 
-/** Botón de borde discontinuo: «añadir invitado», «añadir cuenta»… */
+/**
+ * Dashed border button for adding things: "añadir invitado", "añadir cuenta",
+ * "añadir aviso".
+ */
 export function DashedButton({
   label,
   icon,
   onPress,
-  height = 38,
+  height = size.control,
 }: {
   label: string;
   icon?: ReactNode;
@@ -118,25 +138,26 @@ export function DashedButton({
         { height, borderColor: pressed ? accent : color.borderStrong },
       ]}>
       {icon}
-      <T
-        style={{
-          fontSize: 10,
-          letterSpacing: 1.4,
-          color: color.textMuted,
-        }}>
+      <AppText
+        style={{ fontSize: 10, letterSpacing: 1.4, color: color.textMuted }}>
         {label}
-      </T>
+      </AppText>
     </Pressable>
   );
 }
 
+/** 1px separator. */
 export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.divider, style]} />;
 }
 
 /**
- * Fila de una lista de Ajustes/Ayuda/Acerca: superficie propia, radios del
- * «gap Nothing» separado y el pressed como cambio de superficie.
+ * A row of a Settings, Help or About list.
+ *
+ * The radii come from `groupRadius` based on the position in the group, and the
+ * pressed state is a surface change (handoff §6 does not allow shadows).
+ * Without `onPress` the row is inert, and `caret` is turned off when the row
+ * carries its own control on the right, such as a switch.
  */
 export function GroupRow({
   index,
@@ -173,23 +194,21 @@ export function GroupRow({
       ]}>
       {icon}
       <View style={styles.groupRowBody}>
-        <T style={{ fontSize: 12.5, color: color.textBody }}>{label}</T>
-        {hint ? (
-          <T style={{ fontSize: 9, letterSpacing: 0.4, color: color.labelDim }}>
-            {hint}
-          </T>
-        ) : null}
+        <AppText style={styles.groupRowLabel}>{label}</AppText>
+        {hint ? <AppText style={styles.groupRowHint}>{hint}</AppText> : null}
       </View>
       {value ? (
-        <T style={{ fontSize: 11.5, color: color.textMuted }}>{value}</T>
+        <AppText style={styles.groupRowValue}>{value}</AppText>
       ) : null}
       {right}
-      {caret ? <CaretRightIcon size={11} color="#3f3f47" /> : null}
+      {caret ? <CaretRightIcon size={11} color={color.caret} /> : null}
     </Pressable>
   );
 }
 
-/** Fila de opción dentro de un bottom sheet. */
+/**
+ * Single choice row inside a bottom sheet; the chosen one carries the check.
+ */
 export function OptionRow({
   label,
   selected,
@@ -215,29 +234,34 @@ export function OptionRow({
               : 'transparent',
         },
       ]}>
-      <T
+      <AppText
         style={{
           flex: 1,
           fontSize: 13,
-          color: selected ? color.text : '#b9b9c1',
+          color: selected ? color.text : color.textNote,
         }}>
         {label}
-      </T>
+      </AppText>
       {selected ? <CheckIcon size={13} color={accent} /> : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  iconButton: {
+    borderRadius: radius.tap,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cta: {
-    height: 54,
-    borderRadius: 20,
+    borderRadius: radius.cta,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
   },
+  disabled: { opacity: 0.45 },
   dashed: {
     borderRadius: radius.control,
     borderWidth: 1,
@@ -255,6 +279,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   groupRowBody: { flex: 1, gap: 2 },
+  groupRowLabel: { fontSize: 12.5, color: color.textBody },
+  groupRowHint: { fontSize: 9, letterSpacing: 0.4, color: color.labelDim },
+  groupRowValue: { fontSize: 11.5, color: color.textMuted },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',

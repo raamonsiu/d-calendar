@@ -9,23 +9,55 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { T } from '@/theme/Text';
+import {
+  habitFrequencyLabel,
+  habitStreakUnit,
+  isHabitDone,
+} from '@/lib/habits';
+import { AppText } from '@/theme/Text';
 import { useAccent, useDuration } from '@/theme/prefs';
-import { EASE_OUT, alpha, color, duration, hitSlopFor } from '@/theme/tokens';
-import { SlidersHorizontalIcon } from '@/ui/icons';
-import { habitFreqLabel, habitStreakUnit, type Habit } from '@/types';
+import { EASE_OUT, alpha, color, duration, radius, tint } from '@/theme/tokens';
+import type { Habit } from '@/types';
+import { ItemSettingsButton } from './ItemSettingsButton';
 
-type Props = {
+/**
+ * Card height. The prototype uses 84 across three columns; with two columns the
+ * card is wider and needs a bit more height so it does not look squashed.
+ */
+const CARD_HEIGHT = 92;
+
+/** Side of the button that opens the habit detail. */
+const SETTINGS_SIZE = 26;
+
+/** From this target on, the markers shrink so they all fit. */
+const DENSE_TARGET = 4;
+const DOT_SIZE = 6;
+const DENSE_DOT_SIZE = 5;
+
+/** How much the card shrinks on the pulse, and how the duration is split. */
+const PULSE_SCALE = 0.94;
+const PULSE_IN_RATIO = 0.45;
+
+/** Long press threshold, used to subtract a repetition. */
+const LONG_PRESS_MS = 420;
+
+type HabitCardProps = {
   habit: Habit;
   width: number;
   showStreak: boolean;
+  /** Returns true when this tap completes the habit. */
   onBump: (delta: 1 | -1) => boolean;
   onOpenSettings: () => void;
 };
 
 /**
- * Tarjeta de hábito. onPress = +1, onLongPress (420 ms) = −1. Al llegar al
- * objetivo la tarjeta se tiñe del acento, el título se tacha y hay pulso.
+ * Habit card on Home: the repetition markers on top and the name with its
+ * frequency below.
+ *
+ * A tap adds a repetition and a long press subtracts one. On reaching the
+ * target the card is tinted with the accent, the name is struck through with a
+ * line animated over its real width, and there is a pulse plus haptic feedback.
+ * The streak is only shown when the caller asks for it.
  */
 export function HabitCard({
   habit,
@@ -33,40 +65,55 @@ export function HabitCard({
   showStreak,
   onBump,
   onOpenSettings,
-}: Props) {
+}: HabitCardProps) {
   const accent = useAccent();
-  const dur = useDuration();
-  const done = habit.progress >= habit.target;
+  const resolveDuration = useDuration();
+  const done = isHabitDone(habit);
 
   const scale = useSharedValue(1);
-  const strike = useSharedValue(done ? 1 : 0);
+  const strikeProgress = useSharedValue(done ? 1 : 0);
   const [titleWidth, setTitleWidth] = useState(0);
 
   useEffect(() => {
-    strike.value = withTiming(done ? 1 : 0, {
-      duration: dur(duration.strike),
+    strikeProgress.value = withTiming(done ? 1 : 0, {
+      duration: resolveDuration(duration.strike),
       easing: Easing.bezier(...EASE_OUT),
     });
-  }, [done, strike, dur]);
+  }, [done, strikeProgress, resolveDuration]);
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const strikeStyle = useAnimatedStyle(() => ({
-    width: strike.value * titleWidth,
+    width: strikeProgress.value * titleWidth,
   }));
 
+  /** The pulse is skipped entirely under the "Reducir animaciones" setting. */
   const pulse = () => {
-    const ms = dur(duration.pulse);
-    if (!ms) return;
+    const total = resolveDuration(duration.pulse);
+    if (!total) return;
     scale.value = withSequence(
-      withTiming(0.94, { duration: ms * 0.45 }),
-      withTiming(1, { duration: ms * 0.55 }),
+      withTiming(PULSE_SCALE, { duration: total * PULSE_IN_RATIO }),
+      withTiming(1, { duration: total * (1 - PULSE_IN_RATIO) }),
     );
   };
 
-  const dotSize = habit.target > 4 ? 5 : 6;
+  const bumpUp = () => {
+    if (onBump(1)) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      pulse();
+      return;
+    }
+    Haptics.selectionAsync();
+  };
+
+  const bumpDown = () => {
+    Haptics.selectionAsync();
+    onBump(-1);
+  };
+
+  const dotSize = habit.target > DENSE_TARGET ? DENSE_DOT_SIZE : DOT_SIZE;
 
   return (
     <Animated.View style={[{ width }, cardStyle]}>
@@ -74,53 +121,39 @@ export function HabitCard({
         accessibilityRole="button"
         accessibilityLabel={`${habit.name}, ${habit.progress} de ${habit.target}`}
         accessibilityHint="Toca para sumar una repetición, mantén pulsado para restarla"
-        delayLongPress={420}
-        onPress={() => {
-          if (onBump(1)) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            pulse();
-          } else {
-            Haptics.selectionAsync();
-          }
-        }}
-        onLongPress={() => {
-          Haptics.selectionAsync();
-          onBump(-1);
-        }}
+        delayLongPress={LONG_PRESS_MS}
+        onPress={bumpUp}
+        onLongPress={bumpDown}
         style={({ pressed }) => [
           styles.card,
           {
-            borderColor: done ? accent : color.borderMut,
+            borderColor: done ? accent : color.borderBox,
             backgroundColor: done
-              ? alpha(accent, 0.07)
+              ? alpha(accent, tint.fill)
               : pressed
                 ? color.cardHover
                 : color.card,
           },
         ]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Ajustes del hábito"
-          hitSlop={hitSlopFor(26)}
+        <ItemSettingsButton
+          label="Ajustes del hábito"
+          size={SETTINGS_SIZE}
+          style={styles.settings}
           onPress={onOpenSettings}
-          style={({ pressed }) => [
-            styles.cog,
-            pressed && { backgroundColor: '#1d1d21' },
-          ]}>
-          <SlidersHorizontalIcon size={16} color="#5a5a62" />
-        </Pressable>
+        />
 
         <View style={styles.dots}>
-          {Array.from({ length: habit.target }, (_, k) => (
+          {Array.from({ length: habit.target }, (_, index) => (
             <View
-              key={k}
+              key={index}
               style={{
                 width: dotSize,
                 height: dotSize,
                 borderRadius: dotSize / 2,
                 borderWidth: 1,
-                borderColor: k < habit.progress ? accent : '#3a3a42',
-                backgroundColor: k < habit.progress ? accent : 'transparent',
+                borderColor: index < habit.progress ? accent : color.outline,
+                backgroundColor:
+                  index < habit.progress ? accent : 'transparent',
               }}
             />
           ))}
@@ -128,16 +161,16 @@ export function HabitCard({
 
         <View style={styles.foot}>
           <View style={styles.titleWrap}>
-            <T
-              w={400}
+            <AppText
+              weight={400}
               numberOfLines={2}
-              onLayout={(e) => setTitleWidth(e.nativeEvent.layout.width)}
+              onLayout={(event) => setTitleWidth(event.nativeEvent.layout.width)}
               style={[
                 styles.title,
-                { color: done ? color.textMuted : '#e9e9ec' },
+                { color: done ? color.textMuted : color.textBody },
               ]}>
               {habit.name}
-            </T>
+            </AppText>
             <Animated.View
               pointerEvents="none"
               style={[styles.strike, { backgroundColor: accent }, strikeStyle]}
@@ -145,19 +178,22 @@ export function HabitCard({
           </View>
 
           <View style={styles.metaRow}>
-            <T
+            <AppText
               numberOfLines={1}
               style={[
                 styles.meta,
-                { color: habit.target > 1 ? color.textMuted : color.labelDim },
+                {
+                  color:
+                    habit.target > 1 ? color.textMuted : color.labelDim,
+                },
               ]}>
-              {habitFreqLabel(habit)}
-            </T>
+              {habitFrequencyLabel(habit)}
+            </AppText>
             {showStreak ? (
-              <T style={[styles.meta, { color: color.faint }]}>
+              <AppText style={[styles.meta, { color: color.faint }]}>
                 · {habit.streak}
                 {habitStreakUnit(habit)}
-              </T>
+              </AppText>
             ) : null}
           </View>
         </View>
@@ -168,23 +204,16 @@ export function HabitCard({
 
 const styles = StyleSheet.create({
   card: {
-    // 84 en el prototipo, a 3 columnas; con 2 columnas la tarjeta es más ancha
-    // y necesita algo más de alto para no quedar apaisada.
-    height: 92,
-    borderRadius: 18,
+    height: CARD_HEIGHT,
+    borderRadius: radius.card,
     borderWidth: 1,
     padding: 9,
     justifyContent: 'space-between',
   },
-  cog: {
+  settings: {
     position: 'absolute',
     top: 5,
     right: 5,
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
     zIndex: 2,
   },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 7 },

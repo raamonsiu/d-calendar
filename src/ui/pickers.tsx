@@ -1,72 +1,119 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   MONTHS,
   addMonths,
-  dowInitials,
   isSameDay,
   isToday,
   monthRows,
   startOfDay,
 } from '@/lib/date';
-import { T } from '@/theme/Text';
+import { gridCellSize } from '@/lib/layout';
+import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { alpha, color, hitSlopFor, radius } from '@/theme/tokens';
+import { alpha, color, hitSlopFor, radius, tint } from '@/theme/tokens';
 import { Sheet } from './Sheet';
+import { WeekdayRow } from './WeekdayRow';
 import { Cta, IconButton } from './controls';
 import { CaretLeftIcon, CaretRightIcon } from './icons';
 
 /**
- * Selectores de fecha y hora propios. El diálogo nativo de Android no se puede
- * tematizar desde JS (`textColor` / `accentColor` / `themeVariant` son solo de
- * iOS), así que se rehacen con los tokens de la app.
+ * Own date and time pickers.
+ *
+ * The native Android dialog cannot be themed from JS (`textColor`,
+ * `accentColor` and `themeVariant` are iOS only), so they are rebuilt with the
+ * app tokens inside a `Sheet`.
  */
 
+/** Step of the minute wheel. */
 const MINUTE_STEP = 5;
-const ITEM_H = 42;
-const VISIBLE = 5;
+
+/**
+ * Height of a wheel row and how many are visible (odd: there is a middle one).
+ */
+const ITEM_HEIGHT = 42;
+const VISIBLE_ITEMS = 5;
+
+/** Width of each wheel and of the colon separator. */
+const WHEEL_WIDTH = 86;
+const COLON_WIDTH = 14;
+const WHEEL_GAP = 4;
+
+/** Gap between cells of the day grid. */
 const CELL_GAP = 4;
+const COLUMNS = 7;
 
-type Mode = 'date' | 'time';
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
 
-type Pending = {
-  mode: Mode;
+type PickerMode = 'date' | 'time';
+
+type PickerRequest = {
+  mode: PickerMode;
   value: Date;
-  onPick: (d: Date) => void;
-  /** Cambia en cada apertura para remontar las ruedas en su posición. */
+  onPick: (picked: Date) => void;
+  /**
+   * Changes on every opening. The sheets use it to move back to the current
+   * value without needing an effect.
+   */
   session: number;
 };
 
-export function useDateTimePicker() {
-  const session = useRef(0);
-  const [pending, setPending] = useState<Pending | null>(null);
+/**
+ * Date and time picker shared by a whole form.
+ *
+ * It is mounted once (`element`) and opened from any control with `open`, which
+ * takes the current value and returns the chosen one through a callback. The
+ * sheet closes itself on picking.
+ *
+ * Postcondition: `onPick` is called at most once per opening, and never when
+ * the user closes without choosing.
+ */
+export type DateTimePicker = {
+  /** Opens the picker; `onPick` receives the chosen date or time. */
+  open: (
+    mode: PickerMode,
+    value: Date,
+    onPick: (picked: Date) => void,
+  ) => void;
+  /** The picker sheets. They have to be drawn once on the screen. */
+  element: ReactNode;
+};
+
+export function useDateTimePicker(): DateTimePicker {
+  const sessionCounter = useRef(0);
+  const [request, setRequest] = useState<PickerRequest | null>(null);
   const [open, setOpen] = useState(false);
 
-  const openPicker = (mode: Mode, value: Date, onPick: (d: Date) => void) => {
-    session.current += 1;
-    setPending({ mode, value, onPick, session: session.current });
+  const openPicker = (
+    mode: PickerMode,
+    value: Date,
+    onPick: (picked: Date) => void,
+  ) => {
+    sessionCounter.current += 1;
+    setRequest({ mode, value, onPick, session: sessionCounter.current });
     setOpen(true);
   };
 
   const close = () => setOpen(false);
 
-  const commit = (date: Date) => {
-    pending?.onPick(date);
+  const commit = (picked: Date) => {
+    request?.onPick(picked);
     setOpen(false);
   };
 
   const element = (
     <>
       <DateSheet
-        open={open && pending?.mode === 'date'}
-        pending={pending}
+        open={open && request?.mode === 'date'}
+        request={request}
         onClose={close}
         onPick={commit}
       />
       <TimeSheet
-        open={open && pending?.mode === 'time'}
-        pending={pending}
+        open={open && request?.mode === 'time'}
+        request={request}
         onClose={close}
         onPick={commit}
       />
@@ -76,35 +123,40 @@ export function useDateTimePicker() {
   return { open: openPicker, element };
 }
 
-// ---------------------------------------------------------------- fecha
-
-function DateSheet({
-  open,
-  pending,
-  onClose,
-  onPick,
-}: {
+type PickerSheetProps = {
   open: boolean;
-  pending: Pending | null;
+  request: PickerRequest | null;
   onClose: () => void;
-  onPick: (d: Date) => void;
-}) {
+  onPick: (picked: Date) => void;
+};
+
+/**
+ * Day grid of a month, with month navigation and a shortcut to today.
+ *
+ * The selected day and today are marked with the accent; every other cell only
+ * changes surface while pressed. The cells are drawn once the container has
+ * been measured, because their side is derived from the width.
+ */
+function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
   const accent = useAccent();
   const { weekStart } = usePrefs();
   const [width, setWidth] = useState(0);
-  const [cursor, setCursor] = useState(() => new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [session, setSession] = useState(0);
 
-  // Al abrir, la rejilla se sitúa en el mes del valor actual.
-  if (pending && pending.session !== session) {
-    setSession(pending.session);
-    setCursor(pending.value);
+  /** On opening, the grid moves to the month of the current value. */
+  if (request && request.session !== session) {
+    setSession(request.session);
+    setVisibleMonth(request.value);
   }
 
-  const selected = pending?.value;
-  const rows = monthRows(cursor.getFullYear(), cursor.getMonth(), weekStart);
-
-  const cell = width > 0 ? (width - CELL_GAP * 6) / 7 : 0;
+  const selected = request?.value;
+  const rows = monthRows(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth(),
+    weekStart,
+  );
+  const cellSize = gridCellSize(width, CELL_GAP, COLUMNS);
 
   return (
     <Sheet open={open} onClose={onClose} title="Elegir día">
@@ -112,77 +164,82 @@ function DateSheet({
         <IconButton
           size={30}
           label="Mes anterior"
-          onPress={() => setCursor((c) => addMonths(c, -1))}>
+          onPress={() => setVisibleMonth((month) => addMonths(month, -1))}>
           <CaretLeftIcon size={14} color={color.textMuted} />
         </IconButton>
+
         <View style={styles.monthName}>
-          <T w={500} style={styles.monthLabel}>
-            {MONTHS[cursor.getMonth()]}
-          </T>
-          <T style={styles.yearLabel}>{cursor.getFullYear()}</T>
+          <AppText weight={500} style={styles.monthLabel}>
+            {MONTHS[visibleMonth.getMonth()]}
+          </AppText>
+          <AppText style={styles.yearLabel}>
+            {visibleMonth.getFullYear()}
+          </AppText>
         </View>
+
         <Pressable
           accessibilityRole="button"
           hitSlop={hitSlopFor(28)}
-          onPress={() => setCursor(new Date())}
-          style={styles.todayBtn}>
-          <T style={[styles.todayLabel, { color: accent }]}>HOY</T>
+          onPress={() => setVisibleMonth(new Date())}
+          style={styles.todayButton}>
+          <AppText style={[styles.todayLabel, { color: accent }]}>HOY</AppText>
         </Pressable>
+
         <IconButton
           size={30}
           label="Mes siguiente"
-          onPress={() => setCursor((c) => addMonths(c, 1))}>
+          onPress={() => setVisibleMonth((month) => addMonths(month, 1))}>
           <CaretRightIcon size={14} color={color.textMuted} />
         </IconButton>
       </View>
 
-      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        <View style={styles.weekdayRow}>
-          {dowInitials(weekStart).map((wd, i) => (
-            <T key={i} style={[styles.weekday, { width: cell }]}>
-              {wd}
-            </T>
-          ))}
-        </View>
+      <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        <WeekdayRow cellWidth={cellSize} gap={CELL_GAP} />
 
-        {cell > 0
-          ? rows.map((row, r) => (
-              <View key={r} style={styles.gridRow}>
-                {row.map((day, c) => {
-                  if (!day)
-                    return <View key={c} style={{ width: cell, height: cell }} />;
+        {cellSize > 0
+          ? rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.gridRow}>
+                {row.map((day, columnIndex) => {
+                  if (!day) {
+                    return (
+                      <View
+                        key={columnIndex}
+                        style={{ width: cellSize, height: cellSize }}
+                      />
+                    );
+                  }
 
-                  const on = !!selected && isSameDay(day, selected);
-                  const today = isToday(day);
+                  const isSelected = !!selected && isSameDay(day, selected);
+                  const marked = isSelected || isToday(day);
 
                   return (
                     <Pressable
-                      key={c}
+                      key={columnIndex}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
+                      accessibilityState={{ selected: isSelected }}
                       accessibilityLabel={`${day.getDate()} de ${MONTHS[day.getMonth()]}`}
                       onPress={() => onPick(startOfDay(day))}
                       style={({ pressed }) => [
                         styles.cell,
                         {
-                          width: cell,
-                          height: cell,
-                          borderColor: on || today ? accent : 'transparent',
-                          backgroundColor: on
-                            ? alpha(accent, 0.16)
+                          width: cellSize,
+                          height: cellSize,
+                          borderColor: marked ? accent : 'transparent',
+                          backgroundColor: isSelected
+                            ? alpha(accent, tint.selected)
                             : pressed
                               ? color.cardHover
                               : color.card,
                         },
                       ]}>
-                      <T
-                        w={on ? 500 : 300}
+                      <AppText
+                        weight={isSelected ? 500 : 300}
                         style={{
                           fontSize: 13,
-                          color: on || today ? accent : color.textSoft,
+                          color: marked ? accent : color.textSoft,
                         }}>
                         {day.getDate()}
-                      </T>
+                      </AppText>
                     </Pressable>
                   );
                 })}
@@ -194,51 +251,52 @@ function DateSheet({
   );
 }
 
-// ---------------------------------------------------------------- hora
-
-function TimeSheet({
-  open,
-  pending,
-  onClose,
-  onPick,
-}: {
-  open: boolean;
-  pending: Pending | null;
-  onClose: () => void;
-  onPick: (d: Date) => void;
-}) {
-  const base = pending?.value ?? new Date();
-  const [hour, setHour] = useState(base.getHours());
-  const [minute, setMinute] = useState(
-    Math.round(base.getMinutes() / MINUTE_STEP) * MINUTE_STEP,
-  );
+/**
+ * Two wheels, hours and minutes, with the selection band in the middle.
+ *
+ * Unlike the date, the time is not applied while spinning: it has to be
+ * confirmed with LISTO, because spinning passes through many intermediate
+ * values.
+ */
+function TimeSheet({ open, request, onClose, onPick }: PickerSheetProps) {
+  const baseDate = request?.value ?? new Date();
+  const [hour, setHour] = useState(baseDate.getHours());
+  const [minute, setMinute] = useState(snapToStep(baseDate.getMinutes()));
   const [session, setSession] = useState(0);
 
-  if (pending && pending.session !== session) {
-    setSession(pending.session);
-    setHour(pending.value.getHours());
-    setMinute(
-      (Math.round(pending.value.getMinutes() / MINUTE_STEP) * MINUTE_STEP) % 60,
-    );
+  /** On opening, the wheels go back to the time of the current value. */
+  if (request && request.session !== session) {
+    setSession(request.session);
+    setHour(request.value.getHours());
+    setMinute(snapToStep(request.value.getMinutes()));
   }
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP);
+  const hours = Array.from({ length: HOURS_PER_DAY }, (_, index) => index);
+  const minutes = Array.from(
+    { length: MINUTES_PER_HOUR / MINUTE_STEP },
+    (_, index) => index * MINUTE_STEP,
+  );
+
+  const confirm = () => {
+    const picked = new Date(baseDate);
+    picked.setHours(hour, minute, 0, 0);
+    onPick(picked);
+  };
 
   return (
     <Sheet open={open} onClose={onClose} title="Elegir hora">
       <View style={styles.wheels}>
         <View style={styles.band} pointerEvents="none" />
         <Wheel
-          key={`h-${session}`}
+          key={`hour-${session}`}
           label="hora"
           values={hours}
           selected={hour}
           onChange={setHour}
         />
-        <T style={styles.colon}>:</T>
+        <AppText style={styles.colon}>:</AppText>
         <Wheel
-          key={`m-${session}`}
+          key={`minute-${session}`}
           label="minutos"
           values={minutes}
           selected={minute}
@@ -246,19 +304,31 @@ function TimeSheet({
         />
       </View>
 
-      <Cta
-        primary
-        label="LISTO"
-        onPress={() => {
-          const d = new Date(base);
-          d.setHours(hour, minute, 0, 0);
-          onPick(d);
-        }}
-      />
+      <Cta primary label="LISTO" onPress={confirm} />
     </Sheet>
   );
 }
 
+/**
+ * Rounds minutes to the step of the wheel.
+ *
+ * Precondition: `minutes` is between 0 and 59. Postcondition: the result is a
+ * multiple of `MINUTE_STEP` and still below 60, so 58 does not become 60 but 0.
+ *
+ * @param minutes Minutes of the original time.
+ */
+function snapToStep(minutes: number) {
+  return (
+    (Math.round(minutes / MINUTE_STEP) * MINUTE_STEP) % MINUTES_PER_HOUR
+  );
+}
+
+/**
+ * One wheel of the time picker: a scroll that snaps to its rows and reports the
+ * value left in the middle.
+ *
+ * The selected value is drawn larger and in the accent.
+ */
 function Wheel({
   label,
   values,
@@ -268,45 +338,49 @@ function Wheel({
   label: string;
   values: number[];
   selected: number;
-  onChange: (v: number) => void;
+  onChange: (value: number) => void;
 }) {
   const accent = useAccent();
-  // Posición de partida fija: si `contentOffset` cambiara al desplazarse, RN lo
-  // reaplicaría y pelearía con el gesto. La rueda se remonta por `key`.
+
+  /**
+   * Fixed starting position: if `contentOffset` changed while scrolling, React
+   * Native would reapply it and fight the gesture. The wheel is remounted by
+   * `key` when the sheet reopens.
+   */
   const [initialOffset] = useState(
-    () => Math.max(0, values.indexOf(selected)) * ITEM_H,
+    () => Math.max(0, values.indexOf(selected)) * ITEM_HEIGHT,
   );
 
   return (
     <ScrollView
       accessibilityLabel={label}
       showsVerticalScrollIndicator={false}
-      snapToInterval={ITEM_H}
+      snapToInterval={ITEM_HEIGHT}
       decelerationRate="fast"
       scrollEventThrottle={32}
       contentOffset={{ x: 0, y: initialOffset }}
       style={styles.wheel}
-      contentContainerStyle={{
-        paddingVertical: (ITEM_H * (VISIBLE - 1)) / 2,
-      }}
-      onScroll={(e) => {
-        // Solo se avisa al cruzar de valor, no en cada frame.
-        const next = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-        const clamped = Math.min(values.length - 1, Math.max(0, next));
-        if (values[clamped] !== selected) onChange(values[clamped]);
+      contentContainerStyle={styles.wheelContent}
+      onScroll={(event) => {
+        /** It only reports on crossing to another value, not on every frame. */
+        const centered = Math.round(
+          event.nativeEvent.contentOffset.y / ITEM_HEIGHT,
+        );
+        const index = Math.min(values.length - 1, Math.max(0, centered));
+        if (values[index] !== selected) onChange(values[index]);
       }}>
-      {values.map((v) => {
-        const on = v === selected;
+      {values.map((value) => {
+        const isSelected = value === selected;
         return (
-          <View key={v} style={styles.wheelItem}>
-            <T
-              w={on ? 500 : 300}
+          <View key={value} style={styles.wheelItem}>
+            <AppText
+              weight={isSelected ? 500 : 300}
               style={{
-                fontSize: on ? 22 : 18,
-                color: on ? accent : color.labelDim,
+                fontSize: isSelected ? 22 : 18,
+                color: isSelected ? accent : color.labelDim,
               }}>
-              {String(v).padStart(2, '0')}
-            </T>
+              {String(value).padStart(2, '0')}
+            </AppText>
           </View>
         );
       })}
@@ -325,19 +399,8 @@ const styles = StyleSheet.create({
   },
   monthLabel: { fontSize: 14, letterSpacing: -0.2 },
   yearLabel: { fontSize: 9, letterSpacing: 1.4, color: color.labelDim },
-  todayBtn: { paddingHorizontal: 8 },
+  todayButton: { paddingHorizontal: 8 },
   todayLabel: { fontSize: 9, letterSpacing: 1.4 },
-  weekdayRow: {
-    flexDirection: 'row',
-    gap: CELL_GAP,
-    marginBottom: CELL_GAP,
-  },
-  weekday: {
-    fontSize: 8,
-    letterSpacing: 1.2,
-    color: color.faint,
-    textAlign: 'center',
-  },
   gridRow: { flexDirection: 'row', gap: CELL_GAP, marginBottom: CELL_GAP },
   cell: {
     borderRadius: radius.chip,
@@ -346,25 +409,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   wheels: {
-    // Ancho fijo para que la banda de selección abrace justo a las dos ruedas.
-    width: 86 * 2 + 4 * 2 + 14,
+    /** Fixed width so the selection band hugs exactly the two wheels. */
+    width: WHEEL_WIDTH * 2 + WHEEL_GAP * 2 + COLON_WIDTH,
     alignSelf: 'center',
-    height: ITEM_H * VISIBLE,
+    height: ITEM_HEIGHT * VISIBLE_ITEMS,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: WHEEL_GAP,
   },
   band: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: (ITEM_H * (VISIBLE - 1)) / 2,
-    height: ITEM_H,
+    top: (ITEM_HEIGHT * (VISIBLE_ITEMS - 1)) / 2,
+    height: ITEM_HEIGHT,
     borderRadius: radius.control,
     backgroundColor: color.cardHover,
   },
-  wheel: { width: 86 },
-  wheelItem: { height: ITEM_H, alignItems: 'center', justifyContent: 'center' },
-  colon: { width: 14, textAlign: 'center', fontSize: 20, color: color.faint },
+  wheel: { width: WHEEL_WIDTH },
+  wheelContent: { paddingVertical: (ITEM_HEIGHT * (VISIBLE_ITEMS - 1)) / 2 },
+  wheelItem: {
+    height: ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colon: {
+    width: COLON_WIDTH,
+    textAlign: 'center',
+    fontSize: 20,
+    color: color.faint,
+  },
 });

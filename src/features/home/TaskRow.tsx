@@ -1,23 +1,33 @@
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { taskMeta } from '@/store/selectors';
-import { T } from '@/theme/Text';
+import { taskDueLabel } from '@/store/selectors';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { color, hitSlopFor } from '@/theme/tokens';
-import { CheckIcon, SlidersHorizontalIcon } from '@/ui/icons';
+import { color, radius } from '@/theme/tokens';
+import { CheckIcon } from '@/ui/icons';
 import type { Task } from '@/types';
+import { ItemSettingsButton } from './ItemSettingsButton';
 
-type Props = {
+/** Side of the button that opens the task detail. */
+const SETTINGS_SIZE = 28;
+
+type TaskRowProps = {
   task: Task;
   onToggle: () => void;
   onOpenSettings: () => void;
 };
 
-/** Fila de tarea: 42px de alto, 54 de área táctil (handoff §5). */
-export function TaskRow({ task, onToggle, onOpenSettings }: Props) {
+/**
+ * Task row on Home (handoff §5): completion circle, title and the due label.
+ *
+ * Tapping the row completes or uncompletes the task; once done, the title is
+ * struck through with the accent and dimmed. The label on the right only
+ * appears when the task has a date or an approximate month.
+ */
+export function TaskRow({ task, onToggle, onOpenSettings }: TaskRowProps) {
   const accent = useAccent();
-  const meta = taskMeta(task);
+  const dueLabel = taskDueLabel(task);
 
   return (
     <Pressable
@@ -37,39 +47,35 @@ export function TaskRow({ task, onToggle, onOpenSettings }: Props) {
         style={[
           styles.check,
           {
-            borderColor: task.done ? accent : '#3a3a42',
+            borderColor: task.done ? accent : color.outline,
             backgroundColor: task.done ? accent : 'transparent',
           },
         ]}>
-        {task.done ? <CheckIcon size={12} color={color.text} weight="bold" /> : null}
+        {task.done ? (
+          <CheckIcon size={12} color={color.text} weight="bold" />
+        ) : null}
       </View>
 
-      <T
+      <AppText
         numberOfLines={1}
         style={[
           styles.title,
           {
-            color: task.done ? '#5c5c65' : '#e9e9ec',
+            color: task.done ? color.textDisabled : color.textBody,
             textDecorationLine: task.done ? 'line-through' : 'none',
             textDecorationColor: accent,
           },
         ]}>
         {task.title}
-      </T>
+      </AppText>
 
-      {meta ? <T style={styles.meta}>{meta}</T> : null}
+      {dueLabel ? <AppText style={styles.due}>{dueLabel}</AppText> : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Ajustes de la tarea"
-        hitSlop={hitSlopFor(28)}
+      <ItemSettingsButton
+        label="Ajustes de la tarea"
+        size={SETTINGS_SIZE}
         onPress={onOpenSettings}
-        style={({ pressed }) => [
-          styles.cog,
-          pressed && { backgroundColor: '#1d1d21' },
-        ]}>
-        <SlidersHorizontalIcon size={17} color="#5a5a62" />
-      </Pressable>
+      />
     </Pressable>
   );
 }
@@ -81,7 +87,7 @@ const styles = StyleSheet.create({
     gap: 11,
     height: 42,
     paddingHorizontal: 4,
-    borderRadius: 12,
+    borderRadius: radius.chip,
   },
   check: {
     width: 20,
@@ -92,12 +98,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: { flex: 1, fontSize: 13.5, letterSpacing: -0.1 },
-  meta: { fontSize: 9.5, letterSpacing: 0.8, color: color.labelDim },
-  cog: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  due: { fontSize: 9.5, letterSpacing: 0.8, color: color.labelDim },
 });

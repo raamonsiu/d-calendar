@@ -1,30 +1,35 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { alpha, color, radius } from '@/theme/tokens';
+import { alpha, color, radius, tint } from '@/theme/tokens';
 
-type Props = {
+type ChipProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
-  /** Punto de color a la izquierda (chips de calendario). */
-  dot?: string;
-  /** `grow` reparte el ancho a partes iguales (opciones y días de la semana). */
+  /** Colour dot on the left, on the calendar chips. */
+  dotColor?: string;
+  /** `grow` splits the width evenly (options and weekdays). */
   grow?: boolean;
   height?: number;
   style?: ViewStyle;
 };
 
+/**
+ * Selection chip. Once selected it is marked with the border and an accent
+ * tint; the colour dot only appears when `dotColor` is passed, and with `grow`
+ * the chip stretches to share out the row.
+ */
 export function Chip({
   label,
   selected,
   onPress,
-  dot,
+  dotColor,
   grow,
   height = 31,
   style,
-}: Props) {
+}: ChipProps) {
   const accent = useAccent();
 
   return (
@@ -41,18 +46,21 @@ export function Chip({
           justifyContent: grow ? 'center' : 'flex-start',
           paddingHorizontal: grow ? 4 : 12,
           borderColor: selected ? accent : color.border,
-          backgroundColor: selected ? alpha(accent, 0.09) : color.card,
+          backgroundColor: selected ? alpha(accent, tint.chip) : color.card,
         },
         style,
       ]}>
-      {dot ? (
-        <View style={[styles.dot, { backgroundColor: dot }]} />
+      {dotColor ? (
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
       ) : null}
-      <T
+      <AppText
         numberOfLines={1}
-        style={{ fontSize: 10.5, color: selected ? color.text : color.textMuted }}>
+        style={{
+          fontSize: 10.5,
+          color: selected ? color.text : color.textMuted,
+        }}>
         {label}
-      </T>
+      </AppText>
     </Pressable>
   );
 }

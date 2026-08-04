@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useAppStore } from '@/store/useAppStore';
-import { Label, T } from '@/theme/Text';
+import { AppText, Label } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
@@ -11,71 +11,89 @@ import { useToast } from '@/ui/Toast';
 import { Cta } from '@/ui/controls';
 import type { Provider } from '@/types';
 
+/** Providers that can be connected with an account. */
 const PROVIDERS: { label: string; value: Provider }[] = [
   { label: 'Google', value: 'GOOGLE' },
   { label: 'iCloud', value: 'ICLOUD' },
   { label: 'Outlook', value: 'OUTLOOK' },
 ];
 
-type Props = {
+/** Minimal email validation: some text, an at sign and a dotted domain. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type SourceMode = 'account' | 'subscription';
+
+type AddSourceSheetProps = {
   open: boolean;
   onClose: () => void;
-  /** Proveedor preseleccionado al abrir desde Ajustes › Conectar. */
+  /** Provider preselected when opening from Settings › Conectar. */
   initialProvider?: Provider;
 };
 
 /**
- * Alta de cuenta o suscripción. Mock: no hay OAuth ni descarga del .ics,
- * la fuente se añade solo al estado local.
+ * Adding an account or a URL subscription.
+ *
+ * Both tabs share the sheet and the CTA, and swap the form and the validation:
+ * the account needs a well formed email, the subscription a name and a URL. The
+ * CTA stays disabled until its own side is valid.
+ *
+ * Mock: there is no OAuth and no `.ics` download; the source is only added to
+ * local state.
  */
-export function AddSourceSheet({ open, onClose, initialProvider }: Props) {
-  const connectAccount = useAppStore((s) => s.connectAccount);
-  const subscribeCalendar = useAppStore((s) => s.subscribeCalendar);
+export function AddSourceSheet({
+  open,
+  onClose,
+  initialProvider,
+}: AddSourceSheetProps) {
+  const connectAccount = useAppStore((state) => state.connectAccount);
+  const subscribeCalendar = useAppStore((state) => state.subscribeCalendar);
   const toast = useToast();
 
-  const [tab, setTab] = useState<'account' | 'url'>('account');
+  const [mode, setMode] = useState<SourceMode>('account');
   const [provider, setProvider] = useState<Provider>('GOOGLE');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
-  // Al abrir desde Ajustes › Conectar se preselecciona el proveedor. Se ajusta
-  // en el render (patrón de estado derivado) en vez de en un efecto.
+  /**
+   * Opening from Settings › Conectar preselects the provider. It is adjusted
+   * during render (derived state) instead of in an effect, which would trigger
+   * a second paint.
+   */
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open && initialProvider) {
-      setTab('account');
+      setMode('account');
       setProvider(initialProvider);
     }
   }
 
-  const reset = () => {
+  const close = () => {
     setEmail('');
     setName('');
     setUrl('');
-  };
-
-  const close = () => {
-    reset();
     onClose();
   };
 
+  const isValid =
+    mode === 'account'
+      ? EMAIL_PATTERN.test(email.trim())
+      : name.trim().length > 0 && url.trim().length > 0;
+
   const submit = () => {
-    if (tab === 'account') {
+    if (mode === 'account') {
       connectAccount(provider, email.trim());
       toast.show(`Cuenta ${email.trim()} conectada`);
     } else {
-      subscribeCalendar(name.trim(), url.trim().endsWith('.ics') ? 'ICS' : 'CALDAV');
+      subscribeCalendar(
+        name.trim(),
+        url.trim().endsWith('.ics') ? 'ICS' : 'CALDAV',
+      );
       toast.show(`${name.trim()} suscrito`);
     }
     close();
   };
-
-  const valid =
-    tab === 'account'
-      ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-      : name.trim().length > 0 && url.trim().length > 0;
 
   return (
     <Sheet open={open} onClose={close} title="Añadir cuenta o calendario">
@@ -84,29 +102,29 @@ export function AddSourceSheet({ open, onClose, initialProvider }: Props) {
           grow
           height={34}
           label="CUENTA"
-          selected={tab === 'account'}
-          onPress={() => setTab('account')}
+          selected={mode === 'account'}
+          onPress={() => setMode('account')}
         />
         <Chip
           grow
           height={34}
           label="SUSCRIPCIÓN"
-          selected={tab === 'url'}
-          onPress={() => setTab('url')}
+          selected={mode === 'subscription'}
+          onPress={() => setMode('subscription')}
         />
       </View>
 
-      {tab === 'account' ? (
+      {mode === 'account' ? (
         <View style={styles.body}>
           <Label size={9}>Proveedor</Label>
           <View style={styles.row}>
-            {PROVIDERS.map((p) => (
+            {PROVIDERS.map((option) => (
               <Chip
-                key={p.value}
+                key={option.value}
                 grow
-                label={p.label}
-                selected={provider === p.value}
-                onPress={() => setProvider(p.value)}
+                label={option.label}
+                selected={provider === option.value}
+                onPress={() => setProvider(option.value)}
               />
             ))}
           </View>
@@ -117,10 +135,10 @@ export function AddSourceSheet({ open, onClose, initialProvider }: Props) {
             value={email}
             onChangeText={setEmail}
           />
-          <T style={styles.note}>
+          <AppText style={styles.note}>
             En esta versión no se abre el navegador: la cuenta se añade en local
             para poder probar la interfaz.
-          </T>
+          </AppText>
         </View>
       ) : (
         <View style={styles.body}>
@@ -136,16 +154,16 @@ export function AddSourceSheet({ open, onClose, initialProvider }: Props) {
             value={url}
             onChangeText={setUrl}
           />
-          <T style={styles.note}>
+          <AppText style={styles.note}>
             Los calendarios suscritos por URL son de solo lectura.
-          </T>
+          </AppText>
         </View>
       )}
 
       <Cta
         primary
-        disabled={!valid}
-        label={tab === 'account' ? 'CONECTAR' : 'SUSCRIBIR'}
+        disabled={!isValid}
+        label={mode === 'account' ? 'CONECTAR' : 'SUSCRIBIR'}
         onPress={submit}
       />
     </Sheet>

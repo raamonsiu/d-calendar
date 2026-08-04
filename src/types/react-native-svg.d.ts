@@ -1,8 +1,9 @@
 /**
- * `phosphor-react-native` se importa desde su fuente (`src/icons/*`) para no
- * arrastrar los ~1500 iconos al bundle, y su `IconBase` pasa `className` al
- * `<Svg>`, que react-native-svg no declara. Se añade aquí para que el
- * typecheck del proyecto no falle por un archivo de terceros.
+ * `phosphor-react-native` is imported from its source (`src/icons/*`) so the
+ * ~1500 icons do not end up in the bundle, and its `IconBase` passes
+ * `className` down to `<Svg>`, which react-native-svg does not declare. It is
+ * added here so the project typecheck does not fail because of a third party
+ * file.
  */
 export {};
 

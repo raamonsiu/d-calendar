@@ -2,11 +2,15 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Label } from '@/theme/Text';
+import { space } from '@/theme/tokens';
 
-/** Grupo de ajustes: micro-etiqueta + items separados con gap 5 (handoff §4a). */
+/**
+ * A group on a list screen (Settings, Calendars, Help, About): micro label on
+ * top and the items separated by the "gap Nothing" gap (handoff §4a).
+ */
 export function Group({
   title,
-  gap = 5,
+  gap = space.gap,
   children,
 }: {
   title: string;

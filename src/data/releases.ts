@@ -1,8 +1,14 @@
+/**
+ * App version and release notes, which is what About and the changelog sheet
+ * show. It is also where the side menu reads the version from.
+ */
+
 export type Release = { version: string; date: string; notes: string[] };
 
 export const APP_VERSION = '1.4';
 export const APP_BUILD = '240';
 
+/** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
   {
     version: '1.4',

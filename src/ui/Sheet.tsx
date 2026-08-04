@@ -11,64 +11,94 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Label } from '@/theme/Text';
 import { useDuration } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { OVERLAY_OPACITY, color, duration, radius } from '@/theme/tokens';
 import { XIcon } from './icons';
 import { usePanelTransition } from './usePanelTransition';
 
-/** Aire entre el sheet y el teclado cuando está abierto. */
+/** Room between the sheet and the keyboard while it is open. */
 const KEYBOARD_GAP = 16;
 
-type Props = {
+/** Minimum distance from the screen edges. */
+const SCREEN_INSET = 10;
+
+/** Height of the header, which is also the drag area. */
+const HEADER_PADDING = 16;
+
+/** Extra travel on the way out so the sheet disappears completely. */
+const EXIT_OVERSHOOT = 24;
+
+/** Drag and velocity past which the gesture closes the sheet. */
+const CLOSE_DRAG = 90;
+const CLOSE_VELOCITY = 800;
+
+/** Gesture threshold: below this the touch is still a tap. */
+const DRAG_ACTIVATION = 10;
+
+type SheetProps = {
   open: boolean;
   onClose: () => void;
-  /** Micro-etiqueta de la cabecera, que además es la zona de arrastre. */
+  /** Micro label of the header, which is also the drag area. */
   title?: string;
   children: ReactNode;
 };
 
 /**
- * Bottom sheet del diseño: tarjeta flotante separada 10px de los bordes,
- * radio 28, overlay negro al 55%. Se monta dentro de la pantalla (no en un
- * Modal) para que quede exactamente como el prototipo.
+ * Bottom sheet from the design: a floating card 10px off the edges, radius 28
+ * and a black overlay at 55%. It is mounted inside the screen instead of in a
+ * `Modal` so it comes out exactly like the prototype.
  *
- * El gesto de cierre vive solo en la cabecera: si cubriera toda la tarjeta
- * competiría con los scrolls internos (ruedas de hora, changelog).
+ * It closes in three ways: tapping the overlay, with the X in the header, or
+ * dragging the header down. The gesture lives in the header only because
+ * covering the whole card would make it compete with the inner scrolls (the
+ * time picker wheels, the changelog list).
+ *
+ * Without `title` no header is drawn, and then there is no drag gesture either.
  */
-export function Sheet({ open, onClose, title, children }: Props) {
-  const dur = useDuration();
+export function Sheet({ open, onClose, title, children }: SheetProps) {
+  const resolveDuration = useDuration();
   const insets = useSafeAreaInsets();
   const { mounted, progress } = usePanelTransition(open, onClose);
 
-  const sheetH = useSharedValue(600);
-  const drag = useSharedValue(0);
-  const keyboard = useSharedValue(0);
+  const sheetHeight = useSharedValue(600);
+  const dragOffset = useSharedValue(0);
+  const keyboardLift = useSharedValue(0);
 
-  // La app dibuja edge-to-edge, así que la ventana no se redimensiona sola:
-  // el sheet sube con el teclado a mano.
+  /**
+   * The app draws edge to edge, so the window does not resize itself when the
+   * keyboard opens: the sheet lifts by hand until it is clear of it.
+   */
   useEffect(() => {
-    const ios = Platform.OS === 'ios';
-    const show = Keyboard.addListener(
-      ios ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
+    const isIos = Platform.OS === 'ios';
+
+    const showSubscription = Keyboard.addListener(
+      isIos ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
         const lift =
-          Math.max(0, e.endCoordinates.height - insets.bottom) + KEYBOARD_GAP;
-        keyboard.value = withTiming(lift, { duration: dur(220) });
+          Math.max(0, event.endCoordinates.height - insets.bottom) +
+          KEYBOARD_GAP;
+        keyboardLift.value = withTiming(lift, {
+          duration: resolveDuration(duration.state),
+        });
       },
     );
-    const hide = Keyboard.addListener(
-      ios ? 'keyboardWillHide' : 'keyboardDidHide',
+
+    const hideSubscription = Keyboard.addListener(
+      isIos ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
-        keyboard.value = withTiming(0, { duration: dur(180) });
+        keyboardLift.value = withTiming(0, {
+          duration: resolveDuration(duration.press),
+        });
       },
     );
+
     return () => {
-      show.remove();
-      hide.remove();
+      showSubscription.remove();
+      hideSubscription.remove();
     };
-  }, [insets.bottom, keyboard, dur]);
+  }, [insets.bottom, keyboardLift, resolveDuration]);
 
   const overlayStyle = useAnimatedStyle(() => ({
-    opacity: progress.value * 0.55,
+    opacity: progress.value * OVERLAY_OPACITY,
   }));
 
   const sheetStyle = useAnimatedStyle(() => ({
@@ -76,23 +106,27 @@ export function Sheet({ open, onClose, title, children }: Props) {
     transform: [
       {
         translateY:
-          (1 - progress.value) * (sheetH.value + 24) +
-          drag.value -
-          keyboard.value,
+          (1 - progress.value) * (sheetHeight.value + EXIT_OVERSHOOT) +
+          dragOffset.value -
+          keyboardLift.value,
       },
     ],
   }));
 
-  const pan = Gesture.Pan()
-    .activeOffsetY(10)
-    .failOffsetY(-10)
-    .onChange((e) => {
-      drag.value = Math.max(0, drag.value + e.changeY);
+  const dragGesture = Gesture.Pan()
+    .activeOffsetY(DRAG_ACTIVATION)
+    .failOffsetY(-DRAG_ACTIVATION)
+    .onChange((event) => {
+      dragOffset.value = Math.max(0, dragOffset.value + event.changeY);
     })
-    .onEnd((e) => {
-      const shouldClose = drag.value > 90 || e.velocityY > 800;
-      // Siempre vuelve a 0: al reabrir, el sheet parte de su sitio.
-      drag.value = withTiming(0, { duration: 180 });
+    .onEnd((event) => {
+      const shouldClose =
+        dragOffset.value > CLOSE_DRAG || event.velocityY > CLOSE_VELOCITY;
+      /**
+       * It always goes back to 0: on reopening, the sheet starts from its
+       * place.
+       */
+      dragOffset.value = withTiming(0, { duration: duration.press });
       if (shouldClose) runOnJS(onClose)();
     });
 
@@ -110,16 +144,16 @@ export function Sheet({ open, onClose, title, children }: Props) {
       </Pressable>
 
       <Animated.View
-        onLayout={(e) => {
-          sheetH.value = e.nativeEvent.layout.height;
+        onLayout={(event) => {
+          sheetHeight.value = event.nativeEvent.layout.height;
         }}
         style={[
           styles.sheet,
-          { bottom: Math.max(10, insets.bottom) },
+          { bottom: Math.max(SCREEN_INSET, insets.bottom) },
           sheetStyle,
         ]}>
         {title ? (
-          <GestureDetector gesture={pan}>
+          <GestureDetector gesture={dragGesture}>
             <View style={styles.header}>
               <Label>{title}</Label>
               <Pressable
@@ -139,23 +173,25 @@ export function Sheet({ open, onClose, title, children }: Props) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { backgroundColor: '#000' },
+  overlay: { backgroundColor: color.scrim },
   sheet: {
     position: 'absolute',
-    left: 10,
-    right: 10,
+    left: SCREEN_INSET,
+    right: SCREEN_INSET,
     backgroundColor: color.surface,
-    borderRadius: 28,
-    paddingTop: 16,
+    borderRadius: radius.sheet,
+    paddingTop: HEADER_PADDING,
     paddingHorizontal: 14,
     paddingBottom: 14,
     gap: 12,
   },
   header: {
-    // Se come el padding superior del sheet para que la zona de arrastre
-    // abarque también ese aire, no solo la altura del texto.
-    marginTop: -16,
-    paddingTop: 16,
+    /**
+     * It eats the top padding of the sheet so the drag area covers that room
+     * too, not just the height of the text.
+     */
+    marginTop: -HEADER_PADDING,
+    paddingTop: HEADER_PADDING,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -164,7 +200,7 @@ const styles = StyleSheet.create({
   close: {
     width: 26,
     height: 26,
-    borderRadius: 9,
+    borderRadius: radius.joined,
     alignItems: 'center',
     justifyContent: 'center',
   },

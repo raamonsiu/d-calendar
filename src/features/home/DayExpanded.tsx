@@ -6,42 +6,68 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
-import { addDays, dowInitial, isToday, startOfDay } from '@/lib/date';
+import { MS_PER_DAY, addDays, isToday, startOfDay, weekdayInitial } from '@/lib/date';
+import { indexOfDay } from '@/lib/layout';
 import { eventsForDay, layoutDay } from '@/store/selectors';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
-import { HOUR_W, RAIL_W, START_H, END_H } from './TodayTimeline';
+import {
+  HOUR_WIDTH,
+  HourGridLines,
+  HourRuler,
+  RAIL_WIDTH,
+  START_HOUR,
+} from './hourRail';
 
+/** Days that can be scrolled through backwards and forwards. */
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
-const ROW_H = 132;
-const HEADER_H = 18;
-const GUTTER_W = 44;
-/** Dos carriles dentro de la fila. */
+
+/** Height of a day row, of the hour row, and width of the day column. */
+export const DAY_ROW_HEIGHT = 132;
+const RULER_HEIGHT = 18;
+const GUTTER_WIDTH = 44;
+
+/** The two lanes inside a day row. */
 const LANE_TOP = [8, 68];
 
-type Props = {
+/** Card height and minimum width for the title to fit. */
+const CARD_HEIGHT = 52;
+const CARD_MIN_WIDTH = 96;
+
+/** Hour the horizontal scroll starts at: the beginning of the working day. */
+const INITIAL_HOUR = 9;
+
+type DayExpandedProps = {
   events: CalEvent[];
-  /** Día al que saltar al montar; por defecto, hoy. */
+  /** Day to jump to on mount; without it, today. */
   focusDay?: Date | null;
   onPressEvent: (event: CalEvent) => void;
 };
 
 /**
- * Día expandido: scroll en los dos ejes. La columna de días queda fija a la
- * izquierda y la fila de horas fija arriba (handoff §5.3).
+ * Expanded day view (handoff §5.3): several days, one per row, scrolling on
+ * both axes.
+ *
+ * The day column stays pinned on the left and the hour row pinned on top. To
+ * pull that off, the column lives outside the horizontal scroll and is moved
+ * vertically by the same offset as the content, read on the UI thread.
  */
-export function DayExpanded({ events, focusDay, onPressEvent }: Props) {
+export function DayExpanded({
+  events,
+  focusDay,
+  onPressEvent,
+}: DayExpandedProps) {
   const accent = useAccent();
   const [height, setHeight] = useState(0);
   const scrollY = useSharedValue(0);
 
   const days = useMemo(() => {
     const first = addDays(startOfDay(new Date()), -DAYS_BEFORE);
-    return Array.from({ length: DAYS_BEFORE + DAYS_AFTER + 1 }, (_, i) =>
-      addDays(first, i),
+    return Array.from({ length: DAYS_BEFORE + DAYS_AFTER + 1 }, (_, offset) =>
+      addDays(first, offset),
     );
   }, []);
 
@@ -49,61 +75,54 @@ export function DayExpanded({ events, focusDay, onPressEvent }: Props) {
     () =>
       days.map((day) => ({
         day,
-        laid: layoutDay(eventsForDay(events, day), START_H, HOUR_W, 96),
+        laidOut: layoutDay(
+          eventsForDay(events, day),
+          START_HOUR,
+          HOUR_WIDTH,
+          CARD_MIN_WIDTH,
+        ),
       })),
     [days, events],
   );
 
-  const onScroll = useAnimatedScrollHandler((e) => {
-    scrollY.value = e.contentOffset.y;
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
   });
 
   const gutterStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -scrollY.value }],
   }));
 
-  const bodyH = Math.max(0, height - HEADER_H);
-
-  const focusIndex = focusDay
-    ? Math.min(
-        days.length - 1,
-        Math.max(
-          0,
-          Math.round(
-            (startOfDay(focusDay).getTime() - days[0].getTime()) / 86400000,
-          ),
-        ),
-      )
-    : DAYS_BEFORE;
+  const bodyHeight = Math.max(0, height - RULER_HEIGHT);
+  const focusIndex = indexOfDay(days, focusDay, DAYS_BEFORE, MS_PER_DAY);
 
   return (
     <View
       style={styles.root}
-      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
-      {/* Columna de días: fuera del scroll horizontal, sincronizada en vertical. */}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
       <View style={styles.gutter}>
-        <View style={{ height: HEADER_H }} />
-        <View style={[styles.gutterClip, { height: bodyH }]}>
+        <View style={{ height: RULER_HEIGHT }} />
+        <View style={[styles.gutterClip, { height: bodyHeight }]}>
           <Animated.View style={gutterStyle}>
             {days.map((day) => {
               const today = isToday(day);
               return (
                 <View key={day.toISOString()} style={styles.gutterRow}>
-                  <T
+                  <AppText
                     style={[
-                      styles.dow,
-                      { color: today ? accent : '#5f5f67' },
+                      styles.gutterInitial,
+                      { color: today ? accent : color.textDim },
                     ]}>
-                    {dowInitial(day)}
-                  </T>
-                  <T
-                    w={400}
+                    {weekdayInitial(day)}
+                  </AppText>
+                  <AppText
+                    weight={400}
                     style={[
-                      styles.gutterNum,
+                      styles.gutterNumber,
                       { color: today ? color.text : color.textMuted },
                     ]}>
                     {day.getDate()}
-                  </T>
+                  </AppText>
                 </View>
               );
             })}
@@ -114,31 +133,25 @@ export function DayExpanded({ events, focusDay, onPressEvent }: Props) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentOffset={{ x: Math.max(0, (9 - START_H) * HOUR_W), y: 0 }}
-        contentContainerStyle={{ width: RAIL_W }}>
-        <View style={{ width: RAIL_W, height }}>
-          <View style={styles.hourRow}>
-            {Array.from({ length: END_H - START_H + 1 }, (_, i) => (
-              <View key={i} style={styles.hourCell}>
-                <T style={styles.hourLabel}>
-                  {String(START_H + i).padStart(2, '0')}
-                </T>
-              </View>
-            ))}
-          </View>
+        contentOffset={{
+          x: Math.max(0, (INITIAL_HOUR - START_HOUR) * HOUR_WIDTH),
+          y: 0,
+        }}
+        contentContainerStyle={styles.railContent}>
+        <View style={{ width: RAIL_WIDTH, height }}>
+          <HourRuler height={RULER_HEIGHT} background={color.box} />
 
           <Animated.ScrollView
             onScroll={onScroll}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
-            contentOffset={{ x: 0, y: focusIndex * ROW_H }}
-            style={{ height: bodyH }}>
-            {rows.map(({ day, laid }) => (
+            contentOffset={{ x: 0, y: focusIndex * DAY_ROW_HEIGHT }}
+            style={{ height: bodyHeight }}>
+            {rows.map(({ day, laidOut }) => (
               <View key={day.toISOString()} style={styles.row}>
-                {Array.from({ length: END_H - START_H + 1 }, (_, i) => (
-                  <View key={i} style={[styles.gridLine, { left: i * HOUR_W }]} />
-                ))}
-                {laid.map(({ event, lane, x, width, startLabel }) => (
+                <HourGridLines />
+
+                {laidOut.map(({ event, lane, left, width, startLabel }) => (
                   <Pressable
                     key={event.id}
                     accessibilityRole="button"
@@ -148,20 +161,20 @@ export function DayExpanded({ events, focusDay, onPressEvent }: Props) {
                       styles.card,
                       {
                         top: LANE_TOP[lane],
-                        left: x,
+                        left,
                         width,
-                        borderColor: pressed ? '#3a3a42' : color.border,
+                        borderColor: pressed ? color.outline : color.border,
                       },
                     ]}>
                     <View style={styles.cardHead}>
                       <View
                         style={[styles.cardDot, { backgroundColor: accent }]}
                       />
-                      <T style={styles.cardTime}>{startLabel}</T>
+                      <AppText style={styles.cardTime}>{startLabel}</AppText>
                     </View>
-                    <T numberOfLines={2} style={styles.cardTitle}>
+                    <AppText numberOfLines={2} style={styles.cardTitle}>
                       {event.title}
-                    </T>
+                    </AppText>
                   </Pressable>
                 ))}
               </View>
@@ -175,47 +188,29 @@ export function DayExpanded({ events, focusDay, onPressEvent }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row' },
-  gutter: { width: GUTTER_W, backgroundColor: color.box, zIndex: 2 },
+  railContent: { width: RAIL_WIDTH },
+  gutter: { width: GUTTER_WIDTH, backgroundColor: color.box, zIndex: 2 },
   gutterClip: { overflow: 'hidden' },
   gutterRow: {
-    height: ROW_H,
+    height: DAY_ROW_HEIGHT,
     justifyContent: 'center',
     gap: 2,
     paddingRight: 6,
     borderTopWidth: 1,
-    borderTopColor: '#17171b',
+    borderTopColor: color.lineSoft,
   },
-  dow: { fontSize: 8, letterSpacing: 1.4 },
-  gutterNum: { fontSize: 17 },
-  hourRow: {
-    flexDirection: 'row',
-    height: HEADER_H,
-    backgroundColor: color.box,
-  },
-  hourCell: {
-    width: HOUR_W,
-    borderLeftWidth: 1,
-    borderLeftColor: color.line,
-    paddingLeft: 6,
-  },
-  hourLabel: { fontSize: 9, letterSpacing: 1.4, color: '#5f5f67' },
+  gutterInitial: { fontSize: 8, letterSpacing: 1.4 },
+  gutterNumber: { fontSize: 17 },
   row: {
-    height: ROW_H,
+    height: DAY_ROW_HEIGHT,
     borderTopWidth: 1,
-    borderTopColor: '#17171b',
-  },
-  gridLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: color.hairline,
+    borderTopColor: color.lineSoft,
   },
   card: {
     position: 'absolute',
-    height: 52,
+    height: CARD_HEIGHT,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: radius.chip,
     backgroundColor: color.cardHover,
     paddingVertical: 6,
     paddingHorizontal: 7,
@@ -224,11 +219,11 @@ const styles = StyleSheet.create({
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   cardDot: { width: 4, height: 4, borderRadius: 2 },
-  cardTime: { fontSize: 8.5, letterSpacing: 0.6, color: '#7d7d85' },
+  cardTime: { fontSize: 8.5, letterSpacing: 0.6, color: color.textSubtle },
   cardTitle: {
     fontSize: 10,
     letterSpacing: -0.2,
     lineHeight: 12.5,
-    color: '#e9e9ec',
+    color: color.textBody,
   },
 });

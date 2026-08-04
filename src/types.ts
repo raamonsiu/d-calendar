@@ -1,3 +1,11 @@
+/**
+ * Data model of the app. Types only: the habit domain logic lives in
+ * `src/lib/habits.ts` and the queries in `src/store/selectors.ts`.
+ *
+ * Instants are stored as timestamps in ms because the store is flat, and that
+ * way they can be compared and serialised without converting.
+ */
+
 export type ItemKind = 'event' | 'task' | 'habit';
 
 export type Provider = 'GOOGLE' | 'ICLOUD' | 'OUTLOOK' | 'CALDAV' | 'ICS';
@@ -5,33 +13,42 @@ export type Provider = 'GOOGLE' | 'ICLOUD' | 'OUTLOOK' | 'CALDAV' | 'ICS';
 export type Account = {
   id: string;
   email: string;
+  /** Letter of the round avatar. */
   initial: string;
   provider: Provider;
 };
 
+/** Label the calendar row shows on the right; '' = none. */
 export type CalendarKind = '' | 'TAREAS' | 'CALDAV' | 'ICS';
 
 export type Calendar = {
   id: string;
   name: string;
-  /** Punto de color del calendario. `null` = usa el acento de la app. */
-  dot: string | null;
+  /** Colour dot of the calendar. `null` = use the app accent. */
+  dotColor: string | null;
   kind: CalendarKind;
-  /** null = «Otros calendarios» (CalDAV / ICS suscritos). */
+  /** null = "Otros calendarios" (subscribed CalDAV / ICS). */
   accountId: string | null;
   visible: boolean;
-  /** Los calendarios suscritos por URL son de solo lectura. */
+  /** Calendars subscribed by URL are read only. */
   readOnly?: boolean;
 };
 
-/** Aviso relativo: n minutos/horas/días antes. */
-export type RelUnit = 0 | 1 | 2;
-export type RelReminder = { id: string; value: number; unit: RelUnit };
+/** Unit of a relative reminder: 0 minutes, 1 hours, 2 days. */
+export type ReminderUnit = 0 | 1 | 2;
 
-/** Aviso de hábito: una hora del día, "09:00". */
+/** Event or task reminder: n minutes, hours or days before. */
+export type RelativeReminder = {
+  id: string;
+  value: number;
+  unit: ReminderUnit;
+};
+
+/** Habit reminder: a time of day in "09:00" format. */
 export type TimeReminder = { id: string; time: string };
 
 export type GuestState = 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
+
 export type Guest = {
   id: string;
   name: string;
@@ -47,18 +64,17 @@ export type CalEvent = {
   id: string;
   title: string;
   description: string;
-  /** Timestamps en ms. */
-  start: number;
-  end: number;
+  startsAt: number;
+  endsAt: number;
   allDay: boolean;
   calendarId: string;
   availability: Availability;
   visibility: Visibility;
   repeat: RepeatRule;
-  /** Índices getDay() (0 = domingo) cuando repeat = 'Días de la semana'. */
+  /** `getDay()` indexes (0 = Sunday) when repeat = 'Días de la semana'. */
   weekdays: number[];
   guests: Guest[];
-  reminders: RelReminder[];
+  reminders: RelativeReminder[];
 };
 
 export type Task = {
@@ -66,52 +82,29 @@ export type Task = {
   title: string;
   description: string;
   calendarId: string;
-  /** Vencimiento exacto en ms, o null si no tiene fecha. */
-  due: number | null;
-  /** Si false, el vencimiento es solo el día (sin hora). */
+  /** Exact due date in ms, or null when there is none. */
+  dueAt: number | null;
+  /** When false, the due date is the day only, with no time. */
   hasTime: boolean;
-  /** «Mes aproximado» cuando no hay fecha exacta: 'Agosto' … 'Sin mes'. */
+  /** Approximate month when there is no exact date: 'Agosto' ... 'Sin mes'. */
   vagueMonth: string | null;
   done: boolean;
-  reminders: RelReminder[];
+  reminders: RelativeReminder[];
 };
 
-export type HabitFreq = 'Diario' | 'Semanal' | 'X por día' | 'X por semana';
+export type HabitFrequency = 'Diario' | 'Semanal' | 'X por día' | 'X por semana';
 
 export type Habit = {
   id: string;
   name: string;
   description: string;
-  freq: HabitFreq;
-  /** Repeticiones necesarias: 1 en diario/semanal, N en x-día/x-semana. */
+  frequency: HabitFrequency;
+  /** Repetitions needed: 1 for daily and weekly, N for the "X por" ones. */
   target: number;
-  /** Índices getDay() en los hábitos semanales. */
+  /** `getDay()` indexes on weekly habits. */
   weekdays: number[];
   reminders: TimeReminder[];
-  /** Repeticiones hechas en el periodo actual. */
+  /** Repetitions done in the current period. */
   progress: number;
   streak: number;
 };
-
-export const isWeeklyFreq = (f: HabitFreq) =>
-  f === 'Semanal' || f === 'X por semana';
-
-export const isMultiFreq = (f: HabitFreq) =>
-  f === 'X por día' || f === 'X por semana';
-
-/** Etiqueta de frecuencia tal y como aparece en la tarjeta del hábito. */
-export function habitFreqLabel(h: Pick<Habit, 'freq' | 'target'>) {
-  switch (h.freq) {
-    case 'Diario':
-      return 'DIARIO';
-    case 'Semanal':
-      return 'SEM.';
-    case 'X por día':
-      return `${h.target}×/DÍA`;
-    case 'X por semana':
-      return `${h.target}×/SEM`;
-  }
-}
-
-export const habitStreakUnit = (h: Pick<Habit, 'freq'>) =>
-  isWeeklyFreq(h.freq) ? 'S' : 'D';

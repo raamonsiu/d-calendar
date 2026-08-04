@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 
+import {
+  insertAt,
+  patchById,
+  withoutId,
+} from '@/lib/collections';
+import { nextHabitProgress, nextHabitStreak, isHabitDone } from '@/lib/habits';
+import { avatarInitial } from '@/lib/text';
+import { color } from '@/theme/tokens';
 import type {
   Account,
   CalEvent,
@@ -11,17 +19,43 @@ import type {
 } from '@/types';
 import { ACCOUNTS, CALENDARS, seedEvents, seedHabits, seedTasks } from './seed';
 
-let counter = 0;
-export const uid = (prefix: string) =>
-  `${prefix}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
+/**
+ * State of the app. It is the only way in to the data: no screen reads or
+ * writes on its own, so replacing this layer with real syncing does not touch
+ * the interface.
+ *
+ * The whole implementation is mock and in memory. Every action makes exactly
+ * one `set` call, so an action never leaves the state half done.
+ */
 
-/** Lo que se guarda para poder deshacer un borrado. */
-export type Removed =
+let idCounter = 0;
+
+/**
+ * Generates an id that is unique within the session.
+ *
+ * Postcondition: two calls never return the same value, not even within the
+ * same millisecond, because the counter is part of the string too.
+ *
+ * @param prefix Prefix identifying the item type ('ev', 'task'...).
+ */
+export function createId(prefix: string) {
+  idCounter += 1;
+  return `${prefix}-${Date.now().toString(36)}-${idCounter.toString(36)}`;
+}
+
+/** How long the sync mock takes to "finish". */
+const MOCK_REFRESH_MS = 1400;
+
+/** Age of the last sync at startup, for the side menu. */
+const INITIAL_SYNC_AGE_MS = 4 * 60 * 1000;
+
+/** What is kept about a deleted item so it can be restored. */
+export type RemovedItem =
   | { kind: 'event'; index: number; item: CalEvent }
   | { kind: 'task'; index: number; item: Task }
   | { kind: 'habit'; index: number; item: Habit };
 
-type State = {
+type AppState = {
   accounts: Account[];
   calendars: Calendar[];
   events: CalEvent[];
@@ -31,7 +65,7 @@ type State = {
   refreshing: boolean;
 };
 
-type Actions = {
+type AppActions = {
   addEvent: (draft: Omit<CalEvent, 'id'>) => string;
   updateEvent: (id: string, patch: Partial<CalEvent>) => void;
 
@@ -42,90 +76,97 @@ type Actions = {
   addHabit: (draft: Omit<Habit, 'id'>) => string;
   updateHabit: (id: string, patch: Partial<Habit>) => void;
   /**
-   * +1 / −1 repetición. Al superar el objetivo con otro press vuelve a 0.
-   * Devuelve true si con este toque el hábito queda completado.
+   * Adds or subtracts one repetition of a habit.
+   *
+   * Postcondition: returns true only when the habit becomes complete with this
+   * tap, which is what triggers the card pulse and the haptic.
    */
   bumpHabit: (id: string, delta: 1 | -1) => boolean;
 
-  removeItem: (kind: ItemKind, id: string) => Removed | null;
-  restoreItem: (removed: Removed) => void;
+  /** Returns what undo needs, or null when the id did not exist. */
+  removeItem: (kind: ItemKind, id: string) => RemovedItem | null;
+  restoreItem: (removed: RemovedItem) => void;
 
   toggleCalendar: (id: string) => void;
   connectAccount: (provider: Provider, email: string) => void;
-  /** Quita la cuenta y sus calendarios. Los elementos locales se conservan. */
+  /** Removes the account and its calendars. Local items are kept. */
   disconnectAccount: (id: string) => void;
   subscribeCalendar: (name: string, kind: 'CALDAV' | 'ICS') => void;
 
   refresh: () => void;
 };
 
-export const useAppStore = create<State & Actions>()((set, get) => ({
+/**
+ * Takes an item out of a list, remembering its position.
+ *
+ * This is the common part of the three deletions: the only thing that changes
+ * between events, tasks and habits is the list being worked on.
+ *
+ * Postcondition: returns null when the id is not in the list. When it is,
+ * `rest` is a new list without it and `index` is the position it held, which is
+ * what `restoreItem` needs to put it back.
+ *
+ * @param list List to take the item out of.
+ * @param id Id of the item being looked for.
+ */
+function extractById<Item extends { id: string }>(list: Item[], id: string) {
+  const index = list.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  return { index, item: list[index], rest: withoutId(list, id) };
+}
+
+export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   accounts: ACCOUNTS,
   calendars: CALENDARS,
   events: seedEvents(),
   tasks: seedTasks(),
   habits: seedHabits(),
-  lastSync: Date.now() - 4 * 60 * 1000,
+  lastSync: Date.now() - INITIAL_SYNC_AGE_MS,
   refreshing: false,
 
   addEvent: (draft) => {
-    const id = uid('ev');
-    set((s) => ({ events: [...s.events, { ...draft, id }] }));
+    const id = createId('ev');
+    set((state) => ({ events: [...state.events, { ...draft, id }] }));
     return id;
   },
   updateEvent: (id, patch) =>
-    set((s) => ({
-      events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-    })),
+    set((state) => ({ events: patchById(state.events, id, patch) })),
 
   addTask: (draft) => {
-    const id = uid('task');
-    set((s) => ({ tasks: [...s.tasks, { ...draft, id }] }));
+    const id = createId('task');
+    set((state) => ({ tasks: [...state.tasks, { ...draft, id }] }));
     return id;
   },
   updateTask: (id, patch) =>
-    set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    })),
+    set((state) => ({ tasks: patchById(state.tasks, id, patch) })),
   toggleTask: (id) =>
-    set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === id ? { ...task, done: !task.done } : task,
+      ),
     })),
 
   addHabit: (draft) => {
-    const id = uid('habit');
-    set((s) => ({ habits: [...s.habits, { ...draft, id }] }));
+    const id = createId('habit');
+    set((state) => ({ habits: [...state.habits, { ...draft, id }] }));
     return id;
   },
   updateHabit: (id, patch) =>
-    set((s) => ({
-      habits: s.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
-    })),
+    set((state) => ({ habits: patchById(state.habits, id, patch) })),
+
   bumpHabit: (id, delta) => {
-    const habit = get().habits.find((h) => h.id === id);
+    const habit = get().habits.find((candidate) => candidate.id === id);
     if (!habit) return false;
 
-    const next =
-      delta === 1
-        ? habit.progress >= habit.target
-          ? 0
-          : habit.progress + 1
-        : Math.max(0, habit.progress - 1);
+    const progress = nextHabitProgress(habit.progress, habit.target, delta);
+    const wasDone = isHabitDone(habit);
+    const isDone = progress >= habit.target;
 
-    const wasDone = habit.progress >= habit.target;
-    const isDone = next >= habit.target;
-
-    set((s) => ({
-      habits: s.habits.map((h) =>
-        h.id === id
-          ? {
-              ...h,
-              progress: next,
-              // La racha sube al completar y baja al deshacer la última.
-              streak: isDone && !wasDone ? h.streak + 1 : wasDone && !isDone ? Math.max(0, h.streak - 1) : h.streak,
-            }
-          : h,
-      ),
+    set((state) => ({
+      habits: patchById(state.habits, id, {
+        progress,
+        streak: nextHabitStreak(habit.streak, wasDone, isDone),
+      }),
     }));
 
     return isDone && !wasDone;
@@ -133,84 +174,86 @@ export const useAppStore = create<State & Actions>()((set, get) => ({
 
   removeItem: (kind, id) => {
     const state = get();
+
     if (kind === 'event') {
-      const index = state.events.findIndex((e) => e.id === id);
-      if (index < 0) return null;
-      const item = state.events[index];
-      set((s) => ({ events: s.events.filter((e) => e.id !== id) }));
-      return { kind, index, item };
+      const removed = extractById(state.events, id);
+      if (!removed) return null;
+      set({ events: removed.rest });
+      return { kind, index: removed.index, item: removed.item };
     }
+
     if (kind === 'task') {
-      const index = state.tasks.findIndex((t) => t.id === id);
-      if (index < 0) return null;
-      const item = state.tasks[index];
-      set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
-      return { kind, index, item };
+      const removed = extractById(state.tasks, id);
+      if (!removed) return null;
+      set({ tasks: removed.rest });
+      return { kind, index: removed.index, item: removed.item };
     }
-    const index = state.habits.findIndex((h) => h.id === id);
-    if (index < 0) return null;
-    const item = state.habits[index];
-    set((s) => ({ habits: s.habits.filter((h) => h.id !== id) }));
-    return { kind, index, item };
+
+    const removed = extractById(state.habits, id);
+    if (!removed) return null;
+    set({ habits: removed.rest });
+    return { kind, index: removed.index, item: removed.item };
   },
 
   restoreItem: (removed) =>
-    set((s) => {
-      const insert = <T,>(list: T[], item: T) => {
-        const out = [...list];
-        out.splice(Math.min(removed.index, out.length), 0, item);
-        return out;
-      };
-      if (removed.kind === 'event')
-        return { events: insert(s.events, removed.item) };
-      if (removed.kind === 'task')
-        return { tasks: insert(s.tasks, removed.item) };
-      return { habits: insert(s.habits, removed.item) };
+    set((state) => {
+      if (removed.kind === 'event') {
+        return { events: insertAt(state.events, removed.index, removed.item) };
+      }
+      if (removed.kind === 'task') {
+        return { tasks: insertAt(state.tasks, removed.index, removed.item) };
+      }
+      return { habits: insertAt(state.habits, removed.index, removed.item) };
     }),
 
   toggleCalendar: (id) =>
-    set((s) => ({
-      calendars: s.calendars.map((c) =>
-        c.id === id ? { ...c, visible: !c.visible } : c,
+    set((state) => ({
+      calendars: state.calendars.map((calendar) =>
+        calendar.id === id
+          ? { ...calendar, visible: !calendar.visible }
+          : calendar,
       ),
     })),
 
   connectAccount: (provider, email) => {
-    const accountId = uid('acc');
+    const accountId = createId('acc');
     const account: Account = {
       id: accountId,
       email,
-      initial: (email[0] ?? '?').toUpperCase(),
+      initial: avatarInitial(email),
       provider,
     };
     const calendar: Calendar = {
-      id: uid('cal'),
+      id: createId('cal'),
       name: email.split('@')[0] || 'Calendario',
-      dot: '#8a8a93',
+      dotColor: color.textMuted,
       kind: '',
       accountId,
       visible: true,
     };
-    set((s) => ({
-      accounts: [...s.accounts, account],
-      calendars: [...s.calendars, calendar],
+
+    set((state) => ({
+      accounts: [...state.accounts, account],
+      calendars: [...state.calendars, calendar],
     }));
   },
 
   disconnectAccount: (id) =>
-    set((s) => ({
-      accounts: s.accounts.filter((a) => a.id !== id),
-      calendars: s.calendars.filter((c) => c.accountId !== id),
+    set((state) => ({
+      accounts: withoutId(state.accounts, id),
+      calendars: state.calendars.filter(
+        (calendar) => calendar.accountId !== id,
+      ),
     })),
 
   subscribeCalendar: (name, kind) =>
-    set((s) => ({
+    set((state) => ({
       calendars: [
-        ...s.calendars,
+        ...state.calendars,
         {
-          id: uid('cal'),
+          id: createId('cal'),
           name,
-          dot: '#5c5c65',
+          dotColor: color.textDisabled,
           kind,
           accountId: null,
           visible: true,
@@ -219,13 +262,16 @@ export const useAppStore = create<State & Actions>()((set, get) => ({
       ],
     })),
 
+  /**
+   * Sync mock: there is no network yet, only the momentary state the side menu
+   * shows while it "refreshes".
+   */
   refresh: () => {
     if (get().refreshing) return;
     set({ refreshing: true });
-    // Mock: no hay red todavía, solo el estado momentáneo del drawer.
     setTimeout(
       () => set({ refreshing: false, lastSync: Date.now() }),
-      1400,
+      MOCK_REFRESH_MS,
     );
   },
 }));

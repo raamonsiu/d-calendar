@@ -1,9 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 
-/** Círculo con la inicial: cuentas del drawer y de Ajustes, invitados. */
+/** Ratio between the letter and the diameter of the circle. */
+const INITIAL_RATIO = 0.4;
+
+/**
+ * Circle with an initial: accounts in the side menu and in Settings, and event
+ * guests. The letter size is derived from the diameter, so the same piece works
+ * in all three places.
+ */
 export function Avatar({
   initial,
   size = 26,
@@ -17,7 +24,9 @@ export function Avatar({
         styles.avatar,
         { width: size, height: size, borderRadius: size / 2 },
       ]}>
-      <T style={{ fontSize: size * 0.4, color: '#b9b9c1' }}>{initial}</T>
+      <AppText style={{ fontSize: size * INITIAL_RATIO, color: color.textNote }}>
+        {initial}
+      </AppText>
     </View>
   );
 }
@@ -25,7 +34,7 @@ export function Avatar({
 const styles = StyleSheet.create({
   avatar: {
     borderWidth: 1,
-    borderColor: '#2f2f36',
+    borderColor: color.edge,
     backgroundColor: color.hairline,
     alignItems: 'center',
     justifyContent: 'center',

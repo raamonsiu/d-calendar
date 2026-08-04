@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -16,11 +16,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { fmtAgo } from '@/lib/date';
+import { APP_VERSION } from '@/data/releases';
+import { formatAgo } from '@/lib/date';
 import { useAppStore } from '@/store/useAppStore';
-import { Label, T } from '@/theme/Text';
+import { AppText, Label } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { color, hitSlopFor } from '@/theme/tokens';
+import {
+  OVERLAY_OPACITY,
+  color,
+  duration,
+  hitSlopFor,
+  radius,
+} from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
 import { DashedButton } from '@/ui/controls';
 import { usePanelTransition } from '@/ui/usePanelTransition';
@@ -36,110 +43,110 @@ import {
 } from '@/ui/icons';
 import type { Calendar } from '@/types';
 
-const APP_VERSION = '1.4';
+/** Share of the screen width taken by the panel. */
+const PANEL_WIDTH_RATIO = 0.8;
 
-type Props = {
+/** Extra travel on the way out so the panel disappears completely. */
+const EXIT_OVERSHOOT = 8;
+
+/** Share of the panel that has to be dragged for it to close. */
+const CLOSE_DRAG_RATIO = 0.35;
+const CLOSE_VELOCITY = 800;
+
+/** Gesture threshold: below this the touch is still a tap. */
+const DRAG_ACTIVATION = 10;
+
+/** Destinations in the menu footer. */
+const MENU_ITEMS = [
+  { label: 'Ajustes', icon: GearSixIcon, path: '/settings' },
+  { label: 'Ayuda y comentarios', icon: QuestionIcon, path: '/help' },
+  {
+    label: 'Acerca de la app y el desarrollador',
+    icon: InfoIcon,
+    path: '/about',
+  },
+] as const;
+
+type SideDrawerProps = {
   open: boolean;
   onClose: () => void;
+  /**
+   * Opens the add account or subscription flow, which lives on the Home screen.
+   */
   onAddSource: () => void;
 };
 
-export function SideDrawer({ open, onClose, onAddSource }: Props) {
+/**
+ * Home side menu: accounts with their calendars, the account-less
+ * subscriptions, and the footer with the secondary screens.
+ *
+ * It closes by tapping the overlay, with the X, with the back button, or by
+ * dragging the panel to the left.
+ */
+export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const panelW = width * 0.8;
+  const panelWidth = width * PANEL_WIDTH_RATIO;
 
-  const accounts = useAppStore((s) => s.accounts);
-  const calendars = useAppStore((s) => s.calendars);
-  const toggleCalendar = useAppStore((s) => s.toggleCalendar);
-  const refresh = useAppStore((s) => s.refresh);
-  const refreshing = useAppStore((s) => s.refreshing);
-  const lastSync = useAppStore((s) => s.lastSync);
+  const accounts = useAppStore((state) => state.accounts);
+  const calendars = useAppStore((state) => state.calendars);
+  const toggleCalendar = useAppStore((state) => state.toggleCalendar);
+  const refresh = useAppStore((state) => state.refresh);
+  const refreshing = useAppStore((state) => state.refreshing);
+  const lastSync = useAppStore((state) => state.lastSync);
 
   const { mounted, progress } = usePanelTransition(open, onClose);
-  const drag = useSharedValue(0);
+  const dragOffset = useSharedValue(0);
 
   const overlayStyle = useAnimatedStyle(() => ({
-    opacity: progress.value * 0.55,
+    opacity: progress.value * OVERLAY_OPACITY,
   }));
 
   const panelStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: -(1 - progress.value) * (panelW + 8) + drag.value },
+      {
+        translateX:
+          -(1 - progress.value) * (panelWidth + EXIT_OVERSHOOT) +
+          dragOffset.value,
+      },
     ],
   }));
 
-  const pan = Gesture.Pan()
-    .activeOffsetX(-10)
-    .failOffsetX(10)
-    .onChange((e) => {
-      drag.value = Math.min(0, drag.value + e.changeX);
+  const dragGesture = Gesture.Pan()
+    .activeOffsetX(-DRAG_ACTIVATION)
+    .failOffsetX(DRAG_ACTIVATION)
+    .onChange((event) => {
+      dragOffset.value = Math.min(0, dragOffset.value + event.changeX);
     })
-    .onEnd((e) => {
+    .onEnd((event) => {
       const shouldClose =
-        drag.value < -panelW * 0.35 || e.velocityX < -800;
-      drag.value = withTiming(0, { duration: 180 });
+        dragOffset.value < -panelWidth * CLOSE_DRAG_RATIO ||
+        event.velocityX < -CLOSE_VELOCITY;
+      dragOffset.value = withTiming(0, { duration: duration.press });
       if (shouldClose) runOnJS(onClose)();
     });
 
-  const grouped = useMemo(
+  const byAccount = useMemo(
     () =>
-      accounts.map((a) => ({
-        account: a,
-        items: calendars.filter((c) => c.accountId === a.id),
+      accounts.map((account) => ({
+        account,
+        calendars: calendars.filter(
+          (calendar) => calendar.accountId === account.id,
+        ),
       })),
     [accounts, calendars],
   );
-  const others = useMemo(
-    () => calendars.filter((c) => c.accountId === null),
+
+  const subscriptions = useMemo(
+    () => calendars.filter((calendar) => calendar.accountId === null),
     [calendars],
   );
 
-  const go = (path: '/settings' | '/help' | '/about') => {
+  const openScreen = (path: (typeof MENU_ITEMS)[number]['path']) => {
     onClose();
     router.push(path);
   };
-
-  const CalendarRow = ({ cal }: { cal: Calendar }) => (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: cal.visible }}
-      accessibilityLabel={cal.name}
-      onPress={() => toggleCalendar(cal.id)}
-      style={({ pressed }) => [
-        styles.calRow,
-        pressed && { backgroundColor: color.hairline },
-      ]}>
-      <View
-        style={[
-          styles.checkbox,
-          {
-            borderColor: cal.visible ? accent : '#3a3a42',
-            backgroundColor: cal.visible ? accent : 'transparent',
-          },
-        ]}>
-        {cal.visible ? (
-          <CheckIcon size={11} color={color.text} weight="bold" />
-        ) : null}
-      </View>
-      <View
-        style={[
-          styles.calDot,
-          { backgroundColor: cal.visible ? (cal.dot ?? accent) : '#2f2f36' },
-        ]}
-      />
-      <T
-        numberOfLines={1}
-        style={[
-          styles.calName,
-          { color: cal.visible ? '#e9e9ec' : '#5c5c65' },
-        ]}>
-        {cal.name}
-      </T>
-      {cal.kind ? <T style={styles.calKind}>{cal.kind}</T> : null}
-    </Pressable>
-  );
 
   if (!mounted) return null;
 
@@ -154,30 +161,30 @@ export function SideDrawer({ open, onClose, onAddSource }: Props) {
         />
       </Pressable>
 
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={dragGesture}>
         <Animated.View
           style={[
             styles.panel,
             {
-              width: panelW,
+              width: panelWidth,
               paddingTop: insets.top + 18,
               paddingBottom: insets.bottom + 14,
             },
             panelStyle,
           ]}>
           <View style={styles.head}>
-            <View style={{ gap: 3 }}>
-              <T w={500} style={styles.appName}>
+            <View style={styles.headTitles}>
+              <AppText weight={500} style={styles.appName}>
                 D-Calendar
-              </T>
-              <T style={styles.version}>VERSIÓN {APP_VERSION}</T>
+              </AppText>
+              <AppText style={styles.version}>VERSIÓN {APP_VERSION}</AppText>
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cerrar menú"
               hitSlop={hitSlopFor(28)}
               onPress={onClose}
-              style={styles.closeBtn}>
+              style={styles.close}>
               <XIcon size={14} color={color.label} />
             </Pressable>
           </View>
@@ -194,81 +201,74 @@ export function SideDrawer({ open, onClose, onAddSource }: Props) {
                 size={14}
                 color={refreshing ? accent : color.textMuted}
               />
-              <T style={styles.refreshLabel}>Actualizar calendarios</T>
-              <T style={styles.refreshMeta}>
-                {refreshing ? 'AHORA' : fmtAgo(lastSync)}
-              </T>
+              <AppText style={styles.refreshLabel}>
+                Actualizar calendarios
+              </AppText>
+              <AppText style={styles.refreshMeta}>
+                {refreshing ? 'AHORA' : formatAgo(lastSync)}
+              </AppText>
             </Pressable>
           </View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scroll}>
-            {grouped.map(({ account, items }) => (
-              <View key={account.id} style={{ gap: 7 }}>
-                <View style={styles.accountHead}>
-                  <Avatar size={20} initial={account.initial} />
-                  <T numberOfLines={1} style={styles.accountEmail}>
-                    {account.email}
-                  </T>
-                  <T style={styles.count}>
-                    {items.filter((c) => c.visible).length}/{items.length}
-                  </T>
-                </View>
-                <View style={{ gap: 2 }}>
-                  {items.map((cal) => (
-                    <CalendarRow key={cal.id} cal={cal} />
-                  ))}
-                </View>
-              </View>
+            {byAccount.map(({ account, calendars: accountCalendars }) => (
+              <CalendarGroup
+                key={account.id}
+                calendars={accountCalendars}
+                onToggle={toggleCalendar}
+                header={
+                  <View style={styles.accountHead}>
+                    <Avatar size={20} initial={account.initial} />
+                    <AppText numberOfLines={1} style={styles.accountEmail}>
+                      {account.email}
+                    </AppText>
+                    <AppText style={styles.count}>
+                      {visibilitySummary(accountCalendars)}
+                    </AppText>
+                  </View>
+                }
+              />
             ))}
 
-            <View style={{ gap: 7 }}>
-              <View style={styles.otherHead}>
-                <Label>Otros calendarios</Label>
-                <T style={styles.count}>
-                  {others.filter((c) => c.visible).length}/{others.length}
-                </T>
-              </View>
-              <View style={{ gap: 2 }}>
-                {others.map((cal) => (
-                  <CalendarRow key={cal.id} cal={cal} />
-                ))}
-              </View>
-              <DashedButton
-                height={36}
-                label="AÑADIR CUENTA O CALENDARIO"
-                icon={<PlusIcon size={11} color={color.label} />}
-                onPress={onAddSource}
-              />
-            </View>
+            <CalendarGroup
+              calendars={subscriptions}
+              onToggle={toggleCalendar}
+              header={
+                <View style={styles.otherHead}>
+                  <Label>Otros calendarios</Label>
+                  <AppText style={styles.count}>
+                    {visibilitySummary(subscriptions)}
+                  </AppText>
+                </View>
+              }
+              footer={
+                <DashedButton
+                  height={36}
+                  label="AÑADIR CUENTA O CALENDARIO"
+                  icon={<PlusIcon size={11} color={color.label} />}
+                  onPress={onAddSource}
+                />
+              }
+            />
           </ScrollView>
 
           <View style={styles.footer}>
-            {(
-              [
-                { label: 'Ajustes', icon: GearSixIcon, path: '/settings' },
-                { label: 'Ayuda y comentarios', icon: QuestionIcon, path: '/help' },
-                {
-                  label: 'Acerca de la app y el desarrollador',
-                  icon: InfoIcon,
-                  path: '/about',
-                },
-              ] as const
-            ).map(({ label, icon: Icon, path }) => (
+            {MENU_ITEMS.map(({ label, icon: Icon, path }) => (
               <Pressable
                 key={path}
                 accessibilityRole="button"
-                onPress={() => go(path)}
+                onPress={() => openScreen(path)}
                 style={({ pressed }) => [
                   styles.menuRow,
                   pressed && { backgroundColor: color.hairline },
                 ]}>
                 <Icon size={15} color={color.textMuted} />
-                <T numberOfLines={1} style={styles.menuLabel}>
+                <AppText numberOfLines={1} style={styles.menuLabel}>
                   {label}
-                </T>
-                <CaretRightIcon size={11} color="#3f3f47" />
+                </AppText>
+                <CaretRightIcon size={11} color={color.caret} />
               </Pressable>
             ))}
           </View>
@@ -278,16 +278,127 @@ export function SideDrawer({ open, onClose, onAddSource }: Props) {
   );
 }
 
+/**
+ * How many calendars of a group are checked, in the "3/5" format of the menu
+ * headers.
+ *
+ * @param calendars Calendars in the group.
+ */
+function visibilitySummary(calendars: Calendar[]) {
+  const visible = calendars.filter((calendar) => calendar.visible).length;
+  return `${visible}/${calendars.length}`;
+}
+
+/**
+ * A calendar block of the menu: a header, the rows and an optional footer.
+ *
+ * This is the common part of the two kinds of group: account groups carry an
+ * avatar and an email in the header, and the subscriptions one carries a micro
+ * label and the add button in the footer.
+ */
+function CalendarGroup({
+  header,
+  calendars,
+  onToggle,
+  footer,
+}: {
+  header: ReactNode;
+  calendars: Calendar[];
+  onToggle: (id: string) => void;
+  footer?: ReactNode;
+}) {
+  return (
+    <View style={styles.group}>
+      {header}
+      <View style={styles.groupRows}>
+        {calendars.map((calendar) => (
+          <CalendarRow
+            key={calendar.id}
+            calendar={calendar}
+            onToggle={() => onToggle(calendar.id)}
+          />
+        ))}
+      </View>
+      {footer}
+    </View>
+  );
+}
+
+/**
+ * Calendar row: checkbox, colour dot and name.
+ *
+ * While unchecked, the dot and the name dim; the label on the right only
+ * appears on calendars that have a kind (TAREAS, CALDAV, ICS).
+ */
+function CalendarRow({
+  calendar,
+  onToggle,
+}: {
+  calendar: Calendar;
+  onToggle: () => void;
+}) {
+  const accent = useAccent();
+
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: calendar.visible }}
+      accessibilityLabel={calendar.name}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.calendarRow,
+        pressed && { backgroundColor: color.hairline },
+      ]}>
+      <View
+        style={[
+          styles.checkbox,
+          {
+            borderColor: calendar.visible ? accent : color.outline,
+            backgroundColor: calendar.visible ? accent : 'transparent',
+          },
+        ]}>
+        {calendar.visible ? (
+          <CheckIcon size={11} color={color.text} weight="bold" />
+        ) : null}
+      </View>
+
+      <View
+        style={[
+          styles.calendarDot,
+          {
+            backgroundColor: calendar.visible
+              ? (calendar.dotColor ?? accent)
+              : color.edge,
+          },
+        ]}
+      />
+
+      <AppText
+        numberOfLines={1}
+        style={[
+          styles.calendarName,
+          { color: calendar.visible ? color.textBody : color.textDisabled },
+        ]}>
+        {calendar.name}
+      </AppText>
+
+      {calendar.kind ? (
+        <AppText style={styles.calendarKind}>{calendar.kind}</AppText>
+      ) : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  overlay: { backgroundColor: '#000' },
+  overlay: { backgroundColor: color.scrim },
   panel: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
     backgroundColor: color.box,
-    borderTopRightRadius: 28,
-    borderBottomRightRadius: 28,
+    borderTopRightRadius: radius.sheet,
+    borderBottomRightRadius: radius.sheet,
   },
   head: {
     flexDirection: 'row',
@@ -296,19 +407,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 14,
   },
+  headTitles: { gap: 3 },
   appName: { fontSize: 17, letterSpacing: -0.2 },
   version: { fontSize: 8.5, letterSpacing: 1.4, color: color.labelDim },
-  closeBtn: {
+  close: {
     width: 28,
     height: 28,
-    borderRadius: 10,
+    borderRadius: radius.tap,
     alignItems: 'center',
     justifyContent: 'center',
   },
   refreshWrap: { paddingHorizontal: 14, paddingBottom: 12 },
   refresh: {
     height: 44,
-    borderRadius: 16,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: color.borderStrong,
     backgroundColor: color.card,
@@ -317,9 +429,11 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingHorizontal: 14,
   },
-  refreshLabel: { flex: 1, fontSize: 11.5, color: '#e9e9ec' },
+  refreshLabel: { flex: 1, fontSize: 11.5, color: color.textBody },
   refreshMeta: { fontSize: 8.5, letterSpacing: 1.1, color: color.faint },
   scroll: { gap: 14, paddingHorizontal: 14, paddingTop: 2, paddingBottom: 8 },
+  group: { gap: 7 },
+  groupRows: { gap: 2 },
   accountHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -339,25 +453,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 4,
   },
-  calRow: {
+  calendarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     height: 38,
     paddingHorizontal: 8,
-    borderRadius: 13,
+    borderRadius: radius.control,
   },
   checkbox: {
     width: 18,
     height: 18,
-    borderRadius: 6,
+    borderRadius: radius.check,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calDot: { width: 6, height: 6, borderRadius: 3 },
-  calName: { flex: 1, fontSize: 12 },
-  calKind: { fontSize: 8, letterSpacing: 1.1, color: color.faint },
+  calendarDot: { width: 6, height: 6, borderRadius: 3 },
+  calendarName: { flex: 1, fontSize: 12 },
+  calendarKind: { fontSize: 8, letterSpacing: 1.1, color: color.faint },
   footer: {
     paddingTop: 10,
     paddingHorizontal: 14,
@@ -371,7 +485,7 @@ const styles = StyleSheet.create({
     gap: 11,
     height: 42,
     paddingHorizontal: 8,
-    borderRadius: 13,
+    borderRadius: radius.control,
   },
   menuLabel: { flex: 1, fontSize: 12.5, color: color.textSoft },
 });

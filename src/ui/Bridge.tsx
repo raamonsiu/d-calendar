@@ -1,80 +1,48 @@
-import { View } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 
-type Props = {
+/** Radius of the two notches left on either side of the bridge. */
+const NOTCH_RADIUS = 5;
+
+/** The bridge takes the middle 30%: a 35% notch is cut on each side. */
+const NOTCH_SIZE = '35%';
+
+type BridgeProps = {
   axis: 'vertical' | 'horizontal';
-  /** El gap del grupo: 5 en vertical (Crear), 6 en horizontal (semana). */
+  /** The group gap: 5 vertically (Crear), 6 horizontally (week view). */
   gap: number;
-  /** Color de la caja que se une. */
+  /** Colour of the box being joined. */
   surface: string;
-  /** Color de lo que hay detrás del gap. */
+  /** Colour of whatever sits behind the gap. */
   behind: string;
 };
 
-const INNER_RADIUS = 5;
-/** El puente ocupa el 30% central; a cada lado queda un 35% recortado. */
-const SIDE = '35%';
-
 /**
- * El puente del «gap Nothing» conectado (handoff §4b).
+ * The connected "gap Nothing" bridge (handoff §4b): it covers the gap between
+ * two boxes leaving a rounded notch on each side.
  *
- * Se pinta como hijo absoluto del SEGUNDO elemento del par. El elemento no
- * puede llevar `overflow: 'hidden'` o el puente se recorta.
+ * It is drawn as an absolute child of the SECOND element of the pair, and that
+ * element must not carry `overflow: 'hidden'` or the bridge gets clipped.
  */
-export function Bridge({ axis, gap, surface, behind }: Props) {
-  if (axis === 'vertical') {
-    const band = {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: -(gap + 1),
-      height: gap + 2,
-    } as const;
+export function Bridge({ axis, gap, surface, behind }: BridgeProps) {
+  return axis === 'vertical' ? (
+    <VerticalBridge gap={gap} surface={surface} behind={behind} />
+  ) : (
+    <HorizontalBridge gap={gap} surface={surface} behind={behind} />
+  );
+}
 
-    return (
-      <>
-        <View
-          pointerEvents="none"
-          style={[band, { backgroundColor: surface }]}
-        />
-        <View
-          pointerEvents="none"
-          style={[
-            band,
-            {
-              left: -1,
-              right: undefined,
-              width: SIDE,
-              backgroundColor: behind,
-              borderTopRightRadius: INNER_RADIUS,
-              borderBottomRightRadius: INNER_RADIUS,
-            },
-          ]}
-        />
-        <View
-          pointerEvents="none"
-          style={[
-            band,
-            {
-              left: undefined,
-              right: -1,
-              width: SIDE,
-              backgroundColor: behind,
-              borderTopLeftRadius: INNER_RADIUS,
-              borderBottomLeftRadius: INNER_RADIUS,
-            },
-          ]}
-        />
-      </>
-    );
-  }
+type AxisBridgeProps = Omit<BridgeProps, 'axis'>;
 
-  const band = {
+/** Bridge between two stacked boxes: a horizontal band over the top edge. */
+function VerticalBridge({ gap, surface, behind }: AxisBridgeProps) {
+  /** It runs 1px past each side so no antialiasing seam is left. */
+  const band: ViewStyle = {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: -gap,
-    width: gap,
-  } as const;
+    left: 0,
+    right: 0,
+    top: -(gap + 1),
+    height: gap + 2,
+  };
 
   return (
     <>
@@ -83,12 +51,12 @@ export function Bridge({ axis, gap, surface, behind }: Props) {
         pointerEvents="none"
         style={[
           band,
+          styles.leftNotch,
           {
-            bottom: undefined,
-            height: SIDE,
+            width: NOTCH_SIZE,
             backgroundColor: behind,
-            borderBottomLeftRadius: INNER_RADIUS,
-            borderBottomRightRadius: INNER_RADIUS,
+            borderTopRightRadius: NOTCH_RADIUS,
+            borderBottomRightRadius: NOTCH_RADIUS,
           },
         ]}
       />
@@ -96,15 +64,65 @@ export function Bridge({ axis, gap, surface, behind }: Props) {
         pointerEvents="none"
         style={[
           band,
+          styles.rightNotch,
           {
-            top: undefined,
-            height: SIDE,
+            width: NOTCH_SIZE,
             backgroundColor: behind,
-            borderTopLeftRadius: INNER_RADIUS,
-            borderTopRightRadius: INNER_RADIUS,
+            borderTopLeftRadius: NOTCH_RADIUS,
+            borderBottomLeftRadius: NOTCH_RADIUS,
           },
         ]}
       />
     </>
   );
 }
+
+/** Bridge between two cells in a row: a vertical band over the left edge. */
+function HorizontalBridge({ gap, surface, behind }: AxisBridgeProps) {
+  const band: ViewStyle = {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: -gap,
+    width: gap,
+  };
+
+  return (
+    <>
+      <View pointerEvents="none" style={[band, { backgroundColor: surface }]} />
+      <View
+        pointerEvents="none"
+        style={[
+          band,
+          styles.topNotch,
+          {
+            height: NOTCH_SIZE,
+            backgroundColor: behind,
+            borderBottomLeftRadius: NOTCH_RADIUS,
+            borderBottomRightRadius: NOTCH_RADIUS,
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          band,
+          styles.bottomNotch,
+          {
+            height: NOTCH_SIZE,
+            backgroundColor: behind,
+            borderTopLeftRadius: NOTCH_RADIUS,
+            borderTopRightRadius: NOTCH_RADIUS,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  leftNotch: { left: -1, right: undefined },
+  rightNotch: { left: undefined, right: -1 },
+  topNotch: { bottom: undefined },
+  bottomNotch: { top: undefined },
+});

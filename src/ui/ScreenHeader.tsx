@@ -1,12 +1,19 @@
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { T } from '@/theme/Text';
-import { color } from '@/theme/tokens';
+import { AppText } from '@/theme/Text';
+import { color, size } from '@/theme/tokens';
 import { ArrowLeftIcon } from './icons';
 import { IconButton } from './controls';
 
-/** Cabecera de las pantallas secundarias: flecha atrás + título 19/500. */
+/**
+ * Header of the secondary screens: back arrow and title.
+ *
+ * Without `onBack` the arrow goes back, or to Home when this screen was opened
+ * straight from a deep link and there is no history. With `compact` the title
+ * drops to 15px, which is what the help articles need because their titles are
+ * long.
+ */
 export function ScreenHeader({
   title,
   onBack,
@@ -14,33 +21,39 @@ export function ScreenHeader({
 }: {
   title: string;
   onBack?: () => void;
-  /** Los artículos de ayuda usan 15px porque el título es largo. */
   compact?: boolean;
 }) {
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   return (
     <View style={styles.row}>
       <IconButton
         size={32}
         label="Atrás"
         style={styles.back}
-        onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))}>
+        onPress={onBack ?? goBack}>
         <ArrowLeftIcon size={20} color={color.textMuted} />
       </IconButton>
-      <T
-        w={500}
+      <AppText
+        weight={500}
         numberOfLines={2}
-        style={[styles.title, compact && { fontSize: 15, lineHeight: 19 }]}>
+        style={[styles.title, compact && styles.titleCompact]}>
         {title}
-      </T>
+      </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    // Alto mínimo para que la fila no dependa de las métricas del texto en la
-    // primera medición, igual que la cabecera de la Home.
-    minHeight: 38,
+    /**
+     * Minimum height so the row does not depend on text metrics on the first
+     * measurement, same as the Home header.
+     */
+    minHeight: size.header,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -48,4 +61,5 @@ const styles = StyleSheet.create({
   },
   back: { marginLeft: -5 },
   title: { flex: 1, fontSize: 19, letterSpacing: -0.3 },
+  titleCompact: { fontSize: 15, lineHeight: 19 },
 });

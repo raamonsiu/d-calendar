@@ -11,50 +11,62 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { color, duration, radius } from '@/theme/tokens';
 
-type Toast = { message: string; onUndo?: () => void };
+type ToastMessage = { message: string; onUndo?: () => void };
 
 type ToastApi = {
-  /** Aviso con «DESHACER» durante 5 s (el que pide el artículo de ayuda). */
-  showUndo: (message: string, onUndo: () => void) => void;
+  /** Plain toast; it goes away on its own. */
   show: (message: string) => void;
+  /** Toast with "DESHACER" for as long as it stays on screen. */
+  showUndo: (message: string, onUndo: () => void) => void;
 };
 
-const ToastContext = createContext<ToastApi>({ showUndo: () => {}, show: () => {} });
+/** How long a toast stays on screen, and with it the window to undo. */
+const TOAST_MS = 5000;
+
+const ToastContext = createContext<ToastApi>({
+  show: () => {},
+  showUndo: () => {},
+});
 
 export const useToast = () => useContext(ToastContext);
 
-const UNDO_MS = 5000;
-
+/**
+ * Bottom toasts of the app. There is only ever one at a time: a new one
+ * replaces the previous one, same as in the prototype.
+ *
+ * It is mounted above the whole navigator, so a toast survives a screen change
+ * and undo keeps working after going back.
+ */
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState<Toast | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const accent = useAccent();
   const { motionOff } = usePrefs();
 
-  const clear = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
+  const clearTimer = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = null;
   }, []);
 
-  const push = useCallback(
-    (next: Toast) => {
-      clear();
+  const showToast = useCallback(
+    (next: ToastMessage) => {
+      clearTimer();
       setToast(next);
-      timer.current = setTimeout(() => setToast(null), UNDO_MS);
+      hideTimer.current = setTimeout(() => setToast(null), TOAST_MS);
     },
-    [clear],
+    [clearTimer],
   );
 
-  useEffect(() => clear, [clear]);
+  useEffect(() => clearTimer, [clearTimer]);
 
   const api: ToastApi = {
-    show: (message) => push({ message }),
-    showUndo: (message, onUndo) => push({ message, onUndo }),
+    show: (message) => showToast({ message }),
+    showUndo: (message, onUndo) => showToast({ message, onUndo }),
   };
 
   return (
@@ -65,24 +77,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           pointerEvents="box-none"
           style={[styles.wrap, { paddingBottom: Math.max(12, insets.bottom) }]}>
           <Animated.View
-            entering={motionOff ? undefined : FadeInDown.duration(220)}
-            exiting={motionOff ? undefined : FadeOutDown.duration(180)}
+            entering={
+              motionOff ? undefined : FadeInDown.duration(duration.state)
+            }
+            exiting={motionOff ? undefined : FadeOutDown.duration(duration.press)}
             style={styles.bar}>
-            <T numberOfLines={1} style={styles.message}>
+            <AppText numberOfLines={1} style={styles.message}>
               {toast.message}
-            </T>
+            </AppText>
             {toast.onUndo ? (
               <Pressable
                 accessibilityRole="button"
                 hitSlop={10}
                 onPress={() => {
                   toast.onUndo?.();
-                  clear();
+                  clearTimer();
                   setToast(null);
                 }}>
-                <T w={500} style={[styles.undo, { color: accent }]}>
+                <AppText weight={500} style={[styles.undo, { color: accent }]}>
                   DESHACER
-                </T>
+                </AppText>
               </Pressable>
             ) : null}
           </Animated.View>
@@ -102,7 +116,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     minHeight: 46,
-    borderRadius: 18,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: color.border,
     backgroundColor: color.card,

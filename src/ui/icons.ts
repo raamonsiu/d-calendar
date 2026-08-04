@@ -1,9 +1,9 @@
 /**
- * Iconos Phosphor, peso `regular` salvo el kebab de cuentas, que va en `bold`.
+ * Phosphor icons, `regular` weight except the account kebab, which is `bold`.
  *
- * Se importan uno a uno desde `phosphor-react-native/src/icons/*` (la ruta que
- * el propio paquete expone para eso): el índice del paquete arrastra ~1500
- * iconos al bundle.
+ * They are imported one by one from `phosphor-react-native/src/icons/*` (the
+ * path the package itself exposes for this): the package index drags ~1500
+ * icons into the bundle.
  */
 export { ArrowLeftIcon } from 'phosphor-react-native/src/icons/ArrowLeft';
 export { ArrowUpRightIcon } from 'phosphor-react-native/src/icons/ArrowUpRight';

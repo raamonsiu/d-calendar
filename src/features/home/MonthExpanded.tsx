@@ -1,73 +1,99 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import {
-  MONTHS,
-  addMonths,
-  dayKey,
-  dowInitials,
-  isToday,
-  monthRows,
-} from '@/lib/date';
-import { T } from '@/theme/Text';
+import { MONTHS, addMonths, dayKey, isToday, monthRows } from '@/lib/date';
+import { gridCellSize } from '@/lib/layout';
+import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { alpha, color } from '@/theme/tokens';
+import { alpha, color, radius, tint } from '@/theme/tokens';
+import { WeekdayRow } from '@/ui/WeekdayRow';
+import { EventDots } from './EventDots';
 
+/** Months that can be scrolled through backwards and forwards. */
 const MONTHS_BEFORE = 12;
 const MONTHS_AFTER = 24;
+
+const COLUMNS = 7;
 const CELL_GAP = 4;
-const TITLE_H = 18;
+
+/** Fixed heights that feed the `getItemLayout` calculation. */
+const TITLE_HEIGHT = 18;
 const TITLE_GAP = 9;
-const WEEKDAY_H = 12;
+const WEEKDAY_HEIGHT = 12;
 const MONTH_GAP = 22;
 
-type Props = {
+/** How many months the list keeps mounted around the visible one. */
+const WINDOW_SIZE = 5;
+
+type MonthExpandedProps = {
   counts: Map<string, number>;
   onPressDay: (day: Date) => void;
 };
 
-/** Mes expandido: scroll vertical continuo entre meses (handoff §5.4). */
-export function MonthExpanded({ counts, onPressDay }: Props) {
+/**
+ * Expanded month view (handoff §5.4): continuous vertical scroll, no paging
+ * between months.
+ *
+ * The grid is drawn once the container has been measured, because the cell side
+ * comes from the available width. Today is marked with the accent and every
+ * cell carries the dots for its events.
+ */
+export function MonthExpanded({ counts, onPressDay }: MonthExpandedProps) {
   const accent = useAccent();
   const { weekStart } = usePrefs();
   const [width, setWidth] = useState(0);
-  const initials = dowInitials(weekStart);
 
   const months = useMemo(() => {
     const first = addMonths(new Date(), -MONTHS_BEFORE);
-    return Array.from({ length: MONTHS_BEFORE + MONTHS_AFTER + 1 }, (_, i) => {
-      const d = addMonths(first, i);
-      return {
-        date: d,
-        rows: monthRows(d.getFullYear(), d.getMonth(), weekStart),
-      };
-    });
+    return Array.from(
+      { length: MONTHS_BEFORE + MONTHS_AFTER + 1 },
+      (_, offset) => {
+        const date = addMonths(first, offset);
+        return {
+          date,
+          rows: monthRows(date.getFullYear(), date.getMonth(), weekStart),
+        };
+      },
+    );
   }, [weekStart]);
 
-  const cellSize = width > 0 ? (width - CELL_GAP * 6) / 7 : 0;
+  const cellSize = gridCellSize(width, CELL_GAP, COLUMNS);
 
-  /** Altura exacta de cada mes, para poder saltar a hoy al montar. */
+  /**
+   * Exact height and offset of each month. They are needed to be able to start
+   * on the current month: without `getItemLayout` the list does not know which
+   * offset to jump to, because months are not all the same height (some take
+   * five rows and others six).
+   *
+   * Every row, the initials one included, adds its own `marginBottom`.
+   */
   const layouts = useMemo(() => {
     let offset = 0;
-    return months.map((m) => {
-      // Cada fila (incluida la de iniciales) lleva marginBottom = CELL_GAP.
-      const grid = m.rows.length * (cellSize + CELL_GAP);
+    return months.map((month) => {
+      const gridHeight = month.rows.length * (cellSize + CELL_GAP);
       const length =
-        TITLE_H + TITLE_GAP + WEEKDAY_H + CELL_GAP + grid + MONTH_GAP;
-      const item = { length, offset };
+        TITLE_HEIGHT +
+        TITLE_GAP +
+        WEEKDAY_HEIGHT +
+        CELL_GAP +
+        gridHeight +
+        MONTH_GAP;
+      const layout = { length, offset };
       offset += length;
-      return item;
+      return layout;
     });
   }, [months, cellSize]);
 
   return (
     <View
       style={styles.root}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {cellSize > 0 ? (
         <FlatList
           data={months}
-          keyExtractor={(m) => `${m.date.getFullYear()}-${m.date.getMonth()}`}
+          keyExtractor={(month) =>
+            `${month.date.getFullYear()}-${month.date.getMonth()}`
+          }
           showsVerticalScrollIndicator={false}
           initialScrollIndex={MONTHS_BEFORE}
           getItemLayout={(_, index) => ({
@@ -75,82 +101,76 @@ export function MonthExpanded({ counts, onPressDay }: Props) {
             offset: layouts[index].offset,
             index,
           })}
-          windowSize={5}
-          renderItem={({ item }) => (
+          windowSize={WINDOW_SIZE}
+          renderItem={({ item: month }) => (
             <View style={styles.month}>
               <View style={styles.monthHead}>
-                <T w={500} style={styles.monthName}>
-                  {MONTHS[item.date.getMonth()]}
-                </T>
-                <T style={styles.monthYear}>{item.date.getFullYear()}</T>
+                <AppText weight={500} style={styles.monthName}>
+                  {MONTHS[month.date.getMonth()]}
+                </AppText>
+                <AppText style={styles.monthYear}>
+                  {month.date.getFullYear()}
+                </AppText>
               </View>
 
-              <View style={styles.weekdayRow}>
-                {initials.map((wd, i) => (
-                  <T key={i} style={[styles.weekday, { width: cellSize }]}>
-                    {wd}
-                  </T>
-                ))}
-              </View>
+              <WeekdayRow
+                cellWidth={cellSize}
+                gap={CELL_GAP}
+                height={WEEKDAY_HEIGHT}
+              />
 
-              {item.rows.map((row, r) => (
-                <View key={r} style={styles.gridRow}>
-                  {row.map((day, c) => {
-                    if (!day)
+              {month.rows.map((row, rowIndex) => (
+                <View key={rowIndex} style={styles.gridRow}>
+                  {row.map((day, columnIndex) => {
+                    if (!day) {
                       return (
                         <View
-                          key={c}
+                          key={columnIndex}
                           style={{ width: cellSize, height: cellSize }}
                         />
                       );
+                    }
 
                     const today = isToday(day);
-                    const n = counts.get(dayKey(day)) ?? 0;
+                    const eventCount = counts.get(dayKey(day)) ?? 0;
 
                     return (
                       <Pressable
-                        key={c}
+                        key={columnIndex}
                         accessibilityRole="button"
-                        accessibilityLabel={`${day.getDate()}, ${n} eventos`}
+                        accessibilityLabel={`${day.getDate()}, ${eventCount} eventos`}
                         onPress={() => onPressDay(day)}
                         style={({ pressed }) => [
                           styles.cell,
                           {
                             width: cellSize,
                             height: cellSize,
-                            borderColor: today ? accent : '#1b1b20',
+                            borderColor: today ? accent : color.borderCell,
                             backgroundColor: today
-                              ? alpha(accent, 0.08)
+                              ? alpha(accent, tint.cell)
                               : pressed
                                 ? color.cardHover
-                                : '#131316',
+                                : color.cell,
                           },
                         ]}>
-                        <T
-                          w={400}
+                        <AppText
+                          weight={400}
                           style={{
                             fontSize: 11.5,
                             color: today
                               ? accent
-                              : n
+                              : eventCount
                                 ? color.textSoft
-                                : '#6b6b73',
+                                : color.textQuiet,
                           }}>
                           {day.getDate()}
-                        </T>
+                        </AppText>
                         <View style={styles.cellDots}>
-                          {Array.from({ length: Math.min(3, n) }, (_, k) => (
-                            <View
-                              key={k}
-                              style={[
-                                styles.cellDot,
-                                { backgroundColor: accent },
-                              ]}
-                            />
-                          ))}
-                          {n > 3 ? (
-                            <T style={styles.cellMore}>+{n - 3}</T>
-                          ) : null}
+                          <EventDots
+                            count={eventCount}
+                            dotSize={3}
+                            fontSize={9}
+                          />
                         </View>
                       </Pressable>
                     );
@@ -169,7 +189,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   month: { marginBottom: MONTH_GAP },
   monthHead: {
-    height: TITLE_H,
+    height: TITLE_HEIGHT,
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 8,
@@ -177,21 +197,9 @@ const styles = StyleSheet.create({
   },
   monthName: { fontSize: 14, letterSpacing: -0.2, color: color.text },
   monthYear: { fontSize: 9, letterSpacing: 1.4, color: color.labelDim },
-  weekdayRow: {
-    flexDirection: 'row',
-    gap: CELL_GAP,
-    height: WEEKDAY_H,
-    marginBottom: CELL_GAP,
-  },
-  weekday: {
-    fontSize: 8,
-    letterSpacing: 1.2,
-    color: color.faint,
-    textAlign: 'center',
-  },
   gridRow: { flexDirection: 'row', gap: CELL_GAP, marginBottom: CELL_GAP },
   cell: {
-    borderRadius: 12,
+    borderRadius: radius.chip,
     borderWidth: 1,
     alignItems: 'center',
     paddingTop: 5,
@@ -206,6 +214,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  cellDot: { width: 3, height: 3, borderRadius: 1.5 },
-  cellMore: { fontSize: 9, color: color.textMuted },
 });

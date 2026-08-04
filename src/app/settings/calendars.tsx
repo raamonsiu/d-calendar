@@ -1,15 +1,28 @@
+/**
+ * Accounts and calendars (route `/settings/calendars`).
+ *
+ * How you get here: from Settings › Integraciones › Calendarios.
+ *
+ * Where it leads: nowhere. The default calendar, the account options and adding
+ * a new source are all resolved in bottom sheets.
+ *
+ * Mock: connecting an account opens no browser and asks for no permissions, and
+ * exporting generates no files. Disconnecting does remove the account and its
+ * calendars from the store, and local items are kept.
+ */
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
+import { groupRadius } from '@/lib/groupRadius';
+import { countLabel } from '@/lib/text';
 import { useAppStore } from '@/store/useAppStore';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { color, radius, space } from '@/theme/tokens';
+import { color, radius } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
 import { Group } from '@/ui/Group';
-import { ScreenHeader } from '@/ui/ScreenHeader';
+import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
 import { useToast } from '@/ui/Toast';
 import { GroupRow, OptionRow } from '@/ui/controls';
@@ -19,183 +32,196 @@ import {
   GoogleLogoIcon,
   MicrosoftOutlookLogoIcon,
   PlusIcon,
+  type Icon,
 } from '@/ui/icons';
-import { groupRadius } from '@/lib/groupRadius';
 import type { Provider } from '@/types';
 
-const CONNECTORS = [
-  { label: 'Conectar cuenta de Google', provider: 'GOOGLE' as Provider, Icon: GoogleLogoIcon },
-  { label: 'Conectar iCloud', provider: 'ICLOUD' as Provider, Icon: AppleLogoIcon },
-  { label: 'Conectar Outlook', provider: 'OUTLOOK' as Provider, Icon: MicrosoftOutlookLogoIcon },
+/** Providers that can be connected, each with its logo. */
+const CONNECTORS: { label: string; provider: Provider; Logo: Icon }[] = [
+  {
+    label: 'Conectar cuenta de Google',
+    provider: 'GOOGLE',
+    Logo: GoogleLogoIcon,
+  },
+  { label: 'Conectar iCloud', provider: 'ICLOUD', Logo: AppleLogoIcon },
+  {
+    label: 'Conectar Outlook',
+    provider: 'OUTLOOK',
+    Logo: MicrosoftOutlookLogoIcon,
+  },
 ];
 
 export default function CalendarsScreen() {
-  const insets = useSafeAreaInsets();
   const accent = useAccent();
   const prefs = usePrefs();
   const toast = useToast();
 
-  const accounts = useAppStore((s) => s.accounts);
-  const calendars = useAppStore((s) => s.calendars);
-  const disconnectAccount = useAppStore((s) => s.disconnectAccount);
+  const accounts = useAppStore((state) => state.accounts);
+  const calendars = useAppStore((state) => state.calendars);
+  const disconnectAccount = useAppStore((state) => state.disconnectAccount);
 
-  const [defaultSheet, setDefaultSheet] = useState(false);
-  const [accountSheet, setAccountSheet] = useState<string | null>(null);
-  const [connect, setConnect] = useState<Provider | null>(null);
+  const [defaultSheetOpen, setDefaultSheetOpen] = useState(false);
+  const [accountSheetId, setAccountSheetId] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<Provider | null>(
+    null,
+  );
 
-  const writable = useMemo(
-    () => calendars.filter((c) => !c.readOnly && c.kind !== 'TAREAS'),
+  /** Only own calendars that are not the tasks one can be written to. */
+  const writableCalendars = useMemo(
+    () =>
+      calendars.filter(
+        (calendar) => !calendar.readOnly && calendar.kind !== 'TAREAS',
+      ),
     [calendars],
   );
-  const defaultCal = calendars.find((c) => c.id === prefs.defaultCalendarId);
-  const account = accounts.find((a) => a.id === accountSheet);
+
+  const defaultCalendar = calendars.find(
+    (calendar) => calendar.id === prefs.defaultCalendarId,
+  );
+  const accountInSheet = accounts.find(
+    (account) => account.id === accountSheetId,
+  );
+
+  const disconnect = () => {
+    if (accountInSheet) {
+      disconnectAccount(accountInSheet.id);
+      toast.show(`${accountInSheet.email} desconectada`);
+    }
+    setAccountSheetId(null);
+  };
 
   return (
-    <View style={styles.root}>
-      <View
-        style={[
-          styles.screen,
-          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 14 },
-        ]}>
-        <ScreenHeader title="Calendarios" />
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}>
-          <Group title="Calendario por defecto">
-            <GroupRow
-              index={0}
-              count={1}
-              label={defaultCal?.name ?? 'Sin calendario'}
-              value="CAMBIAR"
-              onPress={() => setDefaultSheet(true)}
-              icon={
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: defaultCal?.dot ?? accent },
-                  ]}
+    <SecondaryScreen
+      title="Calendarios"
+      overlays={
+        <>
+          <Sheet
+            open={defaultSheetOpen}
+            onClose={() => setDefaultSheetOpen(false)}
+            title="Calendario por defecto">
+            <View style={styles.options}>
+              {writableCalendars.map((calendar) => (
+                <OptionRow
+                  key={calendar.id}
+                  label={calendar.name}
+                  selected={prefs.defaultCalendarId === calendar.id}
+                  onPress={() => {
+                    prefs.setPreference('defaultCalendarId', calendar.id);
+                    setDefaultSheetOpen(false);
+                  }}
                 />
-              }
-            />
-          </Group>
+              ))}
+            </View>
+          </Sheet>
 
-          <Group title="Cuentas conectadas">
-            {accounts.map((a, i) => {
-              const n = calendars.filter((c) => c.accountId === a.id).length;
-              return (
-                <Pressable
-                  key={a.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Opciones de ${a.email}`}
-                  onPress={() => setAccountSheet(a.id)}
-                  style={({ pressed }) => [
-                    styles.accountRow,
-                    groupRadius(i, accounts.length),
-                    {
-                      backgroundColor: pressed
-                        ? color.cardHover
-                        : color.surface,
-                    },
-                  ]}>
-                  <Avatar initial={a.initial} />
-                  <View style={styles.accountBody}>
-                    <T numberOfLines={1} style={styles.accountEmail}>
-                      {a.email}
-                    </T>
-                    <T style={styles.accountMeta}>
-                      {a.provider} · {n}{' '}
-                      {n === 1 ? 'CALENDARIO' : 'CALENDARIOS'}
-                    </T>
-                  </View>
-                  <DotsThreeVerticalIcon
-                    size={19}
-                    color={color.label}
-                    weight="bold"
-                  />
-                </Pressable>
-              );
-            })}
-          </Group>
+          <Sheet
+            open={!!accountSheetId}
+            onClose={() => setAccountSheetId(null)}
+            title={accountInSheet?.email ?? ''}>
+            <View style={styles.options}>
+              <OptionRow
+                label="Exportar como .ics"
+                selected={false}
+                onPress={() => {
+                  setAccountSheetId(null);
+                  toast.show(
+                    'La exportación llegará con la sincronización real',
+                  );
+                }}
+              />
+              <OptionRow
+                label="Desconectar la cuenta"
+                selected={false}
+                onPress={disconnect}
+              />
+            </View>
+          </Sheet>
 
-          <Group title="Conectar" gap={6}>
-            {CONNECTORS.map(({ label, provider, Icon }) => (
-              <Pressable
-                key={provider}
-                accessibilityRole="button"
-                onPress={() => setConnect(provider)}
-                style={({ pressed }) => [
-                  styles.connector,
-                  { borderColor: pressed ? accent : color.borderStrong },
-                ]}>
-                <Icon size={15} color={color.textMuted} />
-                <T style={styles.connectorLabel}>{label}</T>
-                <PlusIcon size={12} color={accent} />
-              </Pressable>
-            ))}
-          </Group>
-        </ScrollView>
-      </View>
-
-      <Sheet
-        open={defaultSheet}
-        onClose={() => setDefaultSheet(false)}
-        title="Calendario por defecto">
-        <View style={styles.options}>
-          {writable.map((c) => (
-            <OptionRow
-              key={c.id}
-              label={c.name}
-              selected={prefs.defaultCalendarId === c.id}
-              onPress={() => {
-                prefs.set('defaultCalendarId', c.id);
-                setDefaultSheet(false);
-              }}
-            />
-          ))}
-        </View>
-      </Sheet>
-
-      <Sheet
-        open={!!accountSheet}
-        onClose={() => setAccountSheet(null)}
-        title={account?.email ?? ''}>
-        <View style={styles.options}>
-          <OptionRow
-            label="Exportar como .ics"
-            selected={false}
-            onPress={() => {
-              setAccountSheet(null);
-              toast.show('La exportación llegará con la sincronización real');
-            }}
+          <AddSourceSheet
+            open={!!connectingProvider}
+            initialProvider={connectingProvider ?? undefined}
+            onClose={() => setConnectingProvider(null)}
           />
-          <OptionRow
-            label="Desconectar la cuenta"
-            selected={false}
-            onPress={() => {
-              if (account) {
-                disconnectAccount(account.id);
-                toast.show(`${account.email} desconectada`);
-              }
-              setAccountSheet(null);
-            }}
-          />
-        </View>
-      </Sheet>
+        </>
+      }>
+      <Group title="Calendario por defecto">
+        <GroupRow
+          index={0}
+          count={1}
+          label={defaultCalendar?.name ?? 'Sin calendario'}
+          value="CAMBIAR"
+          onPress={() => setDefaultSheetOpen(true)}
+          icon={
+            <View
+              style={[
+                styles.dot,
+                { backgroundColor: defaultCalendar?.dotColor ?? accent },
+              ]}
+            />
+          }
+        />
+      </Group>
 
-      <AddSourceSheet
-        open={!!connect}
-        initialProvider={connect ?? undefined}
-        onClose={() => setConnect(null)}
-      />
-    </View>
+      <Group title="Cuentas conectadas">
+        {accounts.map((account, index) => {
+          const owned = calendars.filter(
+            (calendar) => calendar.accountId === account.id,
+          ).length;
+
+          return (
+            <Pressable
+              key={account.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Opciones de ${account.email}`}
+              onPress={() => setAccountSheetId(account.id)}
+              style={({ pressed }) => [
+                styles.accountRow,
+                groupRadius(index, accounts.length),
+                {
+                  backgroundColor: pressed ? color.cardHover : color.surface,
+                },
+              ]}>
+              <Avatar initial={account.initial} />
+              <View style={styles.accountBody}>
+                <AppText numberOfLines={1} style={styles.accountEmail}>
+                  {account.email}
+                </AppText>
+                <AppText style={styles.accountMeta}>
+                  {account.provider} ·{' '}
+                  {countLabel(owned, 'CALENDARIO', 'CALENDARIOS')}
+                </AppText>
+              </View>
+              <DotsThreeVerticalIcon
+                size={19}
+                color={color.label}
+                weight="bold"
+              />
+            </Pressable>
+          );
+        })}
+      </Group>
+
+      <Group title="Conectar" gap={6}>
+        {CONNECTORS.map(({ label, provider, Logo }) => (
+          <Pressable
+            key={provider}
+            accessibilityRole="button"
+            onPress={() => setConnectingProvider(provider)}
+            style={({ pressed }) => [
+              styles.connector,
+              { borderColor: pressed ? accent : color.borderStrong },
+            ]}>
+            <Logo size={15} color={color.textMuted} />
+            <AppText style={styles.connectorLabel}>{label}</AppText>
+            <PlusIcon size={12} color={accent} />
+          </Pressable>
+        ))}
+      </Group>
+    </SecondaryScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
-  screen: { flex: 1, paddingHorizontal: space.screen, gap: 12 },
-  scroll: { gap: 16, paddingBottom: 6 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   accountRow: {
     flexDirection: 'row',

@@ -1,9 +1,12 @@
 # D-Calendar
 
-Calendario, tareas y hábitos en una sola pantalla. App en React Native con
-Expo, construida a partir del prototipo y el handoff que hay en `pre-info/`.
+Calendar, tasks and habits on a single screen. React Native app built with Expo,
+from the prototype and handoff in `pre-info/`.
 
-## Arrancar
+The interface is in Spanish, because that is what the design specifies. Code,
+comments and documentation are in English.
+
+## Getting started
 
 ```bash
 npm install
@@ -13,35 +16,35 @@ npm install
 npx expo start
 ```
 
-Pulsa `a` para abrir en Android (emulador o dispositivo con Expo Go). El diseño
-está pensado a 412×892, así que Android es la referencia.
+Press `a` to open on Android (emulator or device with Expo Go). The design is
+laid out for 412×892, so Android is the reference.
 
-## Qué hay
+## What is in it
 
-| Ruta | Pantalla |
+| Route | Screen |
 |---|---|
-| `/` | Home: caja de calendario (hoy / semana / día expandido / mes expandido), tareas, hábitos y menú lateral |
-| `/create` | Crear evento, tarea o hábito |
-| `/item/[id]` | Ficha del elemento: el mismo formulario en modo edición, con Eliminar |
-| `/settings` | Ajustes |
-| `/settings/calendars` | Cuentas conectadas y conectores |
-| `/help` | Ayuda y comentarios |
-| `/help/[slug]` | Artículo de ayuda |
-| `/about` | Acerca de la app y el desarrollador |
+| `/` | Home: calendar box (today / week / expanded day / expanded month), tasks, habits and side menu |
+| `/create` | Create an event, a task or a habit |
+| `/item/[id]` | Item detail: the same form in edit mode, with Delete |
+| `/settings` | Settings |
+| `/settings/calendars` | Connected accounts and connectors |
+| `/help` | Help and feedback |
+| `/help/[slug]` | Help article |
+| `/about` | About the app and the developer |
 
-## Estado de los datos
+## Data status
 
-**Todo es mock y vive en memoria.** El store (`src/store/useAppStore.ts`)
-arranca sembrado con los eventos, tareas, hábitos, cuentas y calendarios del
-prototipo, y vuelve a ese estado al cerrar la app. Crear o editar algo escribe
-solo en local: no hay OAuth, ni subida a Google/iCloud, ni notificaciones
-programadas. «Añadir cuenta o calendario» y «Añadir invitado» son sheets que
-añaden la fuente al estado local.
+**Everything is mock and lives in memory.** The store
+(`src/store/useAppStore.ts`) starts seeded with the events, tasks, habits,
+accounts and calendars from the prototype, and returns to that state when the app
+is closed. Creating or editing something only writes locally: there is no OAuth,
+no upload to Google/iCloud and no scheduled notifications. "Añadir cuenta o
+calendario" and "Añadir invitado" are sheets that add the source to local state.
 
-La siguiente iteración sustituye esa capa por la conexión real; la UI no
-debería cambiar.
+The next iteration replaces that layer with the real connection; the UI should
+not change.
 
-## Comandos
+## Commands
 
 ```bash
 npx tsc --noEmit
@@ -51,4 +54,13 @@ npx tsc --noEmit
 npx expo lint
 ```
 
-Convenciones de código y reglas del diseño: [AGENTS.md](AGENTS.md).
+```bash
+npx expo export --platform android
+```
+
+## Documentation
+
+- [AGENTS.md](AGENTS.md) — code conventions and design rules.
+- [docs/CONTEXT.md](docs/CONTEXT.md) — layer map, settled decisions and known
+  traps. It is the starting point for any new task.
+- `pre-info/handoff.md` — the designer's specification.

@@ -1,42 +1,57 @@
+/**
+ * Main screen (route `/`).
+ *
+ * The only root screen of the app: it brings together the calendar box, the
+ * list of tasks and habits, and the create button.
+ *
+ * How you get here: it is the initial route. Secondary screens come back here
+ * with the back arrow, and it is also the fallback destination when someone
+ * opens an item detail through a deep link and there is no history to go back
+ * to.
+ *
+ * Where it leads:
+ * - `/create` with the CREAR button.
+ * - `/item/[id]` when tapping a calendar event or the settings icon of a task
+ *   or a habit.
+ * - `/settings`, `/help` and `/about` from the side menu.
+ *
+ * The calendar box has four states, combining mode (day or week) with size
+ * (collapsed or expanded). Tapping a day in the week or month view opens that
+ * day in the expanded view.
+ */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  SectionList,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
-import { DayExpanded } from '@/features/home/DayExpanded';
-import { HabitCard } from '@/features/home/HabitCard';
+import { AgendaList } from '@/features/home/AgendaList';
+import { DAY_ROW_HEIGHT, DayExpanded } from '@/features/home/DayExpanded';
 import { ModeColumn } from '@/features/home/ModeColumn';
 import { MonthExpanded } from '@/features/home/MonthExpanded';
 import { SideDrawer } from '@/features/home/SideDrawer';
-import { TaskRow } from '@/features/home/TaskRow';
 import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
-import { MONTHS, dayKey, fmtDayTitle, weekDays } from '@/lib/date';
-import { countsByDay, eventsForDay, todayTasks, visibleEvents } from '@/store/selectors';
+import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
+import { dayKey, weekDays } from '@/lib/date';
+import {
+  eventCountsByDay,
+  eventsForDay,
+  tasksForHome,
+  visibleEvents,
+} from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
-import { color, radius, space } from '@/theme/tokens';
+import { color, radius, size, space } from '@/theme/tokens';
 import { Cta, IconButton } from '@/ui/controls';
 import { ListIcon, PlusIcon } from '@/ui/icons';
-import type { Habit, Task } from '@/types';
 
-type Mode = 'today' | 'week';
+/** Height taken by the header, the CTA and the gaps around the box. */
+const CHROME_HEIGHT = 220;
 
-type Row =
-  | { type: 'task'; task: Task }
-  | { type: 'habits'; habits: Habit[] };
-
-const GRID_GAP = 7;
-/** Rejilla de hábitos: 2 columnas para que la tarjeta respire. */
-const GRID_COLS = 2;
-const BOX_PAD = 14;
+/** Height of the calendar box while collapsed. */
+const COLLAPSED_BOX_HEIGHT = 200;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -44,115 +59,68 @@ export default function HomeScreen() {
   const { weekStart } = usePrefs();
   const accent = useAccent();
 
-  const [mode, setMode] = useState<Mode>('today');
+  const [mode, setMode] = useState<CalendarMode>('today');
   const [expanded, setExpanded] = useState(false);
-  const [drawer, setDrawer] = useState(false);
-  const [addSource, setAddSource] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
   const [focusDay, setFocusDay] = useState<Date | null>(null);
-  const [gridWidth, setGridWidth] = useState(0);
 
-  const events = useAppStore((s) => s.events);
-  const calendars = useAppStore((s) => s.calendars);
-  const tasks = useAppStore((s) => s.tasks);
-  const habits = useAppStore((s) => s.habits);
-  const toggleTask = useAppStore((s) => s.toggleTask);
-  const bumpHabit = useAppStore((s) => s.bumpHabit);
+  const events = useAppStore((state) => state.events);
+  const calendars = useAppStore((state) => state.calendars);
+  const tasks = useAppStore((state) => state.tasks);
+  const habits = useAppStore((state) => state.habits);
+  const toggleTask = useAppStore((state) => state.toggleTask);
+  const bumpHabit = useAppStore((state) => state.bumpHabit);
 
-  const today = new Date();
-  const shown = useMemo(
+  const shownEvents = useMemo(
     () => visibleEvents(events, calendars),
     [events, calendars],
   );
-  const counts = useMemo(() => countsByDay(shown), [shown]);
+  const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);
   const days = useMemo(() => weekDays(new Date(), weekStart), [weekStart]);
   const todaysEvents = useMemo(
-    () => eventsForDay(shown, new Date()),
-    [shown],
+    () => eventsForDay(shownEvents, new Date()),
+    [shownEvents],
   );
+  const visibleTasks = useMemo(() => tasksForHome(tasks), [tasks]);
 
-  const weekCount = days.reduce(
-    (acc, d) => acc + (counts.get(dayKey(d)) ?? 0),
+  const weekEventCount = days.reduce(
+    (total, day) => total + (counts.get(dayKey(day)) ?? 0),
     0,
   );
 
-  const visibleTasks = useMemo(() => todayTasks(tasks), [tasks]);
-  const doneTasks = visibleTasks.filter((t) => t.done).length;
-  const doneHabits = habits.filter((h) => h.progress >= h.target).length;
+  const header = homeHeaderCopy({
+    mode,
+    expanded,
+    focusDay,
+    today: new Date(),
+    todayEventCount: todaysEvents.length,
+    weekEventCount,
+    visibleDayCount: Math.max(
+      1,
+      Math.round((height - CHROME_HEIGHT) / DAY_ROW_HEIGHT),
+    ),
+  });
 
-  const sections = useMemo(
-    () => [
-      {
-        key: 'tasks',
-        title: 'TAREAS',
-        count: `${doneTasks}/${visibleTasks.length}`,
-        data: visibleTasks.map<Row>((task) => ({ type: 'task', task })),
-      },
-      {
-        key: 'habits',
-        title: 'HÁBITOS',
-        count: `${doneHabits}/${habits.length}`,
-        data: [{ type: 'habits', habits } as Row],
-      },
-    ],
-    [visibleTasks, habits, doneTasks, doneHabits],
-  );
-
+  /** Opens a specific day in the expanded day view. */
   const openDay = (day: Date) => {
     setFocusDay(day);
     setMode('today');
     setExpanded(true);
   };
 
-  // Cabecera según el estado de la caja (mismo mapa que el prototipo).
-  const headTitle = expanded
-    ? mode === 'week'
-      ? MONTHS[today.getMonth()]
-      : fmtDayTitle(focusDay ?? today)
-    : mode === 'week'
-      ? 'Esta semana'
-      : fmtDayTitle(today);
-
-  const visibleDays = Math.max(1, Math.round((height - 220) / 132));
-  const headSub = expanded
-    ? mode === 'today'
-      ? `${visibleDays} DÍAS`
-      : String(today.getFullYear())
-    : MONTHS[today.getMonth()].toUpperCase();
-
-  const headRight = expanded
-    ? ''
-    : mode === 'today'
-      ? `${todaysEvents.length} EVENTOS`
-      : `${weekCount} EVENTOS`;
-
-  const modeLabel = expanded
-    ? mode === 'today'
-      ? 'DÍA'
-      : 'MES'
-    : mode === 'today'
-      ? 'HOY'
-      : 'SEM';
-  const modeOther = expanded
-    ? mode === 'today'
-      ? 'MES'
-      : 'DÍA'
-    : mode === 'today'
-      ? 'SEM'
-      : 'HOY';
-
-  const cardWidth =
-    gridWidth > 0
-      ? (gridWidth - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS
-      : 0;
+  const openItem = (id: string) => router.push(`/item/${id}`);
 
   const modeColumn = (
     <ModeColumn
-      label={modeLabel}
-      other={modeOther}
+      label={header.modeLabel}
+      other={header.otherModeLabel}
       expanded={expanded}
-      onToggleMode={() => setMode((m) => (m === 'today' ? 'week' : 'today'))}
+      onToggleMode={() =>
+        setMode((current) => (current === 'today' ? 'week' : 'today'))
+      }
       onToggleExpand={() => {
-        setExpanded((e) => !e);
+        setExpanded((current) => !current);
         setFocusDay(null);
       }}
     />
@@ -169,19 +137,21 @@ export default function HomeScreen() {
           <IconButton
             size={32}
             label="Menú"
-            style={{ marginLeft: -5 }}
-            onPress={() => setDrawer(true)}>
+            style={styles.menuButton}
+            onPress={() => setDrawerOpen(true)}>
             <ListIcon size={20} color={color.textMuted} />
           </IconButton>
-          {/* Solo textos dentro de la fila con baseline: con Views mezcladas la
-              primera medición de Yoga sale corta y la caja de abajo se solapa. */}
+
           <View style={styles.headerText}>
-            <T w={500} numberOfLines={1} style={styles.headTitle}>
-              {headTitle}
-            </T>
-            <T style={styles.headMeta}>{headSub}</T>
+            <AppText weight={500} numberOfLines={1} style={styles.headerTitle}>
+              {header.title}
+            </AppText>
+            <AppText style={styles.headerMeta}>{header.subtitle}</AppText>
           </View>
-          {headRight ? <T style={styles.headMeta}>{headRight}</T> : null}
+
+          {header.right ? (
+            <AppText style={styles.headerMeta}>{header.right}</AppText>
+          ) : null}
         </View>
 
         {expanded ? (
@@ -189,9 +159,9 @@ export default function HomeScreen() {
             {modeColumn}
             {mode === 'today' ? (
               <DayExpanded
-                events={shown}
+                events={shownEvents}
                 focusDay={focusDay}
-                onPressEvent={(e) => router.push(`/item/${e.id}`)}
+                onPressEvent={(event) => openItem(event.id)}
               />
             ) : (
               <MonthExpanded counts={counts} onPressDay={openDay} />
@@ -204,62 +174,20 @@ export default function HomeScreen() {
               {mode === 'today' ? (
                 <TodayTimeline
                   events={todaysEvents}
-                  onPressEvent={(e) => router.push(`/item/${e.id}`)}
+                  onPressEvent={(event) => openItem(event.id)}
                 />
               ) : (
                 <WeekStrip days={days} counts={counts} onPressDay={openDay} />
               )}
             </View>
 
-            <View style={styles.contentBox}>
-              <SectionList
-                sections={sections}
-                keyExtractor={(item, index) =>
-                  item.type === 'task' ? item.task.id : `habits-${index}`
-                }
-                stickySectionHeadersEnabled
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.listContent}
-                renderSectionHeader={({ section }) => (
-                  <View
-                    style={[
-                      styles.sectionHeader,
-                      section.key === 'habits' && styles.sectionHeaderSecond,
-                    ]}>
-                    <T style={styles.sectionTitle}>{section.title}</T>
-                    <T style={styles.sectionCount}>{section.count}</T>
-                  </View>
-                )}
-                renderItem={({ item }) =>
-                  item.type === 'task' ? (
-                    <TaskRow
-                      task={item.task}
-                      onToggle={() => toggleTask(item.task.id)}
-                      onOpenSettings={() => router.push(`/item/${item.task.id}`)}
-                    />
-                  ) : (
-                    <View
-                      style={styles.grid}
-                      onLayout={(e) =>
-                        setGridWidth(e.nativeEvent.layout.width)
-                      }>
-                      {cardWidth > 0
-                        ? item.habits.map((habit) => (
-                            <HabitCard
-                              key={habit.id}
-                              habit={habit}
-                              width={cardWidth}
-                              showStreak
-                              onBump={(delta) => bumpHabit(habit.id, delta)}
-                              onOpenSettings={() =>
-                                router.push(`/item/${habit.id}`)
-                              }
-                            />
-                          ))
-                        : null}
-                    </View>
-                  )
-                }
+            <View style={styles.agendaBox}>
+              <AgendaList
+                tasks={visibleTasks}
+                habits={habits}
+                onToggleTask={toggleTask}
+                onBumpHabit={bumpHabit}
+                onOpenItem={openItem}
               />
             </View>
           </View>
@@ -273,44 +201,54 @@ export default function HomeScreen() {
       </View>
 
       <SideDrawer
-        open={drawer}
-        onClose={() => setDrawer(false)}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         onAddSource={() => {
-          setDrawer(false);
-          setAddSource(true);
+          setDrawerOpen(false);
+          setAddSourceOpen(true);
         }}
       />
-      <AddSourceSheet open={addSource} onClose={() => setAddSource(false)} />
+      <AddSourceSheet
+        open={addSourceOpen}
+        onClose={() => setAddSourceOpen(false)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+  root: { flex: 1, backgroundColor: color.background },
   screen: {
     flex: 1,
     paddingHorizontal: space.screen,
     gap: 10,
   },
   header: {
-    // Alto fijo a propósito: con alto automático la primera medición del texto
-    // usa métricas de la fuente de sistema y la caja del calendario se cuela
-    // por encima hasta el siguiente relayout.
-    height: 38,
+    /**
+     * Fixed height on purpose: with automatic height the first text measurement
+     * uses system font metrics and the calendar box slips over the header until
+     * the next relayout.
+     */
+    height: size.header,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
     paddingHorizontal: 6,
     zIndex: 2,
   },
+  menuButton: { marginLeft: -5 },
+  /**
+   * Only texts go inside the row with `baseline`: mixing Views in makes Yoga's
+   * first measurement come out short and the box below overlaps.
+   */
   headerText: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 9,
   },
-  headTitle: { fontSize: 19, lineHeight: 26, letterSpacing: -0.3 },
-  headMeta: {
+  headerTitle: { fontSize: 19, lineHeight: 26, letterSpacing: -0.3 },
+  headerMeta: {
     fontSize: 10,
     letterSpacing: 1.6,
     color: color.label,
@@ -320,45 +258,20 @@ const styles = StyleSheet.create({
   box: {
     backgroundColor: color.box,
     borderWidth: 1,
-    borderColor: color.borderMut,
+    borderColor: color.borderBox,
     borderRadius: radius.box,
     padding: 11,
     flexDirection: 'row',
     gap: 10,
   },
-  boxCollapsed: { height: 200, overflow: 'hidden' },
+  boxCollapsed: { height: COLLAPSED_BOX_HEIGHT, overflow: 'hidden' },
   boxExpanded: { flex: 1, overflow: 'hidden' },
-  contentBox: {
+  agendaBox: {
     flex: 1,
     backgroundColor: color.box,
     borderWidth: 1,
-    borderColor: color.borderMut,
+    borderColor: color.borderBox,
     borderRadius: radius.box,
     overflow: 'hidden',
-  },
-  listContent: { paddingHorizontal: BOX_PAD, paddingBottom: 12 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    backgroundColor: color.box,
-    marginHorizontal: -BOX_PAD,
-    paddingHorizontal: BOX_PAD,
-    paddingTop: 13,
-    paddingBottom: 9,
-  },
-  sectionHeaderSecond: {
-    marginTop: 12,
-    paddingTop: 9,
-    borderTopWidth: 1,
-    borderTopColor: color.line,
-  },
-  sectionTitle: { fontSize: 9, letterSpacing: 1.8, color: color.label },
-  sectionCount: { fontSize: 9, letterSpacing: 1.2, color: color.faint },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GRID_GAP,
-    paddingTop: 9,
   },
 });

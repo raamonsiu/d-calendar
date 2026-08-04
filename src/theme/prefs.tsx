@@ -12,23 +12,26 @@ import { color } from './tokens';
 
 export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
 
-export type Prefs = {
+export type Preferences = {
   accent: string;
   weekStart: WeekStart;
-  /** Duración por defecto de un evento, en minutos. */
+  /** Default duration of an event, in minutes. */
   defaultDuration: number;
   defaultCalendarId: string;
   reduceMotion: boolean;
   mono: boolean;
 };
 
-type PrefsContextValue = Prefs & {
-  /** true si el usuario lo pidió en Ajustes o si el sistema lo tiene activado. */
+type PreferencesContextValue = Preferences & {
+  /** true when the user asked for it in Settings or the system has it on. */
   motionOff: boolean;
-  set: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
+  setPreference: <Key extends keyof Preferences>(
+    key: Key,
+    value: Preferences[Key],
+  ) => void;
 };
 
-const DEFAULTS: Prefs = {
+const DEFAULT_PREFERENCES: Preferences = {
   accent: color.accentDefault,
   weekStart: 'Lunes',
   defaultDuration: 30,
@@ -37,56 +40,79 @@ const DEFAULTS: Prefs = {
   mono: false,
 };
 
-const PrefsContext = createContext<PrefsContextValue>({
-  ...DEFAULTS,
+/**
+ * Under the "Reducir animaciones" setting the overlay keeps a short fade
+ * instead of appearing at once (handoff §3).
+ */
+const REDUCED_OVERLAY_MS = 100;
+
+const PreferencesContext = createContext<PreferencesContextValue>({
+  ...DEFAULT_PREFERENCES,
   motionOff: false,
-  set: () => {},
+  setPreference: () => {},
 });
 
-export function PrefsProvider({ children }: { children: ReactNode }) {
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
+/**
+ * Keeps the app preferences and combines them with the system accessibility
+ * settings. In this iteration they live in memory: closing the app restores the
+ * defaults.
+ */
+export function PreferencesProvider({ children }: { children: ReactNode }) {
+  const [preferences, setPreferences] = useState<Preferences>(
+    DEFAULT_PREFERENCES,
+  );
   const [systemReduceMotion, setSystemReduceMotion] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((v) => {
-      if (alive) setSystemReduceMotion(v);
+    let subscribed = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (subscribed) setSystemReduceMotion(enabled);
     });
-    const sub = AccessibilityInfo.addEventListener(
+    const subscription = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
       setSystemReduceMotion,
     );
     return () => {
-      alive = false;
-      sub.remove();
+      subscribed = false;
+      subscription.remove();
     };
   }, []);
 
-  const value = useMemo<PrefsContextValue>(
+  const value = useMemo<PreferencesContextValue>(
     () => ({
-      ...prefs,
-      motionOff: prefs.reduceMotion || systemReduceMotion,
-      set: (key, v) => setPrefs((p) => ({ ...p, [key]: v })),
+      ...preferences,
+      motionOff: preferences.reduceMotion || systemReduceMotion,
+      setPreference: (key, next) =>
+        setPreferences((current) => ({ ...current, [key]: next })),
     }),
-    [prefs, systemReduceMotion],
+    [preferences, systemReduceMotion],
   );
 
-  return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
+  return (
+    <PreferencesContext.Provider value={value}>
+      {children}
+    </PreferencesContext.Provider>
+  );
 }
 
-export const usePrefs = () => useContext(PrefsContext);
+export const usePrefs = () => useContext(PreferencesContext);
 
-/** El acento, que es lo único que va en color. */
-export const useAccent = () => useContext(PrefsContext).accent;
+/** The accent, the only thing in the app that carries colour. */
+export const useAccent = () => useContext(PreferencesContext).accent;
 
 /**
- * Duración de animación respetando «Reducir animaciones».
- * El overlay conserva un fade corto en lugar de saltar de golpe (handoff §3).
+ * Returns the function that translates a duration from the theme into the real
+ * duration, honouring the "Reducir animaciones" setting.
+ *
+ * Precondition: `milliseconds` comes from `duration` (tokens); `kind` tells the
+ * overlay fade apart from every other kind of movement. Postcondition: with
+ * motion enabled it returns the duration untouched; with motion disabled it
+ * returns 0, or `REDUCED_OVERLAY_MS` for the overlay.
  */
 export function useDuration() {
   const { motionOff } = usePrefs();
-  return (ms: number, kind: 'motion' | 'overlay' = 'motion') => {
-    if (!motionOff) return ms;
-    return kind === 'overlay' ? 100 : 0;
+  return (milliseconds: number, kind: 'motion' | 'overlay' = 'motion') => {
+    if (!motionOff) return milliseconds;
+    return kind === 'overlay' ? REDUCED_OVERLAY_MS : 0;
   };
 }

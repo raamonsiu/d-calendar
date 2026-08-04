@@ -1,17 +1,27 @@
+/**
+ * Help and feedback (route `/help`).
+ *
+ * How you get here: from the Home side menu.
+ *
+ * Where it leads: to `/help/[slug]` when a resource is tapped. The feedback
+ * form opens in a bottom sheet over this same screen.
+ *
+ * Mock: sending feedback calls no service; the sheet just moves to its "sent"
+ * state and the fields are cleared on close.
+ */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { TOPICS } from '@/data/help';
 import { groupRadius } from '@/lib/groupRadius';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { alpha, color, radius, space } from '@/theme/tokens';
+import { alpha, color, radius, tint } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
 import { Group } from '@/ui/Group';
-import { ScreenHeader } from '@/ui/ScreenHeader';
+import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
 import { Cta } from '@/ui/controls';
 import {
@@ -21,157 +31,161 @@ import {
   PaperPlaneTiltIcon,
 } from '@/ui/icons';
 
-const KINDS = ['Error', 'Idea', 'Otro'];
+/** Kinds of feedback that can be sent. */
+const FEEDBACK_KINDS = ['Error', 'Idea', 'Otro'];
+
+/** Support address shown under the button. */
+const SUPPORT_EMAIL = 'soporte@d-calendar.app';
+
+/** CTA height on this screen, shorter than a bottom action bar. */
+const CTA_HEIGHT = 48;
+
+/** Which step the feedback sheet is on. */
+type FeedbackStep = 'form' | 'sent' | null;
 
 export default function HelpScreen() {
-  const insets = useSafeAreaInsets();
   const accent = useAccent();
 
-  const [feedback, setFeedback] = useState<'form' | 'sent' | null>(null);
-  const [kind, setKind] = useState('Error');
+  const [step, setStep] = useState<FeedbackStep>(null);
+  const [kind, setKind] = useState(FEEDBACK_KINDS[0]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
   const closeFeedback = () => {
-    setFeedback(null);
+    setStep(null);
     setTitle('');
     setBody('');
   };
 
   return (
-    <View style={styles.root}>
-      <View
-        style={[
-          styles.screen,
-          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 14 },
-        ]}>
-        <ScreenHeader title="Ayuda y comentarios" />
+    <SecondaryScreen
+      title="Ayuda y comentarios"
+      overlays={
+        <Sheet
+          open={!!step}
+          onClose={closeFeedback}
+          title={step === 'sent' ? 'Gracias' : 'Nuevo comentario'}>
+          {step === 'form' ? (
+            <View style={styles.form}>
+              <View style={styles.kindRow}>
+                {FEEDBACK_KINDS.map((option) => (
+                  <Chip
+                    key={option}
+                    grow
+                    height={34}
+                    label={option}
+                    selected={kind === option}
+                    onPress={() => setKind(option)}
+                  />
+                ))}
+              </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}>
-          <Group title="Recursos populares">
-            {TOPICS.map((topic, i) => (
-              <Pressable
-                key={topic.slug}
-                accessibilityRole="button"
-                onPress={() => router.push(`/help/${topic.slug}`)}
-                style={({ pressed }) => [
-                  styles.topic,
-                  groupRadius(i, TOPICS.length),
-                  { backgroundColor: pressed ? color.cardHover : color.surface },
+              <View
+                style={[
+                  styles.inputBox,
+                  groupRadius(0, 2, radius.card, radius.joined),
                 ]}>
-                <topic.icon size={15} color={color.textMuted} />
-                <View style={styles.topicBody}>
-                  <T style={styles.topicTitle}>{topic.title}</T>
-                  <T style={styles.topicMeta}>{topic.meta}</T>
-                </View>
-                <CaretRightIcon size={11} color="#3f3f47" />
-              </Pressable>
-            ))}
-          </Group>
+                <Field
+                  variant="bare"
+                  fontSize={14}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Título del comentario"
+                />
+              </View>
 
-          <Group title="Enviar comentarios">
-            <View style={styles.feedbackCard}>
-              <T style={styles.feedbackText}>
-                ¿Algo no funciona o echas algo en falta? Cuéntanoslo y lo leemos
-                todo.
-              </T>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setFeedback('form')}
-                style={({ pressed }) => [
-                  styles.feedbackCta,
-                  {
-                    borderColor: accent,
-                    backgroundColor: alpha(accent, pressed ? 0.14 : 0.07),
-                  },
+              <View
+                style={[
+                  styles.inputBox,
+                  groupRadius(1, 2, radius.card, radius.joined),
                 ]}>
-                <PaperPlaneTiltIcon size={14} color={accent} />
-                <T style={styles.feedbackCtaLabel}>ENVIAR COMENTARIO</T>
-              </Pressable>
-              <View style={styles.mailRow}>
-                <EnvelopeSimpleIcon size={12} color={color.faint} />
-                <T style={styles.mail}>soporte@d-calendar.app</T>
+                <Field
+                  variant="bare"
+                  multiline
+                  value={body}
+                  onChangeText={setBody}
+                  placeholder="Cuéntanos qué ha pasado, qué esperabas y en qué pantalla"
+                  style={styles.bodyInput}
+                />
+              </View>
+
+              <View style={styles.submit}>
+                <Cta
+                  primary
+                  disabled={!title.trim()}
+                  label="ENVIAR"
+                  onPress={() => setStep('sent')}
+                />
               </View>
             </View>
-          </Group>
-        </ScrollView>
-      </View>
+          ) : (
+            <View style={styles.sent}>
+              <View
+                style={[
+                  styles.sentIcon,
+                  {
+                    borderColor: accent,
+                    backgroundColor: alpha(accent, tint.glyph),
+                  },
+                ]}>
+                <CheckIcon size={19} color={accent} />
+              </View>
+              <AppText weight={400} style={styles.sentTitle}>
+                Comentario enviado
+              </AppText>
+              <AppText style={styles.sentText}>
+                Gracias. Si hace falta más contexto te escribimos a
+                dani@digimevo.com.
+              </AppText>
+            </View>
+          )}
+        </Sheet>
+      }>
+      <Group title="Recursos populares">
+        {TOPICS.map((topic, index) => (
+          <Pressable
+            key={topic.slug}
+            accessibilityRole="button"
+            onPress={() => router.push(`/help/${topic.slug}`)}
+            style={({ pressed }) => [
+              styles.topic,
+              groupRadius(index, TOPICS.length),
+              { backgroundColor: pressed ? color.cardHover : color.surface },
+            ]}>
+            <topic.icon size={15} color={color.textMuted} />
+            <View style={styles.topicBody}>
+              <AppText style={styles.topicTitle}>{topic.title}</AppText>
+              <AppText style={styles.topicMeta}>{topic.meta}</AppText>
+            </View>
+            <CaretRightIcon size={11} color={color.caret} />
+          </Pressable>
+        ))}
+      </Group>
 
-      <Sheet
-        open={!!feedback}
-        onClose={closeFeedback}
-        title={feedback === 'sent' ? 'Gracias' : 'Nuevo comentario'}>
-        {feedback === 'form' ? (
-          <View style={{ gap: 5 }}>
-            <View style={styles.kindRow}>
-              {KINDS.map((k) => (
-                <Chip
-                  key={k}
-                  grow
-                  height={34}
-                  label={k}
-                  selected={kind === k}
-                  onPress={() => setKind(k)}
-                />
-              ))}
-            </View>
-            <View style={[styles.inputBox, styles.inputBoxTop]}>
-              <Field
-                variant="bare"
-                size={14}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Título del comentario"
-              />
-            </View>
-            <View style={[styles.inputBox, styles.inputBoxBottom]}>
-              <Field
-                variant="bare"
-                multiline
-                value={body}
-                onChangeText={setBody}
-                placeholder="Cuéntanos qué ha pasado, qué esperabas y en qué pantalla"
-                style={styles.bodyInput}
-              />
-            </View>
-            <View style={{ marginTop: 5 }}>
-              <Cta
-                primary
-                disabled={!title.trim()}
-                label="ENVIAR"
-                onPress={() => setFeedback('sent')}
-              />
-            </View>
+      <Group title="Enviar comentarios">
+        <View style={styles.feedbackCard}>
+          <AppText style={styles.feedbackText}>
+            ¿Algo no funciona o echas algo en falta? Cuéntanoslo y lo leemos
+            todo.
+          </AppText>
+          <Cta
+            primary
+            height={CTA_HEIGHT}
+            label="ENVIAR COMENTARIO"
+            icon={<PaperPlaneTiltIcon size={14} color={accent} />}
+            onPress={() => setStep('form')}
+          />
+          <View style={styles.mailRow}>
+            <EnvelopeSimpleIcon size={12} color={color.faint} />
+            <AppText style={styles.mail}>{SUPPORT_EMAIL}</AppText>
           </View>
-        ) : (
-          <View style={styles.sent}>
-            <View
-              style={[
-                styles.sentIcon,
-                { borderColor: accent, backgroundColor: alpha(accent, 0.1) },
-              ]}>
-              <CheckIcon size={19} color={accent} />
-            </View>
-            <T w={400} style={styles.sentTitle}>
-              Comentario enviado
-            </T>
-            <T style={styles.sentText}>
-              Gracias. Si hace falta más contexto te escribimos a
-              dani@digimevo.com.
-            </T>
-          </View>
-        )}
-      </Sheet>
-    </View>
+        </View>
+      </Group>
+    </SecondaryScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
-  screen: { flex: 1, paddingHorizontal: space.screen, gap: 12 },
-  scroll: { gap: 16, paddingBottom: 6 },
   topic: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,17 +203,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  feedbackText: { fontSize: 12.5, lineHeight: 18, color: '#b9b9c1' },
-  feedbackCta: {
-    height: 48,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-  },
-  feedbackCtaLabel: { fontSize: 10, letterSpacing: 1.8, color: color.text },
+  feedbackText: { fontSize: 12.5, lineHeight: 18, color: color.textNote },
   mailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -207,25 +211,15 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   mail: { fontSize: 9.5, letterSpacing: 0.6, color: color.labelDim },
+  form: { gap: 5 },
   kindRow: { flexDirection: 'row', gap: 5 },
   inputBox: {
     backgroundColor: color.card,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  inputBoxTop: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomLeftRadius: 9,
-    borderBottomRightRadius: 9,
-  },
-  inputBoxBottom: {
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-  },
-  bodyInput: { minHeight: 72, lineHeight: 19, color: '#b9b9c1' },
+  bodyInput: { minHeight: 72, lineHeight: 19, color: color.textNote },
+  submit: { marginTop: 5 },
   sent: {
     alignItems: 'center',
     gap: 11,

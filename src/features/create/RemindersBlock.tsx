@@ -1,172 +1,209 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { fmtTime } from '@/lib/date';
-import { T } from '@/theme/Text';
-import { color, hitSlopFor, radius } from '@/theme/tokens';
+import { nextInCycle, patchById, withoutId } from '@/lib/collections';
+import { formatTime } from '@/lib/date';
+import { countLabel } from '@/lib/text';
+import { createId } from '@/store/useAppStore';
+import { AppText } from '@/theme/Text';
+import { color, hitSlopFor, radius, size } from '@/theme/tokens';
 import { DashedButton } from '@/ui/controls';
 import { BellIcon, PlusIcon, XIcon } from '@/ui/icons';
-import { uid } from '@/store/useAppStore';
-import type { RelReminder, RelUnit, TimeReminder } from '@/types';
+import type { RelativeReminder, ReminderUnit, TimeReminder } from '@/types';
 import { ControlButton, FormBlock } from './blocks';
 
-const REL_UNITS = ['MINUTOS ANTES', 'HORAS ANTES', 'DÍAS ANTES'];
-const REL_VALUES = [5, 10, 15, 30, 45];
+/** Units of a relative reminder, in `ReminderUnit` order. */
+const RELATIVE_UNITS = ['MINUTOS ANTES', 'HORAS ANTES', 'DÍAS ANTES'];
 
-type Common = {
-  /** Se llama tras añadir, para que el formulario baje hasta el aviso nuevo. */
+/** Values the control cycles through when tapped. */
+const RELATIVE_VALUES = [5, 10, 15, 30, 45];
+
+/** Starting values of a new reminder. */
+const NEW_RELATIVE_VALUE = 30;
+const NEW_REMINDER_HOUR = 21;
+
+/** Widths of the controls in the row. */
+const VALUE_WIDTH = 62;
+const TIME_WIDTH = 72;
+
+type CommonProps = {
+  /** Called after adding, so the form scrolls down to the new reminder. */
   onAdded: () => void;
 };
 
-type RelProps = Common & {
+type RelativeProps = CommonProps & {
   kind: 'relative';
-  reminders: RelReminder[];
-  onChange: (next: RelReminder[]) => void;
+  reminders: RelativeReminder[];
+  onChange: (next: RelativeReminder[]) => void;
 };
 
-type TimeProps = Common & {
+type TimeProps = CommonProps & {
   kind: 'time';
   reminders: TimeReminder[];
   onChange: (next: TimeReminder[]) => void;
-  /** Etiqueta de la derecha: depende de si el hábito es semanal. */
+  /** Label on the right: depends on whether the habit is weekly. */
   unitLabel: string;
+  /** Opens the form's time picker with the current value of the row. */
   onPickTime: (current: string, apply: (time: string) => void) => void;
 };
 
 /**
- * Caja de notificaciones, común a los tres tipos. Los eventos y las tareas
- * avisan «n minutos/horas/días antes»; los hábitos, a horas del día.
+ * Notifications box, the last one of the form in all three types.
+ *
+ * Events and tasks remind you "n minutes, hours or days before"; habits remind
+ * you at times of day. Both variants share the box, the header counter and the
+ * row, and only the controls in the middle change.
  */
-export function RemindersBlock(props: RelProps | TimeProps) {
-  const count =
+export function RemindersBlock(props: RelativeProps | TimeProps) {
+  const summary =
     props.kind === 'time'
-      ? `${props.reminders.length} ${props.reminders.length === 1 ? 'HORA' : 'HORAS'}`
-      : `${props.reminders.length} ${props.reminders.length === 1 ? 'AVISO' : 'AVISOS'}`;
+      ? countLabel(props.reminders.length, 'HORA', 'HORAS')
+      : countLabel(props.reminders.length, 'AVISO', 'AVISOS');
 
-  const removeButton = (onPress: () => void, label: string) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={hitSlopFor(30)}
-      onPress={onPress}
-      style={styles.remove}>
-      <XIcon size={13} color="#4a4a52" />
-    </Pressable>
-  );
+  const addReminder = () => {
+    if (props.kind === 'time') {
+      props.onChange([
+        ...props.reminders,
+        {
+          id: createId('r'),
+          time: formatTime(new Date(2000, 0, 1, NEW_REMINDER_HOUR, 0)),
+        },
+      ]);
+    } else {
+      props.onChange([
+        ...props.reminders,
+        { id: createId('r'), value: NEW_RELATIVE_VALUE, unit: 0 },
+      ]);
+    }
+    props.onAdded();
+  };
 
   return (
     <FormBlock
       last
       title="NOTIFICACIONES"
-      right={<T style={styles.count}>{count}</T>}>
+      right={<AppText style={styles.summary}>{summary}</AppText>}>
       <View style={styles.list}>
         {props.kind === 'time'
-          ? props.reminders.map((r) => (
-              <View key={r.id} style={styles.row}>
-                <BellIcon size={13} color={color.labelDim} />
+          ? props.reminders.map((reminder) => (
+              <ReminderRow
+                key={reminder.id}
+                removeLabel="Quitar hora"
+                onRemove={() =>
+                  props.onChange(withoutId(props.reminders, reminder.id))
+                }>
                 <ControlButton
                   center
-                  height={36}
-                  width={72}
-                  label={r.time}
+                  height={size.controlSmall}
+                  width={TIME_WIDTH}
+                  label={reminder.time}
                   onPress={() =>
-                    props.onPickTime(r.time, (time) =>
+                    props.onPickTime(reminder.time, (time) =>
                       props.onChange(
-                        props.reminders.map((x) =>
-                          x.id === r.id ? { ...x, time } : x,
-                        ),
+                        patchById(props.reminders, reminder.id, { time }),
                       ),
                     )
                   }
                 />
                 <View style={styles.unit}>
-                  <T numberOfLines={1} style={styles.unitLabel}>
+                  <AppText numberOfLines={1} style={styles.unitLabel}>
                     {props.unitLabel}
-                  </T>
+                  </AppText>
                 </View>
-                {removeButton(
-                  () =>
-                    props.onChange(props.reminders.filter((x) => x.id !== r.id)),
-                  'Quitar hora',
-                )}
-              </View>
+              </ReminderRow>
             ))
-          : props.reminders.map((r) => (
-              <View key={r.id} style={styles.row}>
-                <BellIcon size={13} color={color.labelDim} />
+          : props.reminders.map((reminder) => (
+              <ReminderRow
+                key={reminder.id}
+                removeLabel="Quitar aviso"
+                onRemove={() =>
+                  props.onChange(withoutId(props.reminders, reminder.id))
+                }>
                 <ControlButton
                   center
-                  height={36}
-                  width={62}
-                  label={String(r.value)}
+                  height={size.controlSmall}
+                  width={VALUE_WIDTH}
+                  label={String(reminder.value)}
                   onPress={() =>
                     props.onChange(
-                      props.reminders.map((x) =>
-                        x.id === r.id
-                          ? {
-                              ...x,
-                              value:
-                                REL_VALUES[
-                                  (REL_VALUES.indexOf(x.value) + 1) %
-                                    REL_VALUES.length
-                                ],
-                            }
-                          : x,
-                      ),
+                      patchById(props.reminders, reminder.id, {
+                        value: nextInCycle(RELATIVE_VALUES, reminder.value),
+                      }),
                     )
                   }
                 />
                 <ControlButton
                   grow
-                  height={36}
-                  label={REL_UNITS[r.unit]}
+                  height={size.controlSmall}
+                  label={RELATIVE_UNITS[reminder.unit]}
                   onPress={() =>
                     props.onChange(
-                      props.reminders.map((x) =>
-                        x.id === r.id
-                          ? { ...x, unit: (((x.unit + 1) % 3) as RelUnit) }
-                          : x,
-                      ),
+                      patchById(props.reminders, reminder.id, {
+                        unit: nextUnit(reminder.unit),
+                      }),
                     )
                   }
                 />
-                {removeButton(
-                  () =>
-                    props.onChange(props.reminders.filter((x) => x.id !== r.id)),
-                  'Quitar aviso',
-                )}
-              </View>
+              </ReminderRow>
             ))}
       </View>
 
       <DashedButton
         label={props.kind === 'time' ? 'AÑADIR HORA' : 'AÑADIR AVISO'}
         icon={<PlusIcon size={12} color={color.textMuted} />}
-        onPress={() => {
-          if (props.kind === 'time') {
-            props.onChange([
-              ...props.reminders,
-              { id: uid('r'), time: fmtTime(new Date(2000, 0, 1, 21, 0)) },
-            ]);
-          } else {
-            props.onChange([
-              ...props.reminders,
-              { id: uid('r'), value: 30, unit: 0 },
-            ]);
-          }
-          props.onAdded();
-        }}
+        onPress={addReminder}
       />
     </FormBlock>
   );
 }
 
+/**
+ * Next unit of a relative reminder, wrapping around after the last one.
+ *
+ * Postcondition: the result is always a valid `ReminderUnit`.
+ *
+ * @param unit Unit currently on screen.
+ */
+function nextUnit(unit: ReminderUnit) {
+  return ((unit + 1) % RELATIVE_UNITS.length) as ReminderUnit;
+}
+
+/**
+ * A reminder row: the bell, whatever controls the caller passes in, and the
+ * remove button.
+ */
+function ReminderRow({
+  removeLabel,
+  onRemove,
+  children,
+}: {
+  removeLabel: string;
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.row}>
+      <BellIcon size={13} color={color.labelDim} />
+      {children}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={removeLabel}
+        hitSlop={hitSlopFor(30)}
+        onPress={onRemove}
+        style={styles.remove}>
+        <XIcon size={13} color={color.iconFaint} />
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  count: { fontSize: 9, letterSpacing: 1.2, color: color.faint },
+  summary: { fontSize: 9, letterSpacing: 1.2, color: color.faint },
   list: { gap: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   unit: {
     flex: 1,
-    height: 36,
+    height: size.controlSmall,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: color.border,
@@ -174,11 +211,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  unitLabel: { fontSize: 11.5, letterSpacing: 0.3, color: '#b9b9c1' },
+  unitLabel: { fontSize: 11.5, letterSpacing: 0.3, color: color.textNote },
   remove: {
     width: 26,
     height: 30,
-    borderRadius: 9,
+    borderRadius: radius.joined,
     alignItems: 'center',
     justifyContent: 'center',
   },

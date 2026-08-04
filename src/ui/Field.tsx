@@ -4,18 +4,24 @@ import { fontFamily, scaleType } from '@/theme/Text';
 import { usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 
-type Props = TextInputProps & {
-  /** `boxed` pinta el control (borde + superficie); `bare` va dentro de una caja. */
+type FieldProps = TextInputProps & {
+  /**
+   * `boxed` draws the control (border and surface); `bare` goes inside a box.
+   */
   variant?: 'boxed' | 'bare';
-  size?: number;
+  fontSize?: number;
 };
 
+/**
+ * Text field of the app. Resolves the font family and the global scale just
+ * like `<AppText>`, and in the `boxed` variant it adds the full control.
+ */
 export function Field({
   variant = 'boxed',
-  size = 12.5,
+  fontSize = 12.5,
   style,
   ...rest
-}: Props) {
+}: FieldProps) {
   const { mono } = usePrefs();
   return (
     <TextInput
@@ -25,11 +31,10 @@ export function Field({
       {...rest}
       style={[
         styles.base,
-        { fontFamily: fontFamily(300, mono), fontSize: size },
+        { fontFamily: fontFamily(300, mono), fontSize },
         variant === 'boxed' && styles.boxed,
         style,
-        // Misma escala global que <T>.
-        scaleType([{ fontSize: size }, style]),
+        scaleType([{ fontSize }, style]),
       ]}
     />
   );

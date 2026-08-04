@@ -1,18 +1,25 @@
-// https://docs.expo.dev/guides/using-eslint/
+/**
+ * ESLint configuration (https://docs.expo.dev/guides/using-eslint/).
+ *
+ * It starts from Expo's own and disables exactly one rule, with a reason.
+ */
 const { defineConfig } = require('eslint/config');
-const expoConfig = require("eslint-config-expo/flat");
+const expoConfig = require('eslint-config-expo/flat');
 
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    ignores: ['dist/*'],
   },
   {
     rules: {
-      // Los shared values de Reanimated son refs mutables por diseño: se
-      // escriben desde gestos y handlers, no solo dentro del efecto que los
-      // usa. La regla del compilador no los modela y da falsos positivos.
-      "react-hooks/immutability": "off",
+      /**
+       * Reanimated shared values are mutable refs by design: they are written
+       * from gestures and handlers, not only inside the effect that uses them.
+       * The React compiler rule does not model them and reports false positives
+       * in every animated component.
+       */
+      'react-hooks/immutability': 'off',
     },
   },
 ]);

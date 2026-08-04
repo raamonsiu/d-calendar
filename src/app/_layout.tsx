@@ -1,3 +1,29 @@
+/**
+ * Navigation root (expo-router).
+ *
+ * Mounts everything the whole app needs before the first screen: fonts, the
+ * gesture container, safe area, preferences and toasts. No screen should mount
+ * these providers again.
+ *
+ * The route map is flat, with Home as the root:
+ *
+ * ```
+ * /                     index               main screen
+ * /create               create              form for a new item
+ * /item/[id]            item/[id]           detail of an existing item
+ * /settings             settings/index      settings
+ * /settings/calendars   settings/calendars  accounts and calendars
+ * /help                 help/index          help and feedback
+ * /help/[slug]          help/[slug]         help article
+ * /about                about               about the app
+ * ```
+ *
+ * Screens slide in from the right, except Crear and the item detail, which come
+ * up from the bottom because they are modal forms.
+ *
+ * Native headers are disabled: every screen draws its own with `ScreenHeader`
+ * so the title follows the design typography.
+ */
 import {
   RobotoMono_300Light,
   RobotoMono_400Regular,
@@ -13,17 +39,18 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { PrefsProvider } from '@/theme/prefs';
+import { PreferencesProvider } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
 import { ToastProvider } from '@/ui/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [fontsLoaded] = useFonts({
     RobotoSlab_300Light,
     RobotoSlab_400Regular,
     RobotoSlab_500Medium,
@@ -33,21 +60,24 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
 
-  if (!loaded) return null;
+  /**
+   * Without fonts nothing is drawn: the splash screen still covers everything.
+   */
+  if (!fontsLoaded) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: color.bg }}>
+    <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <PrefsProvider>
+        <PreferencesProvider>
           <ToastProvider>
             <StatusBar style="light" />
             <Stack
               screenOptions={{
                 headerShown: false,
-                contentStyle: { backgroundColor: color.bg },
+                contentStyle: styles.content,
                 animation: 'slide_from_right',
               }}>
               <Stack.Screen name="index" />
@@ -66,8 +96,13 @@ export default function RootLayout() {
               <Stack.Screen name="about" />
             </Stack>
           </ToastProvider>
-        </PrefsProvider>
+        </PreferencesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.background },
+  content: { backgroundColor: color.background },
+});

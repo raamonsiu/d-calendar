@@ -3,88 +3,99 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { decimalHours } from '@/lib/date';
 import { layoutDay } from '@/store/selectors';
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
+import {
+  HOUR_WIDTH,
+  HourGridLines,
+  HourRuler,
+  RAIL_WIDTH,
+  START_HOUR,
+  hourToLeft,
+} from './hourRail';
 
-export const START_H = 6;
-export const END_H = 23;
-export const HOUR_W = 62;
-export const RAIL_W = (END_H - START_H + 1) * HOUR_W;
+/** Height of the hour row and of an event card. */
+const RULER_HEIGHT = 16;
+const CARD_HEIGHT = 70;
 
-/** Dos carriles para los solapes. */
+/** The two lanes overlapping events are spread across. */
 const LANE_TOP = [0, 78];
-const CARD_H = 70;
 
-type Props = {
+/** The autoscroll leaves a little room before the current hour. */
+const NOW_MARGIN = 24;
+
+type TodayTimelineProps = {
   events: CalEvent[];
   onPressEvent: (event: CalEvent) => void;
 };
 
 /**
- * Franja horaria de hoy: ScrollView horizontal con ~5 h visibles y autoscroll
- * inicial a la hora actual − 24px (handoff §5, `data-rn="TodayTimeline"`).
+ * Today's hour strip, in the collapsed box on Home.
+ *
+ * It is a horizontal scroll with about five hours visible that starts
+ * positioned at the current hour. The "now" line is only drawn when the current
+ * hour falls inside the visible hours of the rail.
  */
-export function TodayTimeline({ events, onPressEvent }: Props) {
+export function TodayTimeline({ events, onPressEvent }: TodayTimelineProps) {
   const accent = useAccent();
-  const ref = useRef<ScrollView>(null);
-  const scrolled = useRef(false);
-  // El carril necesita alto explícito: dentro de un ScrollView horizontal
-  // `flex: 1` estiraría el ancho, no el alto.
+  const scrollRef = useRef<ScrollView>(null);
+  const hasScrolled = useRef(false);
+
+  /**
+   * The rail needs an explicit height: inside a horizontal ScrollView `flex: 1`
+   * stretches the width, not the height.
+   */
   const [height, setHeight] = useState(0);
 
-  const nowX = (decimalHours(new Date()) - START_H) * HOUR_W;
-  const laid = layoutDay(events, START_H, HOUR_W);
+  const nowLeft = hourToLeft(decimalHours(new Date()));
+  const laidOut = layoutDay(events, START_HOUR, HOUR_WIDTH);
 
   useEffect(() => {
-    if (scrolled.current) return;
-    scrolled.current = true;
-    // Sin animación: es la posición de partida, no un movimiento.
+    if (hasScrolled.current) return;
+    hasScrolled.current = true;
+    /** No animation: this is the starting position, not a movement. */
     requestAnimationFrame(() =>
-      ref.current?.scrollTo({ x: Math.max(0, nowX - 24), animated: false }),
+      scrollRef.current?.scrollTo({
+        x: Math.max(0, nowLeft - NOW_MARGIN),
+        animated: false,
+      }),
     );
-  }, [nowX]);
+  }, [nowLeft]);
 
   return (
     <ScrollView
-      ref={ref}
+      ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={styles.flex}
-      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-      contentContainerStyle={{ width: RAIL_W }}>
+      style={styles.scroll}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      contentContainerStyle={styles.railContent}>
       <View style={[styles.rail, { height }]}>
-        <View style={styles.hourRow}>
-          {Array.from({ length: END_H - START_H + 1 }, (_, i) => (
-            <View key={i} style={styles.hourCell}>
-              <T style={styles.hourLabel}>
-                {String(START_H + i).padStart(2, '0')}
-              </T>
-            </View>
-          ))}
-        </View>
+        <HourRuler height={RULER_HEIGHT} />
 
         <View style={styles.canvas}>
-          {Array.from({ length: END_H - START_H + 1 }, (_, i) => (
-            <View key={i} style={[styles.gridLine, { left: i * HOUR_W }]} />
-          ))}
+          <HourGridLines />
 
-          {nowX >= 0 && nowX <= RAIL_W ? (
+          {nowLeft >= 0 && nowLeft <= RAIL_WIDTH ? (
             <>
               <View
-                style={[styles.nowLine, { left: nowX, backgroundColor: accent }]}
+                style={[
+                  styles.nowLine,
+                  { left: nowLeft, backgroundColor: accent },
+                ]}
               />
               <View
                 style={[
                   styles.nowDot,
-                  { left: nowX - 2, backgroundColor: accent },
+                  { left: nowLeft - 2, backgroundColor: accent },
                 ]}
               />
             </>
           ) : null}
 
-          {laid.map(({ event, lane, x, width, startLabel }) => (
+          {laidOut.map(({ event, lane, left, width, startLabel }) => (
             <Pressable
               key={event.id}
               accessibilityRole="button"
@@ -94,19 +105,21 @@ export function TodayTimeline({ events, onPressEvent }: Props) {
                 styles.card,
                 {
                   top: LANE_TOP[lane],
-                  left: x,
+                  left,
                   width,
-                  borderColor: pressed ? '#3a3a42' : color.border,
-                  backgroundColor: pressed ? '#1c1c20' : color.cardHover,
+                  borderColor: pressed ? color.outline : color.border,
+                  backgroundColor: pressed
+                    ? color.cardPressed
+                    : color.cardHover,
                 },
               ]}>
               <View style={styles.cardHead}>
-                <View style={[styles.dot, { backgroundColor: accent }]} />
-                <T style={styles.cardTime}>{startLabel}</T>
+                <View style={[styles.cardDot, { backgroundColor: accent }]} />
+                <AppText style={styles.cardTime}>{startLabel}</AppText>
               </View>
-              <T w={400} numberOfLines={3} style={styles.cardTitle}>
+              <AppText weight={400} numberOfLines={3} style={styles.cardTitle}>
                 {event.title}
-              </T>
+              </AppText>
             </Pressable>
           ))}
         </View>
@@ -116,23 +129,15 @@ export function TodayTimeline({ events, onPressEvent }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  rail: { width: RAIL_W },
-  hourRow: { flexDirection: 'row', height: 16 },
-  hourCell: {
-    width: HOUR_W,
-    borderLeftWidth: 1,
-    borderLeftColor: color.line,
-    paddingLeft: 6,
-  },
-  hourLabel: { fontSize: 9, letterSpacing: 1.4, color: '#5f5f67' },
-  canvas: { position: 'absolute', left: 0, top: 22, bottom: 0, width: RAIL_W },
-  gridLine: {
+  scroll: { flex: 1 },
+  railContent: { width: RAIL_WIDTH },
+  rail: { width: RAIL_WIDTH },
+  canvas: {
     position: 'absolute',
-    top: 0,
+    left: 0,
+    top: 22,
     bottom: 0,
-    width: 1,
-    backgroundColor: color.hairline,
+    width: RAIL_WIDTH,
   },
   nowLine: { position: 'absolute', top: -8, bottom: 0, width: 1 },
   nowDot: {
@@ -144,21 +149,21 @@ const styles = StyleSheet.create({
   },
   card: {
     position: 'absolute',
-    height: CARD_H,
+    height: CARD_HEIGHT,
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: radius.event,
     paddingVertical: 8,
     paddingHorizontal: 7,
     gap: 3,
     overflow: 'hidden',
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: { width: 5, height: 5, borderRadius: 2.5 },
-  cardTime: { fontSize: 9, letterSpacing: 0.6, color: '#7d7d85' },
+  cardDot: { width: 5, height: 5, borderRadius: 2.5 },
+  cardTime: { fontSize: 9, letterSpacing: 0.6, color: color.textSubtle },
   cardTitle: {
     fontSize: 10,
     letterSpacing: -0.2,
     lineHeight: 13,
-    color: '#e9e9ec',
+    color: color.textBody,
   },
 });

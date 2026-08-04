@@ -1,16 +1,13 @@
 import { addDays, startOfDay } from '@/lib/date';
-import type {
-  Account,
-  CalEvent,
-  Calendar,
-  Habit,
-  Task,
-} from '@/types';
+import { color } from '@/theme/tokens';
+import type { Account, CalEvent, Calendar, Habit, Task } from '@/types';
 
 /**
- * Datos de arranque. Son los del prototipo (`pre-info/*.dc.html`), recolocados
- * alrededor de la fecha real para que la app se vea como el diseño.
- * Todo vive en memoria: nada de esto llega a un endpoint todavía.
+ * Startup data: the prototype's own (`pre-info/*.dc.html`), moved around the
+ * real date so the app looks like the design.
+ *
+ * Everything lives in memory. None of this reaches an endpoint yet, so this
+ * whole module goes away once syncing is real.
  */
 
 export const ACCOUNTS: Account[] = [
@@ -24,12 +21,16 @@ export const ACCOUNTS: Account[] = [
   { id: 'acc-3', email: 'casa@icloud.com', initial: 'C', provider: 'ICLOUD' },
 ];
 
+/**
+ * Calendars from the prototype. `dotColor: null` means the calendar is drawn
+ * with the app accent; the ones with `accountId: null` are the "Otros
+ * calendarios" subscriptions, which are read only.
+ */
 export const CALENDARS: Calendar[] = [
-  // dot: null = el calendario se pinta con el acento de la app.
   {
     id: 'cal-personal',
     name: 'Personal',
-    dot: null,
+    dotColor: null,
     kind: '',
     accountId: 'acc-1',
     visible: true,
@@ -37,7 +38,7 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-trabajo',
     name: 'Trabajo',
-    dot: '#8a8a93',
+    dotColor: color.textMuted,
     kind: '',
     accountId: 'acc-1',
     visible: true,
@@ -45,7 +46,7 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-tareas',
     name: 'Tareas',
-    dot: '#b9b9c1',
+    dotColor: color.textNote,
     kind: 'TAREAS',
     accountId: 'acc-1',
     visible: true,
@@ -53,7 +54,7 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-familia',
     name: 'Familia',
-    dot: '#8a8a93',
+    dotColor: color.textMuted,
     kind: '',
     accountId: 'acc-2',
     visible: true,
@@ -61,7 +62,7 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-cumples',
     name: 'Cumpleaños',
-    dot: '#5c5c65',
+    dotColor: color.textDisabled,
     kind: '',
     accountId: 'acc-2',
     visible: false,
@@ -69,16 +70,15 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-icloud-casa',
     name: 'iCloud · Casa',
-    dot: '#8a8a93',
+    dotColor: color.textMuted,
     kind: 'CALDAV',
     accountId: 'acc-3',
     visible: true,
   },
-  // Otros calendarios: suscripciones sin cuenta, de solo lectura.
   {
     id: 'cal-festivos',
     name: 'Festivos España',
-    dot: '#5c5c65',
+    dotColor: color.textDisabled,
     kind: 'ICS',
     accountId: null,
     visible: true,
@@ -87,7 +87,7 @@ export const CALENDARS: Calendar[] = [
   {
     id: 'cal-liga',
     name: 'Liga · Calendario',
-    dot: '#5c5c65',
+    dotColor: color.textDisabled,
     kind: 'ICS',
     accountId: null,
     visible: false,
@@ -95,62 +95,134 @@ export const CALENDARS: Calendar[] = [
   },
 ];
 
-type Template = {
-  s: number;
-  e: number;
-  t: string;
-  cal: string;
+/** Event template: hours in decimal so they can be shifted by adding. */
+type EventTemplate = {
+  startHour: number;
+  endHour: number;
+  title: string;
+  calendarId: string;
 };
 
-/** Los seis eventos de hoy del prototipo. */
-const TODAY_EVENTS: Template[] = [
-  { s: 8, e: 9, t: 'Gimnasio', cal: 'cal-personal' },
-  { s: 9.5, e: 10.25, t: 'Daily equipo', cal: 'cal-trabajo' },
-  { s: 11, e: 12.5, t: 'Revisión de diseño', cal: 'cal-trabajo' },
-  { s: 13.5, e: 14.25, t: 'Comida con Marta', cal: 'cal-personal' },
-  { s: 16, e: 17.5, t: 'Bloque foco', cal: 'cal-trabajo' },
-  { s: 19, e: 20, t: 'Cena en casa de Ana', cal: 'cal-familia' },
+/** The six events of today from the prototype. */
+const TODAY_EVENTS: EventTemplate[] = [
+  { startHour: 8, endHour: 9, title: 'Gimnasio', calendarId: 'cal-personal' },
+  {
+    startHour: 9.5,
+    endHour: 10.25,
+    title: 'Daily equipo',
+    calendarId: 'cal-trabajo',
+  },
+  {
+    startHour: 11,
+    endHour: 12.5,
+    title: 'Revisión de diseño',
+    calendarId: 'cal-trabajo',
+  },
+  {
+    startHour: 13.5,
+    endHour: 14.25,
+    title: 'Comida con Marta',
+    calendarId: 'cal-personal',
+  },
+  {
+    startHour: 16,
+    endHour: 17.5,
+    title: 'Bloque foco',
+    calendarId: 'cal-trabajo',
+  },
+  {
+    startHour: 19,
+    endHour: 20,
+    title: 'Cena en casa de Ana',
+    calendarId: 'cal-familia',
+  },
 ];
 
-/** Relleno para que la semana y el mes tengan puntos. */
-const FILLER: Template[] = [
-  { s: 9, e: 9.5, t: 'Standup', cal: 'cal-trabajo' },
-  { s: 10.5, e: 12, t: 'Sesión de trabajo', cal: 'cal-trabajo' },
-  { s: 12.5, e: 13.5, t: 'Comida', cal: 'cal-personal' },
-  { s: 15, e: 16, t: 'Recogida del cole', cal: 'cal-familia' },
-  { s: 17, e: 18.5, t: 'Entrenamiento', cal: 'cal-personal' },
-  { s: 20, e: 21.5, t: 'Cine', cal: 'cal-personal' },
+/** Filler so the week and the month have event dots. */
+const FILLER_EVENTS: EventTemplate[] = [
+  { startHour: 9, endHour: 9.5, title: 'Standup', calendarId: 'cal-trabajo' },
+  {
+    startHour: 10.5,
+    endHour: 12,
+    title: 'Sesión de trabajo',
+    calendarId: 'cal-trabajo',
+  },
+  { startHour: 12.5, endHour: 13.5, title: 'Comida', calendarId: 'cal-personal' },
+  {
+    startHour: 15,
+    endHour: 16,
+    title: 'Recogida del cole',
+    calendarId: 'cal-familia',
+  },
+  {
+    startHour: 17,
+    endHour: 18.5,
+    title: 'Entrenamiento',
+    calendarId: 'cal-personal',
+  },
+  { startHour: 20, endHour: 21.5, title: 'Cine', calendarId: 'cal-personal' },
 ];
 
-/** Mismo truco que el prototipo: una tabla fija en vez de aleatoriedad. */
-const SEED_COUNTS = [
+/**
+ * How many filler events each day carries. It is a fixed table, same as in the
+ * prototype: with random numbers the app would look different on every launch.
+ */
+const EVENTS_PER_DAY = [
   0, 2, 4, 6, 3, 5, 1, 0, 3, 2, 5, 1, 4, 0, 2, 6, 3, 1, 5, 2, 0, 4, 3, 1, 2, 5,
   0, 3, 6, 2, 4,
 ];
 
-const at = (day: Date, hours: number) => {
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
+/**
+ * Filler days before and after today: they cover the week and the month scroll.
+ */
+const FILLER_DAYS_BEFORE = 21;
+const FILLER_DAYS_AFTER = 45;
+
+/** The lunch event brings a guest so the guest list can be seen populated. */
+const TODAY_EVENT_WITH_GUEST = 3;
+
+/**
+ * Converts a decimal hour into the timestamp of that moment of a day.
+ *
+ * Precondition: `hours` is between 0 and 24. Postcondition: returns an instant
+ * on the same day as `day`, with seconds at 0.
+ *
+ * @param day Reference day.
+ * @param hours Hour in decimal, for example 9.5 for 09:30.
+ */
+function timestampAt(day: Date, hours: number) {
+  const hour = Math.floor(hours);
+  const minutes = Math.round((hours - hour) * 60);
   return new Date(
     day.getFullYear(),
     day.getMonth(),
     day.getDate(),
-    h,
-    m,
+    hour,
+    minutes,
     0,
     0,
   ).getTime();
-};
+}
 
-function makeEvent(id: string, day: Date, tpl: Template): CalEvent {
+/**
+ * Builds a complete event out of a template.
+ *
+ * Postcondition: the event carries the defaults of the Crear form (busy,
+ * default visibility, no repetition) and a reminder 15 minutes before.
+ *
+ * @param id Id assigned to the event.
+ * @param day Day it falls on.
+ * @param template Hours, title and calendar.
+ */
+function buildEvent(id: string, day: Date, template: EventTemplate): CalEvent {
   return {
     id,
-    title: tpl.t,
+    title: template.title,
     description: '',
-    start: at(day, tpl.s),
-    end: at(day, tpl.e),
+    startsAt: timestampAt(day, template.startHour),
+    endsAt: timestampAt(day, template.endHour),
     allDay: false,
-    calendarId: tpl.cal,
+    calendarId: template.calendarId,
     availability: 'Ocupado',
     visibility: 'Predet.',
     repeat: 'No',
@@ -160,44 +232,62 @@ function makeEvent(id: string, day: Date, tpl: Template): CalEvent {
   };
 }
 
+/**
+ * Startup events: the six of today plus the filler for the surrounding weeks.
+ *
+ * Postcondition: every event has a unique id and falls between
+ * `FILLER_DAYS_BEFORE` days before today and `FILLER_DAYS_AFTER` days after.
+ */
 export function seedEvents(): CalEvent[] {
   const today = startOfDay(new Date());
-  const out: CalEvent[] = [];
+  const events: CalEvent[] = [];
 
-  TODAY_EVENTS.forEach((tpl, i) => {
-    const ev = makeEvent(`ev-today-${i}`, today, tpl);
-    if (i === 3) {
-      ev.guests = [
+  TODAY_EVENTS.forEach((template, position) => {
+    const event = buildEvent(`ev-today-${position}`, today, template);
+    if (position === TODAY_EVENT_WITH_GUEST) {
+      event.guests = [
         { id: 'g-marta', name: 'Marta Ruiz', initial: 'M', state: 'PENDIENTE' },
       ];
     }
-    out.push(ev);
+    events.push(event);
   });
 
-  // 21 días antes y 45 después: suficiente para la semana y tres meses de scroll.
-  for (let offset = -21; offset <= 45; offset++) {
-    if (offset === 0) continue;
-    const day = addDays(today, offset);
-    const count = SEED_COUNTS[Math.abs(day.getDate() + day.getMonth()) % 31];
-    for (let k = 0; k < count; k++) {
-      const tpl = FILLER[(k + day.getDate()) % FILLER.length];
-      const shift = ((k % 3) - 1) * 0.5;
-      out.push(
-        makeEvent(`ev-${offset}-${k}`, day, {
-          ...tpl,
-          s: tpl.s + shift,
-          e: tpl.e + shift,
+  for (
+    let dayOffset = -FILLER_DAYS_BEFORE;
+    dayOffset <= FILLER_DAYS_AFTER;
+    dayOffset += 1
+  ) {
+    if (dayOffset === 0) continue;
+
+    const day = addDays(today, dayOffset);
+    const dayIndex =
+      Math.abs(day.getDate() + day.getMonth()) % EVENTS_PER_DAY.length;
+    const eventCount = EVENTS_PER_DAY[dayIndex];
+
+    for (let position = 0; position < eventCount; position += 1) {
+      const template =
+        FILLER_EVENTS[(position + day.getDate()) % FILLER_EVENTS.length];
+      /** Half an hour up or down so the overlaps do not come out identical. */
+      const shift = ((position % 3) - 1) * 0.5;
+
+      events.push(
+        buildEvent(`ev-${dayOffset}-${position}`, day, {
+          ...template,
+          startHour: template.startHour + shift,
+          endHour: template.endHour + shift,
         }),
       );
     }
   }
 
-  return out;
+  return events;
 }
 
+/**
+ * The five tasks from the prototype: one overdue, one done and three pending.
+ */
 export function seedTasks(): Task[] {
   const today = startOfDay(new Date());
-  const t = (h: number) => at(today, h);
 
   return [
     {
@@ -205,7 +295,7 @@ export function seedTasks(): Task[] {
       title: 'Enviar presupuesto a Nordic',
       description: '',
       calendarId: 'cal-tareas',
-      due: t(11),
+      dueAt: timestampAt(today, 11),
       hasTime: true,
       vagueMonth: null,
       done: false,
@@ -216,7 +306,7 @@ export function seedTasks(): Task[] {
       title: 'Revisar PR #482',
       description: '',
       calendarId: 'cal-tareas',
-      due: today.getTime(),
+      dueAt: today.getTime(),
       hasTime: false,
       vagueMonth: null,
       done: false,
@@ -227,7 +317,7 @@ export function seedTasks(): Task[] {
       title: 'Comprar regalo de Ana',
       description: '',
       calendarId: 'cal-tareas',
-      due: null,
+      dueAt: null,
       hasTime: false,
       vagueMonth: null,
       done: true,
@@ -238,8 +328,7 @@ export function seedTasks(): Task[] {
       title: 'Llamar al dentista',
       description: '',
       calendarId: 'cal-tareas',
-      // Vencida: la fila muestra VENCE.
-      due: addDays(today, -1).getTime(),
+      dueAt: addDays(today, -1).getTime(),
       hasTime: false,
       vagueMonth: null,
       done: false,
@@ -250,7 +339,7 @@ export function seedTasks(): Task[] {
       title: 'Cerrar sprint en Linear',
       description: '',
       calendarId: 'cal-tareas',
-      due: t(18),
+      dueAt: timestampAt(today, 18),
       hasTime: true,
       vagueMonth: null,
       done: false,
@@ -259,13 +348,14 @@ export function seedTasks(): Task[] {
   ];
 }
 
+/** The six habits from the prototype, one of each frequency. */
 export function seedHabits(): Habit[] {
   return [
     {
       id: 'habit-1',
       name: 'Leer 20 min',
       description: '',
-      freq: 'Diario',
+      frequency: 'Diario',
       target: 1,
       weekdays: [],
       reminders: [{ id: 'habit-1-r0', time: '22:00' }],
@@ -276,7 +366,7 @@ export function seedHabits(): Habit[] {
       id: 'habit-2',
       name: 'Agua',
       description: '',
-      freq: 'X por día',
+      frequency: 'X por día',
       target: 5,
       weekdays: [],
       reminders: [
@@ -291,7 +381,7 @@ export function seedHabits(): Habit[] {
       id: 'habit-3',
       name: 'Meditar',
       description: '',
-      freq: 'Diario',
+      frequency: 'Diario',
       target: 1,
       weekdays: [],
       reminders: [{ id: 'habit-3-r0', time: '07:00' }],
@@ -302,7 +392,7 @@ export function seedHabits(): Habit[] {
       id: 'habit-4',
       name: 'Gimnasio',
       description: '',
-      freq: 'X por semana',
+      frequency: 'X por semana',
       target: 3,
       weekdays: [1, 3, 5],
       reminders: [{ id: 'habit-4-r0', time: '08:00' }],
@@ -313,7 +403,7 @@ export function seedHabits(): Habit[] {
       id: 'habit-5',
       name: 'Llamar a mamá',
       description: '',
-      freq: 'Semanal',
+      frequency: 'Semanal',
       target: 1,
       weekdays: [0],
       reminders: [{ id: 'habit-5-r0', time: '12:00' }],
@@ -324,7 +414,7 @@ export function seedHabits(): Habit[] {
       id: 'habit-6',
       name: 'Diario',
       description: '',
-      freq: 'Diario',
+      frequency: 'Diario',
       target: 1,
       weekdays: [],
       reminders: [{ id: 'habit-6-r0', time: '21:00' }],

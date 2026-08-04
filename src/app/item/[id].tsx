@@ -1,31 +1,43 @@
+/**
+ * Item detail (route `/item/[id]`).
+ *
+ * How you get here: by tapping a calendar event, or the settings icon of a task
+ * or a habit. It comes up from the bottom, same as Crear.
+ *
+ * Where it leads: back on save, on close or on delete. If the item does not
+ * exist (or has just been deleted) it redirects to Home, so no empty screen is
+ * left in the history.
+ *
+ * Reuses `ItemForm` in edit mode: the item type is derived from the id by
+ * looking it up in the three store lists.
+ */
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
-import { ItemForm, type Editing } from '@/features/create/ItemForm';
+import { ItemForm } from '@/features/create/ItemForm';
+import type { Editing } from '@/features/create/useItemForm';
 import { useAppStore } from '@/store/useAppStore';
 
-/**
- * La «ficha del elemento» que abre el icono de ajustes de una tarea, un hábito
- * o un evento: el mismo formulario de Crear, en modo edición y con Eliminar.
- */
 export default function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const events = useAppStore((s) => s.events);
-  const tasks = useAppStore((s) => s.tasks);
-  const habits = useAppStore((s) => s.habits);
+  const events = useAppStore((state) => state.events);
+  const tasks = useAppStore((state) => state.tasks);
+  const habits = useAppStore((state) => state.habits);
 
   const editing = useMemo<Editing | null>(() => {
-    const event = events.find((e) => e.id === id);
+    const event = events.find((candidate) => candidate.id === id);
     if (event) return { kind: 'event', item: event };
-    const task = tasks.find((t) => t.id === id);
+
+    const task = tasks.find((candidate) => candidate.id === id);
     if (task) return { kind: 'task', item: task };
-    const habit = habits.find((h) => h.id === id);
+
+    const habit = habits.find((candidate) => candidate.id === id);
     if (habit) return { kind: 'habit', item: habit };
+
     return null;
   }, [id, events, tasks, habits]);
 
-  // El elemento se ha borrado desde esta misma pantalla.
   if (!editing) return <Redirect href="/" />;
 
   return <ItemForm editing={editing} />;

@@ -11,13 +11,27 @@ import { useDuration } from '@/theme/prefs';
 import { EASE_OUT, duration } from '@/theme/tokens';
 
 /**
- * Entrada y salida de un panel (drawer o bottom sheet): mantiene el contenido
- * montado mientras dura la animación de cierre y cierra con el botón atrás.
+ * Entrance and exit of a panel (side menu or bottom sheet).
  *
- * `progress` va de 0 a 1 y es lo que consumen los `useAnimatedStyle`.
+ * It solves the two things both panels need the same way: keeping the content
+ * mounted while the closing animation runs, and closing with the Android back
+ * button.
+ *
+ * Precondition: the caller stops drawing the panel once `mounted` is false.
+ * Postcondition: `progress` goes from 0 (out) to 1 (in) and is what the panel's
+ * `useAnimatedStyle` hooks consume. Under the "Reducir animaciones" setting the
+ * jump is immediate because the duration becomes 0.
+ *
+ * @param open Whether the panel should be open.
+ * @param onClose What to do when closing is requested from the back button.
  */
 export function usePanelTransition(open: boolean, onClose: () => void) {
-  const dur = useDuration();
+  const resolveDuration = useDuration();
+
+  /**
+   * It mounts in the same render that requests opening (derived state) so the
+   * entrance animation starts without a blank frame.
+   */
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
 
@@ -25,27 +39,32 @@ export function usePanelTransition(open: boolean, onClose: () => void) {
 
   useEffect(() => {
     if (!mounted) return;
-    const easing = Easing.bezier(...EASE_OUT);
+
+    const timing = {
+      duration: resolveDuration(duration.panel),
+      easing: Easing.bezier(...EASE_OUT),
+    };
+
     if (open) {
-      progress.value = withTiming(1, { duration: dur(duration.panel), easing });
+      progress.value = withTiming(1, timing);
       return;
     }
-    progress.value = withTiming(
-      0,
-      { duration: dur(duration.panel), easing },
-      (finished) => {
-        if (finished) runOnJS(setMounted)(false);
-      },
-    );
-  }, [open, mounted, dur, progress]);
+
+    progress.value = withTiming(0, timing, (finished) => {
+      if (finished) runOnJS(setMounted)(false);
+    });
+  }, [open, mounted, resolveDuration, progress]);
 
   useEffect(() => {
     if (!open) return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose();
-      return true;
-    });
-    return () => sub.remove();
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        onClose();
+        return true;
+      },
+    );
+    return () => subscription.remove();
   }, [open, onClose]);
 
   return { mounted, progress };

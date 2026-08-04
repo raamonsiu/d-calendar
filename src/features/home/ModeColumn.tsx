@@ -1,12 +1,16 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { T } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { color, radius } from '@/theme/tokens';
 import { ArrowsInSimpleIcon, ArrowsOutSimpleIcon } from '@/ui/icons';
 
-type Props = {
+type ModeColumnProps = {
+  /**
+   * Current view: HOY/SEM in the collapsed box, DÍA/MES in the expanded one.
+   */
   label: string;
+  /** The other view, the one a tap switches to. */
   other: string;
   expanded: boolean;
   onToggleMode: () => void;
@@ -14,8 +18,12 @@ type Props = {
 };
 
 /**
- * El control de la izquierda de la caja del calendario: arriba HOY/SEM
- * (o DÍA/MES al expandir), abajo expandir/colapsar.
+ * Control column to the left of the calendar box: switching view on top,
+ * expanding or collapsing below.
+ *
+ * The expand button takes whatever height is left while the box is collapsed,
+ * and switches to a fixed height once expanded so it does not stretch down the
+ * whole screen.
  */
 export function ModeColumn({
   label,
@@ -23,7 +31,7 @@ export function ModeColumn({
   expanded,
   onToggleMode,
   onToggleExpand,
-}: Props) {
+}: ModeColumnProps) {
   const accent = useAccent();
 
   return (
@@ -35,18 +43,20 @@ export function ModeColumn({
         style={({ pressed }) => [
           styles.button,
           styles.modeButton,
-          pressed && { borderColor: accent, backgroundColor: '#1b1b1f' },
+          pressed && { borderColor: accent, backgroundColor: color.control },
         ]}>
-        <T w={500} style={styles.modeLabel}>
+        <AppText weight={500} style={styles.modeLabel}>
           {label}
-        </T>
+        </AppText>
         <View style={[styles.rule, { backgroundColor: accent }]} />
-        <T style={styles.modeOther}>{other}</T>
+        <AppText style={styles.modeOther}>{other}</AppText>
       </Pressable>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={expanded ? 'Colapsar calendario' : 'Expandir calendario'}
+        accessibilityLabel={
+          expanded ? 'Colapsar calendario' : 'Expandir calendario'
+        }
         onPress={onToggleExpand}
         style={({ pressed }) => [
           styles.button,
@@ -54,9 +64,9 @@ export function ModeColumn({
           pressed && { borderColor: accent },
         ]}>
         {expanded ? (
-          <ArrowsInSimpleIcon size={15} color="#9a9aa2" />
+          <ArrowsInSimpleIcon size={15} color={color.textNeutral} />
         ) : (
-          <ArrowsOutSimpleIcon size={15} color="#9a9aa2" />
+          <ArrowsOutSimpleIcon size={15} color={color.textNeutral} />
         )}
       </Pressable>
     </View>
@@ -66,7 +76,7 @@ export function ModeColumn({
 const styles = StyleSheet.create({
   column: { width: 46, gap: 5 },
   button: {
-    borderRadius: 16,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: color.borderStrong,
     backgroundColor: color.hairline,

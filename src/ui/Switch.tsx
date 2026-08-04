@@ -8,37 +8,54 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useAccent, useDuration } from '@/theme/prefs';
-import { EASE_OUT, alpha, color, duration } from '@/theme/tokens';
+import { EASE_OUT, alpha, color, duration, tint } from '@/theme/tokens';
 
-type Props = {
+type SwitchProps = {
   value: boolean;
   onChange: (next: boolean) => void;
-  /** Envuelve el switch en su propio Pressable; desactívalo si ya hay uno fuera. */
+  /**
+   * Wraps the switch in its own Pressable; turn it off when there is one
+   * outside.
+   */
   standalone?: boolean;
 };
 
-const TRACK_W = 38;
-const TRACK_H = 22;
-const KNOB = 16;
-const KNOB_OFF = 2;
-// El borde de 1px va por dentro en RN: la caja interior mide 36.
-const KNOB_ON = TRACK_W - 2 - KNOB - KNOB_OFF; // 18
+const TRACK_WIDTH = 38;
+const TRACK_HEIGHT = 22;
+const KNOB_SIZE = 16;
+const KNOB_INSET = 2;
 
-export function Switch({ value, onChange, standalone = true }: Props) {
+/**
+ * Travel of the knob. The 1px border goes inside in React Native, so the inner
+ * box is 36 wide and not 38.
+ */
+const KNOB_TRAVEL = TRACK_WIDTH - 2 - KNOB_SIZE - KNOB_INSET * 2;
+
+/**
+ * Point of the animation from which the knob is already drawn in the accent.
+ */
+const KNOB_TINT_AT = 0.5;
+
+/**
+ * Switch from the design. The knob moves with `translateX` (not with `left`) so
+ * the animation runs on the UI thread, and the track is tinted with the accent
+ * while it is on.
+ */
+export function Switch({ value, onChange, standalone = true }: SwitchProps) {
   const accent = useAccent();
-  const dur = useDuration();
-  const t = useSharedValue(value ? 1 : 0);
+  const resolveDuration = useDuration();
+  const progress = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
-    t.value = withTiming(value ? 1 : 0, {
-      duration: dur(duration.state),
+    progress.value = withTiming(value ? 1 : 0, {
+      duration: resolveDuration(duration.state),
       easing: Easing.bezier(...EASE_OUT),
     });
-  }, [value, t, dur]);
+  }, [value, progress, resolveDuration]);
 
   const knobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: t.value * (KNOB_ON - KNOB_OFF) }],
-    backgroundColor: t.value > 0.5 ? accent : '#5c5c65',
+    transform: [{ translateX: progress.value * KNOB_TRAVEL }],
+    backgroundColor: progress.value > KNOB_TINT_AT ? accent : color.knobOff,
   }));
 
   const track = (
@@ -46,7 +63,7 @@ export function Switch({ value, onChange, standalone = true }: Props) {
       style={[
         styles.track,
         {
-          backgroundColor: value ? alpha(accent, 0.22) : color.card,
+          backgroundColor: value ? alpha(accent, tint.track) : color.card,
           borderColor: value ? accent : color.borderStrong,
         },
       ]}>
@@ -69,17 +86,17 @@ export function Switch({ value, onChange, standalone = true }: Props) {
 
 const styles = StyleSheet.create({
   track: {
-    width: TRACK_W,
-    height: TRACK_H,
-    borderRadius: TRACK_H / 2,
+    width: TRACK_WIDTH,
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
     borderWidth: 1,
   },
   knob: {
     position: 'absolute',
-    top: 2,
-    left: KNOB_OFF,
-    width: KNOB,
-    height: KNOB,
-    borderRadius: KNOB / 2,
+    top: KNOB_INSET,
+    left: KNOB_INSET,
+    width: KNOB_SIZE,
+    height: KNOB_SIZE,
+    borderRadius: KNOB_SIZE / 2,
   },
 });
