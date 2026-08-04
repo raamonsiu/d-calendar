@@ -1,56 +1,54 @@
-# Welcome to your Expo app 👋
+# D-Calendar
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Calendario, tareas y hábitos en una sola pantalla. App en React Native con
+Expo, construida a partir del prototipo y el handoff que hay en `pre-info/`.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Arrancar
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+```bash
+npx expo start
+```
 
-### Other setup steps
+Pulsa `a` para abrir en Android (emulador o dispositivo con Expo Go). El diseño
+está pensado a 412×892, así que Android es la referencia.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Qué hay
 
-## Learn more
+| Ruta | Pantalla |
+|---|---|
+| `/` | Home: caja de calendario (hoy / semana / día expandido / mes expandido), tareas, hábitos y menú lateral |
+| `/create` | Crear evento, tarea o hábito |
+| `/item/[id]` | Ficha del elemento: el mismo formulario en modo edición, con Eliminar |
+| `/settings` | Ajustes |
+| `/settings/calendars` | Cuentas conectadas y conectores |
+| `/help` | Ayuda y comentarios |
+| `/help/[slug]` | Artículo de ayuda |
+| `/about` | Acerca de la app y el desarrollador |
 
-To learn more about developing your project with Expo, look at the following resources:
+## Estado de los datos
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**Todo es mock y vive en memoria.** El store (`src/store/useAppStore.ts`)
+arranca sembrado con los eventos, tareas, hábitos, cuentas y calendarios del
+prototipo, y vuelve a ese estado al cerrar la app. Crear o editar algo escribe
+solo en local: no hay OAuth, ni subida a Google/iCloud, ni notificaciones
+programadas. «Añadir cuenta o calendario» y «Añadir invitado» son sheets que
+añaden la fuente al estado local.
 
-## Join the community
+La siguiente iteración sustituye esa capa por la conexión real; la UI no
+debería cambiar.
 
-Join our community of developers creating universal apps.
+## Comandos
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx tsc --noEmit
+```
+
+```bash
+npx expo lint
+```
+
+Convenciones de código y reglas del diseño: [AGENTS.md](AGENTS.md).

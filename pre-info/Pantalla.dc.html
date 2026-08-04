@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-2d6525a5-f370-48d3-8db2-75b8c3020130/styles.css">
+<script src="_ds/nocturne-2d6525a5-f370-48d3-8db2-75b8c3020130/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0a0a0b}
+a{color:#e5252f;text-decoration:none}
+a:hover{color:#ff5a62}
+*::-webkit-scrollbar{width:0;height:0}
+*{scrollbar-width:none}
+@keyframes nq-pop{0%{transform:scale(1)}45%{transform:scale(.94)}100%{transform:scale(1)}}
+</style>
+</helmet>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412px,892px">
+<div style="position:relative;height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:12px 12px 10px;background:#0a0a0b;font-family:'Roboto Slab',Georgia,serif;color:#f0f0f2;overflow:hidden">
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;padding:2px 6px 0">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div role="button" onClick="{{ openDrawer }}" title="Menú" data-rn="HomeHeader.MenuButton" data-rn-note="Pressable 28×28, hitSlop 10; abre el Drawer" style="flex:none;width:28px;height:28px;margin-left:-4px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#8a8a93;font-size:16px;cursor:pointer;transition:color 180ms ease,background 180ms ease" style-hover="color:#f0f0f2;background:#161619"><i class="ph ph-list"></i></div>
+      <span style="font-size:19px;font-weight:500;letter-spacing:-0.3px">{{ headTitle }}</span>
+      <span style="font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#6e6e76">{{ headSub }}</span>
+    </div>
+    <span style="font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#6e6e76">{{ headRight }}</span>
+  </div>
+
+  <sc-if value="{{ isCollapsed }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
+
+    <div style="height:200px;flex:none;box-sizing:border-box;background:#101012;border:1px solid #1f1f24;border-radius:26px;padding:11px;display:flex;gap:10px;overflow:hidden">
+      <div style="flex:none;width:46px;display:flex;flex-direction:column;gap:5px">
+        <div role="button" onClick="{{ toggleMode }}" data-rn="CalendarBox.ModeToggle" data-rn-note="Alterna today|week. Estado en useCalendarView()" style="height:112px;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:border-color 180ms ease,background 180ms ease" style-hover="border-color:#e5252f;background:#1b1b1f">
+          <span style="font-size:9px;letter-spacing:1.4px;font-weight:500;color:#f0f0f2">{{ modeLabel }}</span>
+          <span style="width:16px;height:1px;background:#e5252f"></span>
+          <span style="font-size:8px;letter-spacing:1.2px;color:#6e6e76">{{ modeOther }}</span>
+        </div>
+        <div role="button" onClick="{{ toggleExpand }}" style="flex:1;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:#9a9aa2;transition:border-color 180ms ease,color 180ms ease" style-hover="border-color:#e5252f;color:#f0f0f2">⤢</div>
+      </div>
+
+      <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+      <div ref="{{ tlRef }}" data-rn="TodayTimeline" data-rn-note="ScrollView horizontal, ~5h visibles (hourWidth 62). Auto-scroll inicial a la hora actual - 24px; sin barra de scroll" style="flex:1;min-width:0;overflow-x:auto;overflow-y:hidden">
+        <div style="position:relative;height:100%;width:{{ railW }}px">
+          <div style="display:flex;height:16px">
+            <sc-for list="{{ hours }}" as="h" hint-placeholder-count="6">
+              <div style="flex:none;width:{{ h.w }}px;font-size:9px;letter-spacing:1.4px;color:#5f5f67;border-left:1px solid #1c1c21;padding-left:6px;box-sizing:border-box">{{ h.label }}</div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:0;top:22px;bottom:0;width:100%">
+            <sc-for list="{{ hours }}" as="h" hint-placeholder-count="6">
+              <div style="position:absolute;top:0;bottom:0;left:{{ h.x }}px;width:1px;background:#161619"></div>
+            </sc-for>
+            <div style="position:absolute;top:-8px;bottom:0;left:{{ nowX }}px;width:1px;background:#e5252f"></div>
+            <div style="position:absolute;top:-11px;left:{{ nowDotX }}px;width:5px;height:5px;border-radius:50%;background:#e5252f"></div>
+            <sc-for list="{{ events }}" as="ev" hint-placeholder-count="4">
+              <div role="button" style="position:absolute;top:{{ ev.top }}px;left:{{ ev.x }}px;width:{{ ev.w }}px;height:70px;box-sizing:border-box;background:#17171a;border:1px solid #26262c;border-radius:14px;padding:8px 7px;display:flex;flex-direction:column;gap:3px;overflow:hidden;cursor:pointer;transition:border-color 180ms ease,background 180ms ease" style-hover="border-color:#3a3a42;background:#1c1c20">
+                <div style="display:flex;align-items:center;gap:5px">
+                  <span style="width:5px;height:5px;border-radius:50%;background:#e5252f;flex:none"></span>
+                  <span style="font-size:9px;letter-spacing:0.6px;color:#7d7d85;white-space:nowrap">{{ ev.start }}</span>
+                </div>
+                <span style="font-size:10px;letter-spacing:-0.2px;font-weight:400;line-height:1.3;color:#e9e9ec;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ ev.title }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isWeek }}">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:9px;letter-spacing:1.6px;color:#5f5f67">SEMANA 31</div>
+        <div data-rn="WeekStrip" style="flex:1;display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+          <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+            <div role="button" data-rn="WeekStrip.DayCell" data-rn-note="Puente sólido de 4px que cruza el gap, centrado en vertical, en todas las celdas menos la primera" style="position:relative;border-radius:{{ d.radius }};background:{{ d.bg }};display:flex;flex-direction:column;align-items:center;padding-top:9px;gap:4px;cursor:pointer;transition:background 180ms ease">
+              <span style="position:absolute;left:-6px;width:6px;top:0;bottom:0;background:#17171a;display:{{ d.slot }}"></span>
+              <span style="position:absolute;left:-6px;width:6px;top:0;height:35%;background:#101012;border-radius:0 0 5px 5px;display:{{ d.slot }}"></span>
+              <span style="position:absolute;left:-6px;width:6px;bottom:0;height:35%;background:#101012;border-radius:5px 5px 0 0;display:{{ d.slot }}"></span>
+              <span style="font-size:8px;letter-spacing:1.2px;color:{{ d.dow }}">{{ d.dowLabel }}</span>
+              <span style="font-size:15px;font-weight:400;color:{{ d.numColor }}">{{ d.num }}</span>
+              <div style="position:absolute;left:4px;right:4px;bottom:7px;display:flex;align-items:center;justify-content:center;gap:2px">
+                <sc-for list="{{ d.dots }}" as="dot" hint-placeholder-count="3">
+                  <span style="width:4px;height:4px;border-radius:50%;background:#e5252f"></span>
+                </sc-for>
+                <span style="font-size:8.5px;color:#8a8a93;letter-spacing:0">{{ d.more }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+
+    <div style="flex:1;min-height:0;box-sizing:border-box;background:#101012;border:1px solid #1f1f24;border-radius:26px;padding:0 14px 12px;display:flex;flex-direction:column;overflow-y:auto">
+      <div style="position:sticky;top:0;z-index:5;background:#101012;margin:0 -14px;padding:13px 14px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">TAREAS</span>
+          <span style="font-size:9px;letter-spacing:1.2px;color:#4d4d55">{{ taskCount }}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="5">
+          <div role="button" onClick="{{ t.onToggle }}" data-rn="TaskRow" data-rn-note="Pressable h=42 (hitSlop v6 -> 54 táctil). onPress alterna done; Haptics.selectionAsync()" style="display:flex;align-items:center;gap:11px;height:42px;padding:0 4px;border-radius:12px;cursor:pointer;transition:background 180ms ease" style-hover="background:#161619">
+            <span style="flex:none;width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:1.5px solid {{ t.ring }};background:{{ t.fill }};display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;font-weight:500;color:#f0f0f2;transition:all 220ms ease">{{ t.mark }}</span>
+            <span style="flex:1;min-width:0;font-size:13.5px;font-weight:300;letter-spacing:-0.1px;color:{{ t.color }};text-decoration:{{ t.deco }};text-decoration-color:#e5252f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color 220ms ease">{{ t.title }}</span>
+            <span style="flex:none;font-size:9.5px;letter-spacing:0.8px;color:#55555d">{{ t.meta }}</span>
+            <div role="button" onClick="{{ stopCfg }}" onPointerDown="{{ stopCfg }}" title="Ajustes del elemento" style-hover="color:#f0f0f2;background:#1d1d21" style="flex:none;width:24px;height:24px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#4a4a52;font-size:13px;transition:color 180ms ease,background 180ms ease"><i class="ph ph-sliders-horizontal"></i></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="position:sticky;top:0;z-index:5;background:#101012;margin:12px -14px 0;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #1c1c21">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">HÁBITOS</span>
+          <span style="font-size:9px;letter-spacing:1.2px;color:#4d4d55">{{ habitCount }}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding-top:9px">
+        <sc-for list="{{ habits }}" as="h" hint-placeholder-count="6">
+          <div role="button" data-rn="HabitCard" data-rn-note="Pressable onPress=+1, onLongPress(420ms)=-1; al completar Animated scale 1->0.94->1 (320ms) + Haptics.impactAsync(Light)" onPointerDown="{{ h.onDown }}" onPointerUp="{{ h.onUp }}" onPointerLeave="{{ h.onCancel }}" onContextMenu="{{ h.onCancel }}" style="position:relative;height:84px;box-sizing:border-box;border-radius:18px;border:1px solid {{ h.border }};background:{{ h.bg }};padding:9px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;overflow:hidden;user-select:none;touch-action:none;animation:{{ h.anim }};transition:border-color 220ms ease,background 220ms ease">
+            <div role="button" onClick="{{ stopCfg }}" onPointerDown="{{ stopCfg }}" title="Ajustes del elemento" style-hover="color:#f0f0f2;background:#1d1d21" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#4a4a52;font-size:12px;transition:color 180ms ease,background 180ms ease"><i class="ph ph-sliders-horizontal"></i></div>
+            <div style="display:flex;align-items:center;gap:3px;height:7px">
+              <sc-for list="{{ h.dots }}" as="d" hint-placeholder-count="3">
+                <span style="width:{{ d.size }}px;height:{{ d.size }}px;border-radius:50%;box-sizing:border-box;border:1px solid {{ d.border }};background:{{ d.bg }};transition:background 220ms ease,border-color 220ms ease"></span>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="position:relative;align-self:flex-start">
+                <span style="font-size:11.5px;line-height:1.2;font-weight:400;color:{{ h.color }};transition:color 220ms ease">{{ h.name }}</span>
+                <span style="position:absolute;left:0;top:50%;height:1px;background:#e5252f;width:{{ h.strike }};transition:width 300ms cubic-bezier(.2,.8,.2,1)"></span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:5px;white-space:nowrap;overflow:hidden">
+                <span style="font-size:8px;letter-spacing:0.6px;color:{{ h.freqColor }}">{{ h.freq }}</span>
+                <span style="font-size:8px;letter-spacing:0.6px;color:#4d4d55">{{ h.streak }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDayExpanded }}">
+  <div style="flex:1;min-height:0;box-sizing:border-box;background:#101012;border:1px solid #1f1f24;border-radius:26px;padding:11px;display:flex;gap:10px;overflow:hidden">
+    <div style="flex:none;width:46px;display:flex;flex-direction:column;gap:5px">
+      <div role="button" onClick="{{ toggleMode }}" data-rn="CalendarBox.ModeToggle" data-rn-note="Alterna today|week. Estado en useCalendarView()" style="height:112px;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer" style-hover="border-color:#e5252f">
+        <span style="font-size:9px;letter-spacing:1.4px;font-weight:500;color:#f0f0f2">DÍA</span>
+        <span style="width:16px;height:1px;background:#e5252f"></span>
+        <span style="font-size:8px;letter-spacing:1.2px;color:#6e6e76">MES</span>
+      </div>
+      <div role="button" onClick="{{ toggleExpand }}" style="flex:none;height:52px;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:#9a9aa2" style-hover="border-color:#e5252f;color:#f0f0f2">⤡</div>
+    </div>
+    <div style="flex:1;min-width:0;overflow:auto">
+      <div style="width:{{ dayRailW }}px;position:relative">
+        <div style="position:sticky;top:0;z-index:3;display:flex;height:18px;background:#101012">
+          <div style="position:sticky;left:0;z-index:4;flex:none;width:44px;background:#101012"></div>
+          <sc-for list="{{ hours }}" as="h" hint-placeholder-count="6">
+            <div style="flex:none;width:{{ h.w }}px;font-size:9px;letter-spacing:1.4px;color:#5f5f67;padding-left:6px;box-sizing:border-box;border-left:1px solid #1c1c21">{{ h.label }}</div>
+          </sc-for>
+        </div>
+        <sc-for list="{{ dayRows }}" as="row" hint-placeholder-count="5">
+          <div style="display:flex;height:132px;border-top:1px solid #17171b">
+            <div style="position:sticky;left:0;z-index:2;flex:none;width:44px;background:#101012;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding-right:6px">
+              <span style="font-size:8px;letter-spacing:1.4px;color:{{ row.dow }}">{{ row.dowLabel }}</span>
+              <span style="font-size:17px;font-weight:400;color:{{ row.numColor }}">{{ row.num }}</span>
+            </div>
+            <div style="position:relative;flex:1">
+              <sc-for list="{{ hours }}" as="h" hint-placeholder-count="6">
+                <div style="position:absolute;top:0;bottom:0;left:{{ h.x }}px;width:1px;background:#161619"></div>
+              </sc-for>
+              <sc-for list="{{ row.events }}" as="ev" hint-placeholder-count="2">
+                <div role="button" style="position:absolute;top:{{ ev.top }}px;left:{{ ev.x }}px;width:{{ ev.w }}px;height:52px;box-sizing:border-box;background:#17171a;border:1px solid #26262c;border-radius:12px;padding:6px 7px;display:flex;flex-direction:column;gap:2px;overflow:hidden;cursor:pointer" style-hover="border-color:#3a3a42">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span style="width:4px;height:4px;border-radius:50%;background:#e5252f;flex:none"></span>
+                    <span style="font-size:8.5px;letter-spacing:0.6px;color:#7d7d85;white-space:nowrap">{{ ev.start }}</span>
+                  </div>
+                  <span style="font-size:10px;letter-spacing:-0.2px;line-height:1.25;color:#e9e9ec;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ ev.title }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isMonthExpanded }}">
+  <div style="flex:1;min-height:0;box-sizing:border-box;background:#101012;border:1px solid #1f1f24;border-radius:26px;padding:11px;display:flex;gap:10px;overflow:hidden">
+    <div style="flex:none;width:46px;display:flex;flex-direction:column;gap:5px">
+      <div role="button" onClick="{{ toggleMode }}" data-rn="CalendarBox.ModeToggle" data-rn-note="Alterna today|week. Estado en useCalendarView()" style="height:112px;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer" style-hover="border-color:#e5252f">
+        <span style="font-size:9px;letter-spacing:1.4px;font-weight:500;color:#f0f0f2">MES</span>
+        <span style="width:16px;height:1px;background:#e5252f"></span>
+        <span style="font-size:8px;letter-spacing:1.2px;color:#6e6e76">DÍA</span>
+      </div>
+      <div role="button" onClick="{{ toggleExpand }}" style="flex:none;height:52px;border-radius:16px;border:1px solid #2a2a30;background:#161619;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:#9a9aa2" style-hover="border-color:#e5252f;color:#f0f0f2">⤡</div>
+    </div>
+    <div style="flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:22px">
+      <sc-for list="{{ months }}" as="m" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-size:14px;font-weight:500;letter-spacing:-0.2px;color:#f0f0f2">{{ m.name }}</span>
+            <span style="font-size:9px;letter-spacing:1.4px;color:#55555d">{{ m.year }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+            <sc-for list="{{ weekdayLabels }}" as="wd" hint-placeholder-count="7">
+              <div style="font-size:8px;letter-spacing:1.2px;color:#4d4d55;text-align:center;padding-bottom:2px">{{ wd }}</div>
+            </sc-for>
+            <sc-for list="{{ m.cells }}" as="c" hint-placeholder-count="35">
+              <div role="button" style="position:relative;aspect-ratio:1/1;border-radius:12px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:flex-start;justify-content:center;padding-top:5px;box-sizing:border-box;cursor:pointer;overflow:hidden">
+                <span style="font-size:11.5px;font-weight:400;color:{{ c.color }}">{{ c.num }}</span>
+                <div style="position:absolute;left:5px;right:4px;bottom:4px;display:flex;align-items:center;gap:2px">
+                  <sc-for list="{{ c.dots }}" as="dot" hint-placeholder-count="2">
+                    <span style="width:3px;height:3px;border-radius:50%;background:#e5252f"></span>
+                  </sc-for>
+                  <span style="font-size:9px;color:#8a8a93">{{ c.more }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <div role="button" onClick="{{ onCreate }}" data-rn="CreateFab" data-rn-note="Barra fija sobre safe-area inset bottom; navega a CreateScreen" style="flex:none;height:54px;border-radius:20px;border:1px solid #2a2a30;background:#0e0e10;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:border-color 180ms ease,background 180ms ease" style-hover="border-color:#e5252f;background:#131315">
+    <span style="font-size:19px;line-height:1;color:#e5252f;font-weight:300">+</span>
+    <span style="font-size:10px;letter-spacing:2px;color:#c9c9d0">CREAR</span>
+  </div>
+
+  <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;z-index:20;background:#000;opacity:{{ drawer.fade }};pointer-events:{{ drawer.pe }};transition:opacity 280ms ease"></div>
+  <div data-rn="SideDrawer" data-rn-note="react-navigation Drawer, width 80%, overlay 55% negro; el estado de sync vive en useCalendarSources()" style="position:absolute;top:0;bottom:0;left:0;z-index:21;width:80%;box-sizing:border-box;background:#101012;border-radius:0 28px 28px 0;transform:translateX({{ drawer.x }});transition:transform 320ms cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding:18px 0 14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 14px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:17px;font-weight:500;letter-spacing:-0.2px">D-Calendar</span>
+        <span style="font-size:8.5px;letter-spacing:1.4px;color:#55555d">VERSIÓN 1.4</span>
+      </div>
+      <div role="button" onClick="{{ closeDrawer }}" style="width:28px;height:28px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#6e6e76;font-size:14px;cursor:pointer" style-hover="color:#f0f0f2"><i class="ph ph-x"></i></div>
+    </div>
+
+    <div style="padding:0 14px 12px">
+      <div role="button" onClick="{{ onRefresh }}" style="height:44px;border-radius:16px;border:1px solid #2a2a30;background:#141417;display:flex;align-items:center;gap:9px;padding:0 14px;cursor:pointer;transition:border-color 180ms ease" style-hover="border-color:#e5252f">
+        <i class="ph ph-arrows-clockwise" style="font-size:14px;color:{{ refreshColor }}"></i>
+        <span style="flex:1;font-size:11.5px;font-weight:300;color:#e9e9ec">Actualizar calendarios</span>
+        <span style="font-size:8.5px;letter-spacing:1.1px;color:#4d4d55">{{ refreshMeta }}</span>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:2px 14px 8px">
+      <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
+            <span style="flex:none;width:20px;height:20px;border-radius:50%;border:1px solid #2f2f36;background:#161619;display:flex;align-items:center;justify-content:center;font-size:8.5px;color:#b9b9c1">{{ a.initial }}</span>
+            <span style="flex:1;min-width:0;font-size:10px;letter-spacing:0.4px;color:#8a8a93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.email }}</span>
+            <span style="font-size:8px;letter-spacing:1.1px;color:#4d4d55">{{ a.count }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ a.items }}" as="c" hint-placeholder-count="3">
+              <div role="button" onClick="{{ c.onToggle }}" style="display:flex;align-items:center;gap:10px;height:38px;padding:0 8px;border-radius:13px;cursor:pointer;transition:background 180ms ease" style-hover="background:#161619">
+                <span style="flex:none;width:18px;height:18px;border-radius:6px;box-sizing:border-box;border:1.5px solid {{ c.ring }};background:{{ c.fill }};display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:#f0f0f2;transition:all 180ms ease">{{ c.mark }}</span>
+                <span style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ c.dot }}"></span>
+                <span style="flex:1;min-width:0;font-size:12px;font-weight:300;color:{{ c.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                <span style="flex:none;font-size:8px;letter-spacing:1.1px;color:#4d4d55">{{ c.kind }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px">
+          <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">OTROS CALENDARIOS</span>
+          <span style="font-size:8px;letter-spacing:1.1px;color:#4d4d55">{{ otherCount }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ others }}" as="c" hint-placeholder-count="3">
+            <div role="button" onClick="{{ c.onToggle }}" style="display:flex;align-items:center;gap:10px;height:38px;padding:0 8px;border-radius:13px;cursor:pointer;transition:background 180ms ease" style-hover="background:#161619">
+              <span style="flex:none;width:18px;height:18px;border-radius:6px;box-sizing:border-box;border:1.5px solid {{ c.ring }};background:{{ c.fill }};display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:#f0f0f2;transition:all 180ms ease">{{ c.mark }}</span>
+              <span style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ c.dot }}"></span>
+              <span style="flex:1;min-width:0;font-size:12px;font-weight:300;color:{{ c.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+              <span style="flex:none;font-size:8px;letter-spacing:1.1px;color:#4d4d55">{{ c.kind }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div role="button" style="height:36px;border-radius:13px;border:1px dashed #2a2a30;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;color:#6e6e76;transition:border-color 180ms ease,color 180ms ease" style-hover="border-color:#e5252f;color:#f0f0f2">
+          <i class="ph ph-plus" style="font-size:11px"></i>
+          <span style="font-size:9px;letter-spacing:1.4px">AÑADIR CUENTA O CALENDARIO</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:10px 14px 0;border-top:1px solid #1c1c21;display:flex;flex-direction:column;gap:1px">
+      <sc-for list="{{ menu }}" as="m" hint-placeholder-count="3">
+        <div role="button" style="display:flex;align-items:center;gap:11px;height:42px;padding:0 8px;border-radius:13px;cursor:pointer;transition:background 180ms ease" style-hover="background:#161619">
+          <i class="{{ m.icon }}" style="font-size:15px;color:#8a8a93"></i>
+          <span style="flex:1;font-size:12.5px;font-weight:300;color:#dcdce1">{{ m.label }}</span>
+          <i class="ph ph-caret-right" style="font-size:11px;color:#3f3f47"></i>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:940},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;today&quot;,&quot;week&quot;],&quot;default&quot;:&quot;today&quot;,&quot;tsType&quot;:&quot;'today' | 'week'&quot;},&quot;expanded&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;hourWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:64,&quot;max&quot;:160,&quot;step&quot;:4,&quot;default&quot;:96,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;},&quot;showStreaks&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const EVENTS = [
+  { s: 8, e: 9, t: 'Gimnasio' },
+  { s: 9.5, e: 10.25, t: 'Daily equipo' },
+  { s: 11, e: 12.5, t: 'Revisión de diseño' },
+  { s: 13.5, e: 14.25, t: 'Comida con Marta' },
+  { s: 16, e: 17.5, t: 'Bloque foco' },
+  { s: 19, e: 20, t: 'Cena en casa de Ana' },
+];
+const DOW = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const HABITS = [
+  { name: 'Leer 20 min', freq: 'DIARIO', target: 1, streak: 12 },
+  { name: 'Agua', freq: '5×/DÍA', target: 5, streak: 23 },
+  { name: 'Meditar', freq: 'DIARIO', target: 1, streak: 8 },
+  { name: 'Gimnasio', freq: '3×/SEM', target: 3, streak: 6, unit: 'S' },
+  { name: 'Llamar a mamá', freq: 'SEM.', target: 1, streak: 4, unit: 'S' },
+  { name: 'Diario', freq: 'DIARIO', target: 1, streak: 41 },
+];
+const ACCOUNTS = [
+  { email: 'dani@digimevo.com', initial: 'D', items: [
+    { name: 'Personal', dot: '#e5252f', kind: '' },
+    { name: 'Trabajo', dot: '#8a8a93', kind: '' },
+    { name: 'Tareas', dot: '#b9b9c1', kind: 'TAREAS' },
+  ] },
+  { email: 'daniel.perez@gmail.com', initial: 'P', items: [
+    { name: 'Familia', dot: '#8a8a93', kind: '' },
+    { name: 'Cumpleaños', dot: '#5c5c65', kind: '' },
+  ] },
+];
+const OTHERS = [
+  { name: 'iCloud · Casa', dot: '#8a8a93', kind: 'CALDAV' },
+  { name: 'Festivos España', dot: '#5c5c65', kind: 'ICS' },
+  { name: 'Liga · Calendario', dot: '#5c5c65', kind: 'ICS' },
+];
+const MENU = [
+  { label: 'Ajustes', icon: 'ph ph-gear-six' },
+  { label: 'Ayuda y comentarios', icon: 'ph ph-question' },
+  { label: 'Acerca de la app y el desarrollador', icon: 'ph ph-info' },
+];
+const START_H = 6, END_H = 23;
+const RED = '#e5252f';
+
+const hhmm = (v) => {
+  const h = Math.floor(v), m = Math.round((v - h) * 60);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+};
+const seedCount = (n) => [0, 2, 4, 6, 3, 5, 1, 0, 3, 2, 5, 1, 4, 0, 2, 6, 3, 1, 5, 2, 0, 4, 3, 1, 2, 5, 0, 3, 6, 2, 4][n % 31];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      mode: props.mode === 'week' ? 'week' : 'today',
+      expanded: !!props.expanded,
+      doneTasks: { 2: true },
+      doneHabits: { 0: 1, 1: 2 },
+      pulse: null,
+      drawer: false,
+      refreshing: false,
+      sync: { '1-2': false, '2-1': false, 'o-1': false, 'o-2': false },
+    };
+    this.tlRef = React.createRef();
+  }
+
+  startHold(i, target) {
+    this._long = false;
+    clearTimeout(this._hold);
+    this._hold = setTimeout(() => {
+      this._long = true;
+      this.setState((s) => ({ doneHabits: { ...s.doneHabits, [i]: Math.max(0, (s.doneHabits[i] ?? 0) - 1) } }));
+    }, 420);
+  }
+
+  endHold(i, target) {
+    clearTimeout(this._hold);
+    if (this._long) { this._long = false; return; }
+    this.setState((s) => {
+      const cur = s.doneHabits[i] ?? 0;
+      const next = cur >= target ? 0 : cur + 1;
+      return { doneHabits: { ...s.doneHabits, [i]: next }, pulse: next >= target ? i : null };
+    });
+  }
+
+  cancelHold() { clearTimeout(this._hold); }
+
+  calRow(c, key) {
+    const on = this.state.sync[key] ?? true;
+    return {
+      name: c.name, kind: c.kind, on,
+      dot: on ? c.dot : '#2f2f36',
+      ring: on ? RED : '#3a3a42', fill: on ? RED : 'transparent', mark: on ? '✓' : '',
+      color: on ? '#e9e9ec' : '#5c5c65',
+      onToggle: () => this.setState((s) => ({ sync: { ...s.sync, [key]: !(s.sync[key] ?? true) } })),
+    };
+  }
+
+  componentWillUnmount() { clearTimeout(this._hold); }
+
+  componentDidMount() { this.scrollNow(); }
+  componentDidUpdate() { this.scrollNow(); }
+
+  scrollNow() {
+    const el = this.tlRef.current;
+    if (el && !el.dataset.did) {
+      el.dataset.did = '1';
+      el.scrollLeft = Math.max(0, (10.33 - START_H) * this.colW() - 24);
+    }
+  }
+
+  colW() { return this.props.hourWidth ?? 62; }
+
+  layout(list) {
+    const w = this.colW(), lanes = [];
+    return list.map((ev) => {
+      let lane = lanes.findIndex((end) => end <= ev.s);
+      if (lane === -1) { lane = lanes.length; }
+      lanes[lane] = ev.e;
+      return {
+        x: (ev.s - START_H) * w, w: Math.max(84, (ev.e - ev.s) * w - 5),
+        top: (lane % 2) * 78, title: ev.t, start: hhmm(ev.s), time: hhmm(ev.s) + '–' + hhmm(ev.e),
+      };
+    });
+  }
+
+  monthCells(year, month) {
+    const first = new Date(year, month, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const days = new Date(year, month + 1, 0).getDate();
+    const out = [];
+    for (let i = 0; i < offset; i++) out.push({ num: '', dots: [], more: '', border: 'transparent', bg: 'transparent', color: 'transparent' });
+    for (let d = 1; d <= days; d++) {
+      const today = year === 2026 && month === 6 && d === 30;
+      const n = seedCount(d + month);
+      out.push({
+        num: d, dots: Array.from({ length: Math.min(3, n) }, (_, i) => i), more: n > 3 ? '+' + (n - 3) : '',
+        border: today ? RED : '#1b1b20', bg: today ? 'rgba(229,37,47,0.08)' : '#131316',
+        color: today ? RED : (n ? '#dcdce1' : '#6b6b73'),
+      });
+    }
+    return out;
+  }
+
+  renderVals() {
+    const { mode, expanded, doneTasks, doneHabits, pulse } = this.state;
+    const w = this.colW();
+    const hours = [];
+    for (let h = START_H; h <= END_H; h++) hours.push({ label: String(h).padStart(2, '0'), x: (h - START_H) * w, w });
+
+    const tasks = [
+      { title: 'Enviar presupuesto a Nordic', meta: '11:00' },
+      { title: 'Revisar PR #482', meta: 'HOY' },
+      { title: 'Comprar regalo de Ana', meta: '' },
+      { title: 'Llamar al dentista', meta: 'VENCE' },
+      { title: 'Cerrar sprint en Linear', meta: '18:00' },
+    ].map((t, i) => {
+      const done = !!doneTasks[i];
+      return {
+        title: t.title, meta: t.meta,
+        ring: done ? RED : '#3a3a42', fill: done ? RED : 'transparent', mark: done ? '✓' : '',
+        color: done ? '#5c5c65' : '#e9e9ec', deco: done ? 'line-through' : 'none',
+        onToggle: () => this.setState((s) => ({ doneTasks: { ...s.doneTasks, [i]: !s.doneTasks[i] } })),
+      };
+    });
+
+    const habits = HABITS.map((h, i) => {
+      const n = doneHabits[i] ?? 0;
+      const done = n >= h.target;
+      const size = h.target > 4 ? 5 : 6;
+      return {
+        name: h.name, freq: h.freq, freqColor: h.target > 1 ? '#8a8a93' : '#55555d',
+        streak: (this.props.showStreaks ?? true) ? '· ' + h.streak + (h.unit || 'D') : '',
+        dots: Array.from({ length: h.target }, (_, k) => ({
+          size, bg: k < n ? RED : 'transparent', border: k < n ? RED : '#3a3a42',
+        })),
+        border: done ? RED : '#1f1f24', bg: done ? 'rgba(229,37,47,0.07)' : '#141417',
+        color: done ? '#8a8a93' : '#e9e9ec',
+        strike: done ? '100%' : '0%', anim: pulse === i ? 'nq-pop .32s ease' : 'none',
+        onDown: () => this.startHold(i, h.target),
+        onUp: () => this.endHold(i, h.target),
+        onCancel: () => this.cancelHold(),
+      };
+    });
+
+    const week = [28, 29, 30, 31, 1, 2, 3].map((n, i) => {
+      const today = i === 2;
+      const c = [2, 4, 6, 3, 5, 1, 0][i];
+      return {
+        num: n, dowLabel: DOW[i], today,
+        dots: Array.from({ length: Math.min(3, c) }, (_, k) => k), more: c > 3 ? '+' + (c - 3) : '',
+        radius: i === 0 ? '17px 6px 6px 17px' : i === 6 ? '6px 17px 17px 6px' : '6px',
+        bridge: i === 0 ? 'transparent' : '#151518',
+        slot: i === 0 ? 'none' : 'block',
+        bg: today ? 'rgba(229,37,47,0.14)' : '#17171a',
+        dow: today ? RED : '#5f5f67', numColor: today ? '#f0f0f2' : '#c9c9d0',
+      };
+    });
+
+    const dayRows = [28, 29, 30, 31, 1, 2, 3].map((n, i) => {
+      const today = i === 2;
+      const shift = (i - 2) * 0.5;
+      const list = EVENTS.filter((_, k) => (k + i) % 7 !== 0 && (k * 3 + i) % 5 !== 0)
+        .map((e) => ({ ...e, s: e.s + shift, e: e.e + shift }));
+      return {
+        num: n, dowLabel: DOW[i], dow: today ? RED : '#5f5f67', numColor: today ? '#f0f0f2' : '#8a8a93',
+        events: this.layout(today ? EVENTS : list).map((ev) => ({ ...ev, top: (ev.top ? 68 : 8) })),
+      };
+    });
+
+    return {
+      hours, tasks, habits, week, dayRows,
+      events: this.layout(EVENTS),
+      railW: (END_H - START_H + 1) * w,
+      dayRailW: 44 + (END_H - START_H + 1) * w,
+      nowX: (10.33 - START_H) * w,
+      nowDotX: (10.33 - START_H) * w - 2,
+      weekdayLabels: DOW,
+      months: [
+        { name: MONTH_NAMES[6], year: 2026, cells: this.monthCells(2026, 6) },
+        { name: MONTH_NAMES[7], year: 2026, cells: this.monthCells(2026, 7) },
+        { name: MONTH_NAMES[8], year: 2026, cells: this.monthCells(2026, 8) },
+      ],
+      isCollapsed: !expanded,
+      isToday: !expanded && mode === 'today',
+      isWeek: !expanded && mode === 'week',
+      isDayExpanded: expanded && mode === 'today',
+      isMonthExpanded: expanded && mode === 'week',
+      modeLabel: mode === 'today' ? 'HOY' : 'SEM',
+      modeOther: mode === 'today' ? 'SEM' : 'HOY',
+      headTitle: expanded && mode === 'week' ? 'Julio' : (mode === 'week' && !expanded ? 'Esta semana' : 'Miércoles 30'),
+      headSub: expanded ? (mode === 'today' ? '4 DÍAS' : '2026') : 'JULIO',
+      headRight: expanded ? '' : (mode === 'today' ? '6 EVENTOS' : '21 EVENTOS'),
+      taskCount: Object.values(doneTasks).filter(Boolean).length + '/5',
+      habitCount: HABITS.filter((h, i) => (doneHabits[i] ?? 0) >= h.target).length + '/6',
+      toggleMode: () => this.setState((s) => ({ mode: s.mode === 'today' ? 'week' : 'today' })),
+      toggleExpand: () => this.setState((s) => ({ expanded: !s.expanded })),
+      openDrawer: () => this.setState({ drawer: true }),
+      closeDrawer: () => this.setState({ drawer: false }),
+      drawer: {
+        x: this.state.drawer ? '0%' : '-102%',
+        fade: this.state.drawer ? 0.55 : 0,
+        pe: this.state.drawer ? 'auto' : 'none',
+      },
+      accounts: ACCOUNTS.map((a, ai) => {
+        const items = a.items.map((c, ci) => this.calRow(c, ai + 1 + '-' + ci));
+        return { email: a.email, initial: a.initial, items, count: items.filter((c) => c.on).length + '/' + items.length };
+      }),
+      others: OTHERS.map((c, i) => this.calRow(c, 'o-' + i)),
+      otherCount: OTHERS.filter((c, i) => (this.state.sync['o-' + i] ?? true)).length + '/' + OTHERS.length,
+      menu: MENU,
+      refreshColor: this.state.refreshing ? RED : '#8a8a93',
+      refreshMeta: this.state.refreshing ? 'AHORA' : 'HACE 4 MIN',
+      onRefresh: () => {
+        this.setState({ refreshing: true });
+        clearTimeout(this._ref);
+        this._ref = setTimeout(() => this.setState({ refreshing: false }), 1400);
+      },
+      onCreate: () => {},
+      stopCfg: (e) => { e.stopPropagation(); e.preventDefault(); },
+      tlRef: this.tlRef,
+    };
+  }
+}
+</script>
+</body>
+</html>

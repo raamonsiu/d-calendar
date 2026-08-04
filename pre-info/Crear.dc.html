@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-2d6525a5-f370-48d3-8db2-75b8c3020130/styles.css">
+<script src="_ds/nocturne-2d6525a5-f370-48d3-8db2-75b8c3020130/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0a0a0b}
+a{color:#e5252f;text-decoration:none}
+a:hover{color:#ff5a62}
+*::-webkit-scrollbar{width:0;height:0}
+*{scrollbar-width:none}
+input,textarea{font-family:'Roboto Slab',Georgia,serif;background:transparent;border:0;outline:none;color:#f0f0f2;padding:0;width:100%;resize:none}
+input::placeholder,textarea::placeholder{color:#45454d}
+</style>
+</helmet>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:12px 12px 10px;background:#0a0a0b;font-family:'Roboto Slab',Georgia,serif;color:#f0f0f2;overflow:hidden">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px">
+    <div role="button" style="flex:none;width:30px;height:30px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#8a8a93;font-size:15px;cursor:pointer" style-hover="color:#f0f0f2"><i class="ph ph-x"></i></div>
+    <div style="flex:1;display:flex;gap:3px;background:#121214;border-radius:15px;padding:4px">
+      <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="3">
+        <div role="button" onClick="{{ k.onClick }}" style="flex:1;height:30px;border-radius:12px;background:{{ k.bg }};border:1px solid {{ k.border }};display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:background 180ms ease,border-color 180ms ease">
+          <span style="width:4px;height:4px;border-radius:50%;background:{{ k.dot }}"></span>
+          <span style="font-size:9.5px;letter-spacing:1.2px;color:{{ k.color }}">{{ k.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;width:30px"></div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:2px">
+
+    <div style="background:#121214;border-radius:26px;padding:15px 16px;display:flex;flex-direction:column;gap:10px">
+      <input placeholder="{{ titlePlaceholder }}" style="font-size:19px;font-weight:400;letter-spacing:-0.3px;line-height:1.25">
+      <div style="height:1px;background:#1c1c21"></div>
+      <textarea rows="2" placeholder="Descripción" style="font-size:12.5px;font-weight:300;line-height:1.45;color:#b9b9c1"></textarea>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:5px">
+
+    <sc-if value="{{ isEvent }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="background:#121214;border-radius:26px 26px 13px 13px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">CUÁNDO</span>
+          <div role="button" onClick="{{ allDay.onToggle }}" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <span style="font-size:9px;letter-spacing:1.2px;color:{{ allDay.labelColor }}">TODO EL DÍA</span>
+            <span style="position:relative;width:38px;height:22px;border-radius:11px;background:{{ allDay.track }};border:1px solid {{ allDay.trackBorder }};transition:background 180ms ease,border-color 180ms ease">
+              <span style="position:absolute;top:2px;left:{{ allDay.knob }}px;width:16px;height:16px;border-radius:50%;background:{{ allDay.knobBg }};transition:left 220ms cubic-bezier(.2,.8,.2,1),background 180ms ease"></span>
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ timeRows }}" as="r" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="flex:none;width:44px;font-size:9px;letter-spacing:1.2px;color:#55555d">{{ r.label }}</span>
+              <div role="button" style="flex:1;height:38px;border-radius:13px;border:1px solid #26262c;background:#141417;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:#dcdce1;cursor:pointer" style-hover="border-color:#3a3a42">{{ r.date }}</div>
+              <div role="button" style="flex:none;width:74px;height:38px;border-radius:13px;border:1px solid {{ r.timeBorder }};background:#141417;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:{{ r.timeColor }};cursor:pointer" style-hover="border-color:#3a3a42">{{ r.time }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">REPETIR</span>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            <sc-for list="{{ repeatChips }}" as="c" hint-placeholder-count="5">
+              <div role="button" onClick="{{ c.onClick }}" style="height:29px;padding:0 11px;border-radius:12px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:center;font-size:10.5px;letter-spacing:0.2px;color:{{ c.color }};cursor:pointer;transition:all 180ms ease">{{ c.label }}</div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ showWeekdays }}">
+          <div style="display:flex;gap:5px;padding-top:2px">
+            <sc-for list="{{ weekdayChips }}" as="d" hint-placeholder-count="7">
+              <div role="button" onClick="{{ d.onClick }}" style="flex:1;height:32px;border-radius:12px;border:1px solid {{ d.border }};background:{{ d.bg }};display:flex;align-items:center;justify-content:center;font-size:10.5px;color:{{ d.color }};cursor:pointer;transition:all 180ms ease">{{ d.label }}</div>
+            </sc-for>
+          </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style-before="content:'';position:absolute;left:0;right:0;top:-6px;height:7px;background:#121214" style="position:relative;background:#121214;border-radius:13px;padding:14px 16px;display:flex;flex-direction:column;gap:11px">
+      <span style="position:absolute;top:-6px;left:-1px;right:65%;height:7px;background:#0a0a0b;border-radius:0 5px 5px 0"></span>
+      <span style="position:absolute;top:-6px;right:-1px;left:65%;height:7px;background:#0a0a0b;border-radius:5px 0 0 5px"></span>
+        <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">CALENDARIO</span>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          <sc-for list="{{ calendars }}" as="c" hint-placeholder-count="3">
+            <div role="button" onClick="{{ c.onClick }}" style="height:31px;padding:0 12px;border-radius:12px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:center;gap:7px;cursor:pointer;transition:all 180ms ease">
+              <span style="width:6px;height:6px;border-radius:50%;background:{{ c.dot }}"></span>
+              <span style="font-size:10.5px;color:{{ c.color }}">{{ c.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:1px;background:#1c1c21"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ statusRows }}" as="row" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="flex:none;width:76px;font-size:9px;letter-spacing:1.2px;color:#55555d">{{ row.label }}</span>
+              <div style="flex:1;display:flex;gap:4px">
+                <sc-for list="{{ row.options }}" as="o" hint-placeholder-count="2">
+                  <div role="button" onClick="{{ o.onClick }}" style="flex:1;height:31px;border-radius:12px;border:1px solid {{ o.border }};background:{{ o.bg }};display:flex;align-items:center;justify-content:center;font-size:10.5px;color:{{ o.color }};cursor:pointer;transition:all 180ms ease">{{ o.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style-before="content:'';position:absolute;left:0;right:0;top:-6px;height:7px;background:#121214" style="position:relative;background:#121214;border-radius:13px;padding:14px 16px;display:flex;flex-direction:column;gap:11px">
+      <span style="position:absolute;top:-6px;left:-1px;right:65%;height:7px;background:#0a0a0b;border-radius:0 5px 5px 0"></span>
+      <span style="position:absolute;top:-6px;right:-1px;left:65%;height:7px;background:#0a0a0b;border-radius:5px 0 0 5px"></span>
+        <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">INVITAR</span>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ guests }}" as="g" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px;height:36px">
+              <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid #2f2f36;background:#161619;display:flex;align-items:center;justify-content:center;font-size:10px;color:#b9b9c1">{{ g.initial }}</span>
+              <span style="flex:1;font-size:12.5px;font-weight:300;color:#dcdce1">{{ g.name }}</span>
+              <span style="font-size:9px;letter-spacing:1.1px;color:#55555d">{{ g.state }}</span>
+              <div role="button" onClick="{{ g.onRemove }}" style="flex:none;width:24px;height:24px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#4a4a52;font-size:12px;cursor:pointer" style-hover="color:#e5252f"><i class="ph ph-x"></i></div>
+            </div>
+          </sc-for>
+        </div>
+        <div role="button" onClick="{{ addGuest }}" style="height:38px;border-radius:13px;border:1px dashed #2a2a30;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:#8a8a93;transition:border-color 180ms ease,color 180ms ease" style-hover="border-color:#e5252f;color:#f0f0f2">
+          <i class="ph ph-user-plus" style="font-size:13px"></i>
+          <span style="font-size:10px;letter-spacing:1.4px">AÑADIR INVITADO</span>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isTask }}">
+    <div style="background:#121214;border-radius:26px 26px 13px 13px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">VENCE</span>
+        <div role="button" onClick="{{ vague.onToggle }}" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <span style="font-size:9px;letter-spacing:1.2px;color:{{ vague.labelColor }}">SIN FECHA EXACTA</span>
+          <span style="position:relative;width:38px;height:22px;border-radius:11px;background:{{ vague.track }};border:1px solid {{ vague.trackBorder }};transition:background 180ms ease,border-color 180ms ease">
+            <span style="position:absolute;top:2px;left:{{ vague.knob }}px;width:16px;height:16px;border-radius:50%;background:{{ vague.knobBg }};transition:left 220ms cubic-bezier(.2,.8,.2,1),background 180ms ease"></span>
+          </span>
+        </div>
+      </div>
+      <sc-if value="{{ isExactDue }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="flex:none;width:44px;font-size:9px;letter-spacing:1.2px;color:#55555d">DÍA</span>
+          <div role="button" style="flex:1;height:38px;border-radius:13px;border:1px solid #26262c;background:#141417;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:#dcdce1;cursor:pointer" style-hover="border-color:#3a3a42">Viernes 1 agosto</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="flex:none;width:44px;font-size:9px;letter-spacing:1.2px;color:#55555d">HORA</span>
+          <div role="button" onClick="{{ dueTime.onToggle }}" style="flex:1;height:38px;border-radius:13px;border:1px solid {{ dueTime.border }};background:#141417;display:flex;align-items:center;justify-content:space-between;padding:0 12px;cursor:pointer">
+            <span style="font-size:12.5px;color:{{ dueTime.color }}">{{ dueTime.label }}</span>
+            <i class="ph ph-clock" style="font-size:13px;color:#55555d"></i>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ isVagueDue }}">
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <sc-for list="{{ monthChips }}" as="c" hint-placeholder-count="6">
+          <div role="button" onClick="{{ c.onClick }}" style="height:31px;padding:0 12px;border-radius:12px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:center;font-size:10.5px;color:{{ c.color }};cursor:pointer;transition:all 180ms ease">{{ c.label }}</div>
+        </sc-for>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isHabit }}">
+    <div style="background:#121214;border-radius:26px 26px 13px 13px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+      <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">TEMPORALIDAD</span>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <sc-for list="{{ freqChips }}" as="c" hint-placeholder-count="4">
+          <div role="button" onClick="{{ c.onClick }}" style="height:31px;padding:0 12px;border-radius:12px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:center;font-size:10.5px;color:{{ c.color }};cursor:pointer;transition:all 180ms ease">{{ c.label }}</div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ showCounter }}">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="flex:1;font-size:11.5px;font-weight:300;color:#b9b9c1">{{ counterLabel }}</span>
+        <div style="flex:none;display:flex;align-items:center;gap:5px">
+          <div role="button" onClick="{{ decCount }}" style="width:34px;height:34px;border-radius:12px;border:1px solid #2a2a30;background:#141417;display:flex;align-items:center;justify-content:center;font-size:15px;color:#c9c9d0;cursor:pointer" style-hover="border-color:#e5252f">−</div>
+          <span style="width:26px;text-align:center;font-size:15px;color:#f0f0f2">{{ count }}</span>
+          <div role="button" onClick="{{ incCount }}" style="width:34px;height:34px;border-radius:12px;border:1px solid #2a2a30;background:#141417;display:flex;align-items:center;justify-content:center;font-size:15px;color:#c9c9d0;cursor:pointer" style-hover="border-color:#e5252f">+</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:3px">
+        <sc-for list="{{ countDots }}" as="d" hint-placeholder-count="3">
+          <span style="width:6px;height:6px;border-radius:50%;border:1px solid #e5252f;background:#e5252f"></span>
+        </sc-for>
+        <span style="font-size:8.5px;letter-spacing:1.1px;color:#55555d;padding-left:5px">MARCADORES EN LA TARJETA</span>
+      </div>
+      </sc-if>
+      <sc-if value="{{ showHabitDays }}">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">DÍAS</span>
+        <div style="display:flex;gap:5px">
+          <sc-for list="{{ habitDayChips }}" as="d" hint-placeholder-count="7">
+            <div role="button" onClick="{{ d.onClick }}" style="flex:1;height:32px;border-radius:12px;border:1px solid {{ d.border }};background:{{ d.bg }};display:flex;align-items:center;justify-content:center;font-size:10.5px;color:{{ d.color }};cursor:pointer;transition:all 180ms ease">{{ d.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <div style-before="content:'';position:absolute;left:0;right:0;top:-6px;height:7px;background:#121214" style="position:relative;background:#121214;border-radius:13px 13px 26px 26px;padding:14px 16px;display:flex;flex-direction:column;gap:11px">
+      <span style="position:absolute;top:-6px;left:-1px;right:65%;height:7px;background:#0a0a0b;border-radius:0 5px 5px 0"></span>
+      <span style="position:absolute;top:-6px;right:-1px;left:65%;height:7px;background:#0a0a0b;border-radius:5px 0 0 5px"></span>
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <span style="font-size:9px;letter-spacing:1.8px;color:#6e6e76">{{ notifTitle }}</span>
+        <span style="font-size:9px;letter-spacing:1.2px;color:#4d4d55">{{ notifCount }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:6px">
+            <i class="ph ph-bell" style="flex:none;font-size:13px;color:#55555d"></i>
+            <div role="button" onClick="{{ n.onValue }}" style="flex:none;min-width:52px;height:36px;padding:0 12px;border-radius:13px;border:1px solid #26262c;background:#141417;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:#f0f0f2;cursor:pointer" style-hover="border-color:#e5252f">{{ n.value }}</div>
+            <div role="button" onClick="{{ n.onUnit }}" style="flex:1;height:36px;padding:0 12px;border-radius:13px;border:1px solid #26262c;background:#141417;display:flex;align-items:center;font-size:11.5px;letter-spacing:0.3px;color:#b9b9c1;cursor:pointer" style-hover="border-color:#e5252f">{{ n.unit }}</div>
+            <div role="button" onClick="{{ n.onRemove }}" style="flex:none;width:30px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#4a4a52;font-size:13px;cursor:pointer" style-hover="color:#e5252f"><i class="ph ph-x"></i></div>
+          </div>
+        </sc-for>
+      </div>
+      <div role="button" onClick="{{ addNotif }}" style="height:38px;border-radius:13px;border:1px dashed #2a2a30;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:#8a8a93;transition:border-color 180ms ease,color 180ms ease" style-hover="border-color:#e5252f;color:#f0f0f2">
+        <i class="ph ph-plus" style="font-size:12px"></i>
+        <span style="font-size:10px;letter-spacing:1.4px">{{ addNotifLabel }}</span>
+      </div>
+    </div>
+
+    </div>
+  </div>
+
+  <div role="button" style="flex:none;height:54px;border-radius:20px;border:1px solid #e5252f;background:rgba(229,37,47,0.07);display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:background 180ms ease" style-hover="background:rgba(229,37,47,0.14)">
+    <span style="font-size:10px;letter-spacing:2px;color:#f0f0f2">{{ cta }}</span>
+  </div>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:940},&quot;kind&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;event&quot;,&quot;task&quot;,&quot;habit&quot;],&quot;default&quot;:&quot;event&quot;,&quot;tsType&quot;:&quot;'event' | 'task' | 'habit'&quot;}}">
+const RED = '#e5252f';
+const DOW = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const REL_UNITS = ['MINUTOS ANTES', 'HORAS ANTES', 'DÍAS ANTES'];
+const VALUES = [5, 10, 15, 30, 45];
+const HOURS = ['07:00', '08:00', '09:00', '12:00', '14:00', '18:00', '21:00', '22:30'];
+const MONTHS = ['Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Sin mes'];
+
+const chip = (label, on, onClick, extra) => ({
+  label, onClick,
+  border: on ? RED : '#26262c',
+  bg: on ? 'rgba(229,37,47,0.09)' : '#141417',
+  color: on ? '#f0f0f2' : '#8a8a93',
+  ...extra,
+});
+
+class Component extends DCLogic {
+  state = {
+    kind: ['event', 'task', 'habit'].includes(this.props.kind) ? this.props.kind : 'event',
+    allDay: false,
+    repeat: 'No',
+    weekdays: { 0: true, 2: true },
+    calendar: 'Personal',
+    busy: 'Ocupado',
+    visibility: 'Predet.',
+    guests: [{ name: 'Marta Ruiz', initial: 'M', state: 'PENDIENTE' }],
+    vague: false,
+    dueTime: '18:00',
+    freq: 'Diario',
+    count: 3,
+    habitDays: { 0: true, 2: true, 4: true },
+    notifs: this.props.kind === 'habit' ? [{ t: '09:00' }, { t: '21:00' }] : [{ v: 15, u: 0 }],
+    times: ['09:00', '21:00'],
+  };
+
+  set(patch) { this.setState(patch); }
+
+  cycle(list, cur) { return list[(list.indexOf(cur) + 1) % list.length]; }
+
+  renderVals() {
+    const s = this.state;
+    const isEvent = s.kind === 'event', isTask = s.kind === 'task', isHabit = s.kind === 'habit';
+    const multi = s.freq === 'X por día' || s.freq === 'X por semana';
+    const weekly = s.freq === 'Semanal' || s.freq === 'X por semana';
+    const sw = (on, onToggle) => ({
+      on, onToggle, knob: on ? 19 : 2,
+      track: on ? 'rgba(229,37,47,0.22)' : '#141417',
+      trackBorder: on ? RED : '#2a2a30',
+      knobBg: on ? RED : '#5c5c65',
+      labelColor: on ? '#f0f0f2' : '#55555d',
+    });
+
+    const notifs = s.notifs.map((n, i) => ({
+      value: isHabit ? n.t : n.v,
+      unit: isHabit ? (weekly ? 'EN LOS DÍAS MARCADOS' : 'CADA DÍA') : REL_UNITS[n.u],
+      onValue: () => this.setState((st) => {
+        const list = [...st.notifs];
+        list[i] = isHabit ? { ...list[i], t: this.cycle(HOURS, list[i].t) } : { ...list[i], v: this.cycle(VALUES, list[i].v) };
+        return { notifs: list };
+      }),
+      onUnit: () => this.setState((st) => {
+        if (isHabit) return null;
+        const list = [...st.notifs];
+        list[i] = { ...list[i], u: (list[i].u + 1) % REL_UNITS.length };
+        return { notifs: list };
+      }),
+      onRemove: () => this.setState((st) => ({ notifs: st.notifs.filter((_, k) => k !== i) })),
+    }));
+
+    return {
+      kinds: [['event', 'EVENTO'], ['task', 'TAREA'], ['habit', 'HÁBITO']].map(([k, label]) => {
+        const on = s.kind === k;
+        return {
+          label, onClick: () => this.setState({ kind: k, notifs: k === 'habit' ? [{ t: '09:00' }] : [{ v: 15, u: 0 }] }),
+          bg: on ? '#1b1b1f' : 'transparent', border: on ? '#2f2f36' : 'transparent',
+          color: on ? '#f0f0f2' : '#6e6e76', dot: on ? RED : 'transparent',
+        };
+      }),
+      isEvent, isTask, isHabit,
+      titlePlaceholder: isEvent ? 'Título del evento' : isTask ? 'Título de la tarea' : 'Nombre del hábito',
+      cta: isEvent ? 'CREAR EVENTO' : isTask ? 'CREAR TAREA' : 'CREAR HÁBITO',
+
+      allDay: sw(s.allDay, () => this.set({ allDay: !s.allDay })),
+      timeRows: [
+        { label: 'INICIO', date: 'Miércoles 30 julio', time: s.allDay ? '—' : '11:00', timeColor: s.allDay ? '#45454d' : '#f0f0f2', timeBorder: s.allDay ? '#1f1f24' : '#26262c' },
+        { label: 'FIN', date: 'Miércoles 30 julio', time: s.allDay ? '—' : '12:30', timeColor: s.allDay ? '#45454d' : '#f0f0f2', timeBorder: s.allDay ? '#1f1f24' : '#26262c' },
+      ],
+      repeatChips: ['No', 'Cada día', 'Días de la semana', 'Cada mes'].map((l) => chip(l, s.repeat === l, () => this.set({ repeat: l }))),
+      showWeekdays: s.repeat === 'Días de la semana',
+      weekdayChips: DOW.map((l, i) => chip(l, !!s.weekdays[i], () => this.setState((st) => ({ weekdays: { ...st.weekdays, [i]: !st.weekdays[i] } })))),
+
+      calendars: [['Personal', RED], ['Trabajo', '#7d7d85'], ['Familia', '#b9b9c1']].map(([l, d]) =>
+        chip(l, s.calendar === l, () => this.set({ calendar: l }), { dot: d })),
+      statusRows: [
+        { label: 'DISPONIB.', options: ['Ocupado', 'Libre'].map((l) => chip(l, s.busy === l, () => this.set({ busy: l }))) },
+        { label: 'VISIBILIDAD', options: ['Predet.', 'Privado', 'Público'].map((l) => chip(l, s.visibility === l, () => this.set({ visibility: l }))) },
+      ],
+      guests: s.guests.map((g, i) => ({ ...g, onRemove: () => this.setState((st) => ({ guests: st.guests.filter((_, k) => k !== i) })) })),
+      addGuest: () => this.setState((st) => ({ guests: [...st.guests, { name: 'Invitado ' + (st.guests.length + 1), initial: 'I', state: 'PENDIENTE' }] })),
+
+      vague: sw(s.vague, () => this.set({ vague: !s.vague })),
+      isExactDue: !s.vague,
+      isVagueDue: s.vague,
+      dueTime: {
+        label: s.dueTime || 'Sin hora', color: s.dueTime ? '#f0f0f2' : '#45454d',
+        border: s.dueTime ? '#26262c' : '#1f1f24',
+        onToggle: () => this.set({ dueTime: s.dueTime ? '' : '18:00' }),
+      },
+      monthChips: MONTHS.map((l) => chip(l, s.dueMonth === l, () => this.set({ dueMonth: l }))),
+
+      freqChips: ['Diario', 'Semanal', 'X por día', 'X por semana'].map((l) => chip(l, s.freq === l, () => this.set({ freq: l }))),
+      showCounter: multi,
+      showHabitDays: weekly,
+      counterLabel: s.freq === 'X por día' ? 'Veces al día' : 'Veces por semana',
+      count: s.count,
+      countDots: Array.from({ length: s.count }, (_, i) => i),
+      incCount: () => this.set({ count: Math.min(10, s.count + 1) }),
+      decCount: () => this.set({ count: Math.max(2, s.count - 1) }),
+      habitDayChips: DOW.map((l, i) => chip(l, !!s.habitDays[i], () => this.setState((st) => ({ habitDays: { ...st.habitDays, [i]: !st.habitDays[i] } })))),
+
+      notifs,
+      notifTitle: 'NOTIFICACIONES',
+      notifCount: s.notifs.length + (s.notifs.length === 1 ? ' AVISO' : ' AVISOS'),
+      addNotifLabel: isHabit ? 'AÑADIR HORA' : 'AÑADIR AVISO',
+      addNotif: () => this.setState((st) => ({
+        notifs: [...st.notifs, isHabit ? { t: HOURS[st.notifs.length % HOURS.length] } : { v: 30, u: 0 }],
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>
