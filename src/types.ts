@@ -42,6 +42,11 @@ export type Calendar = {
    * them hangs from an account.
    */
   sharedBy?: string;
+  /**
+   * Where a subscribed calendar is downloaded from. Only subscriptions carry
+   * one, and for now it is only kept: nothing downloads it yet.
+   */
+  url?: string;
 };
 
 /** Unit of a relative reminder: 0 minutes, 1 hours, 2 days. */

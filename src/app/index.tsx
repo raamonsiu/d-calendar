@@ -70,6 +70,7 @@ export default function HomeScreen() {
 
   const events = useAppStore((state) => state.events);
   const deviceEvents = useAppStore((state) => state.deviceEvents);
+  const subscriptionEvents = useAppStore((state) => state.subscriptionEvents);
   const calendars = useAppStore((state) => state.calendars);
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
@@ -77,12 +78,17 @@ export default function HomeScreen() {
   const bumpHabit = useAppStore((state) => state.bumpHabit);
 
   /**
-   * The app's own events and the ones read from the device are drawn the same:
-   * they only differ in where they came from and in what tapping one does.
+   * The app's own events, the ones read from the device and the ones downloaded
+   * from a subscription are drawn the same: they only differ in where they came
+   * from and in what tapping one does.
    */
   const shownEvents = useMemo(
-    () => visibleEvents([...events, ...deviceEvents], calendars),
-    [events, deviceEvents, calendars],
+    () =>
+      visibleEvents(
+        [...events, ...deviceEvents, ...subscriptionEvents],
+        calendars,
+      ),
+    [events, deviceEvents, subscriptionEvents, calendars],
   );
   const byDay = useMemo(() => eventsByDay(shownEvents), [shownEvents]);
   const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);

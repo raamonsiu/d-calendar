@@ -28,7 +28,9 @@ import {
   type CalendarOrigin,
   type CalendarPlacement,
 } from '@/lib/calendarSources';
-import { fromDeviceId, toDeviceId } from '@/lib/deviceIds';
+import { calendarWindow } from '@/lib/calendarWindow';
+import { MS_PER_DAY } from '@/lib/date';
+import { fromDeviceId, toDeviceId } from '@/lib/sourceIds';
 import { avatarInitial } from '@/lib/text';
 import type {
   Account,
@@ -46,23 +48,6 @@ import type {
 /** Calendars can only be read on the native targets. */
 export const DEVICE_CALENDARS_SUPPORTED = Platform.OS !== 'web';
 
-/**
- * How far back and forward the device is read, in days.
- *
- * A year ahead so an event created here does not vanish the moment it is saved:
- * what the app writes to a calendar of the device only comes back to it through
- * this read, and a birthday six months out has to be inside the window. Three
- * months back is enough to look over the recent past without dragging in years
- * of history.
- *
- * The month view still scrolls further than this, and there those months come
- * out empty; reading on demand, following what the user is looking at, is what
- * closes that gap.
- */
-const WINDOW_BEFORE_DAYS = 90;
-const WINDOW_AFTER_DAYS = 365;
-
-const MS_PER_DAY = 86400000;
 const MINUTES_PER_HOUR = 60;
 const MINUTES_PER_DAY = 1440;
 
@@ -500,9 +485,9 @@ function toAppCalendar(
 /**
  * Reads the accounts, the calendars and the events of the device.
  *
- * The window is a month back and two months forward: enough for the month view
- * to be populated and for the reminder plan, without dragging in years of
- * history.
+ * How far it looks is `calendarWindow`, shared with the subscribed calendars:
+ * the two end up in the same lists, and a window that differed between them
+ * would show one calendar ending where the other carries on.
  *
  * Precondition: none; the permission is checked here and the read is skipped
  * without it. Postcondition: returns null when there is no permission or the
@@ -592,8 +577,7 @@ export async function readDeviceCalendarData(
     calendars.push(toAppCalendar(calendar, placement, accountId));
   }
 
-  const from = new Date(now - WINDOW_BEFORE_DAYS * MS_PER_DAY);
-  const to = new Date(now + WINDOW_AFTER_DAYS * MS_PER_DAY);
+  const { from, to } = calendarWindow(now);
 
   /**
    * Each calendar is asked separately, and on purpose: the loose `listEvents`

@@ -34,13 +34,15 @@ laid out for 412×892, so Android is the reference.
 
 ## Data status
 
-**Everything is mock, but it is stored on the device.** On a fresh install the
-store (`src/store/useAppStore.ts`) is seeded with the events, tasks, habits,
-accounts and calendars from the prototype; from there on it is persisted with
-AsyncStorage, so what you create survives closing the app. Creating or editing
-something only writes locally: there is no OAuth and no upload to Google/iCloud.
-"Añadir cuenta o calendario" and "Añadir invitado" are sheets that add the source
-to local state.
+**What the app makes is stored on the device.** The store
+(`src/store/useAppStore.ts`) is persisted with AsyncStorage, so what you create
+survives closing the app. There is no OAuth and no upload of its own: what leaves
+the phone is what gets written to a calendar of the device, and from there the
+account syncs it. Adding an account leads out to the system settings, which is
+where accounts are actually added.
+
+Two things are still mock: "Añadir invitado" adds the guest to local state
+without inviting anybody, and exporting generates no file.
 
 The next iteration replaces that layer with the real connection; the UI should
 not change.
@@ -63,6 +65,17 @@ It is not read only. An event the user owns can be edited and deleted, and a new
 one can be created in any calendar the system allows, from where the account
 syncs it on its own. Their inherited reminders are off by default, because the
 calendar they came from already announces them.
+
+## Calendars by URL
+
+Also real. A calendar published as an `.ics` — a course timetable, a holiday
+calendar, the secret iCal address of a Google calendar — is downloaded and read
+with `ical.js`, with its time zones and its recurrence rules. It is read only:
+there is nowhere in a file served over HTTP to write.
+
+They are downloaded when the app starts, when it returns to the foreground and
+when the side menu's refresh is pulled, and what was read is stored, so the
+calendar is still there with no signal.
 
 ## Commands
 

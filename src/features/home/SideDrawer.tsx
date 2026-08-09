@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/data/releases';
 import { ownerLabel } from '@/lib/calendarSources';
 import { formatAgo } from '@/lib/date';
-import { isDeviceId } from '@/lib/deviceIds';
+import { isDeviceId } from '@/lib/sourceIds';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText, Label } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
@@ -100,7 +100,15 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
   const calendars = useAppStore((state) => state.calendars);
   const toggleCalendar = useAppStore((state) => state.toggleCalendar);
   const refresh = useAppStore((state) => state.refresh);
-  const refreshing = useAppStore((state) => state.refreshing);
+  const readingDevice = useAppStore((state) => state.refreshing);
+  const downloading = useAppStore((state) => state.syncingSubscriptions);
+
+  /**
+   * There is one "sync" from where the user stands: the calendars of the device
+   * being read again and the subscribed ones being downloaded. Which of the two
+   * is still going is not their problem, so the control reports either.
+   */
+  const refreshing = readingDevice || downloading;
   const lastSync = useAppStore((state) => state.lastSync);
 
   const { mounted, progress } = usePanelTransition(open, onClose);
@@ -146,17 +154,25 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
   );
 
   /**
-   * The app's own calendars, which are the ones it did not read from the device
-   * and where everything it creates goes.
+   * The app's own calendars, which are where everything it creates goes.
+   *
+   * A calendar subscribed by URL is created here too, so it carries an id of the
+   * app; what tells it apart is the address it is downloaded from, and it
+   * belongs with the other subscriptions rather than next to Personal, which is
+   * a calendar you can write in.
    */
   const ownCalendars = useMemo(
-    () => calendars.filter((calendar) => !isDeviceId(calendar.id)),
+    () =>
+      calendars.filter(
+        (calendar) => !isDeviceId(calendar.id) && !calendar.url,
+      ),
     [calendars],
   );
 
   /**
-   * The calendars of the device that hang from no account split in two: the
-   * ones somebody shared, which carry who did, and the subscriptions.
+   * The calendars that hang from no account split in two: the ones somebody
+   * shared, which carry who did, and the subscriptions, whether they were
+   * subscribed to here or on the phone.
    */
   const shared = useMemo(
     () =>
@@ -173,9 +189,10 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
     () =>
       calendars.filter(
         (calendar) =>
-          isDeviceId(calendar.id) &&
-          calendar.accountId === null &&
-          !calendar.sharedBy,
+          calendar.url ||
+          (isDeviceId(calendar.id) &&
+            calendar.accountId === null &&
+            !calendar.sharedBy),
       ),
     [calendars],
   );

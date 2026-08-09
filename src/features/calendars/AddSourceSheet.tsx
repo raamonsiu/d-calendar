@@ -1,97 +1,103 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import {
+  ACCOUNT_SETTINGS_DIRECT,
+  openAccountSettings,
+} from '@/services/systemAccounts';
 import { useAppStore } from '@/store/useAppStore';
-import { AppText, Label } from '@/theme/Text';
+import { AppText } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
 import { useToast } from '@/ui/Toast';
 import { Cta } from '@/ui/controls';
-import type { Provider } from '@/types';
 
-/** Providers that can be connected with an account. */
-const PROVIDERS: { label: string; value: Provider }[] = [
-  { label: 'Google', value: 'GOOGLE' },
-  { label: 'iCloud', value: 'ICLOUD' },
-  { label: 'Outlook', value: 'OUTLOOK' },
-];
+/** The two things this sheet can add. */
+export type SourceMode = 'account' | 'subscription';
 
-/** Minimal email validation: some text, an at sign and a dotted domain. */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type SourceMode = 'account' | 'subscription';
+/**
+ * Where the accounts of the phone are, said in the words of each system. On
+ * Android the button gets there on its own, so the line only names the place it
+ * is about to open.
+ */
+const ACCOUNT_PATH = ACCOUNT_SETTINGS_DIRECT
+  ? 'Se abrirán los ajustes de cuentas del teléfono.'
+  : 'En Ajustes del sistema › Calendario › Cuentas.';
 
 type AddSourceSheetProps = {
   open: boolean;
   onClose: () => void;
-  /** Provider preselected when opening from Settings › Conectar. */
-  initialProvider?: Provider;
+  /** Tab the sheet opens on; without it, the account one. */
+  initialMode?: SourceMode;
 };
 
 /**
- * Adding an account or a URL subscription.
+ * Adding a calendar: an account of the phone, or a subscription by URL.
  *
- * Both tabs share the sheet and the CTA, and swap the form and the validation:
- * the account needs a well formed email, the subscription a name and a URL. The
- * CTA stays disabled until its own side is valid.
+ * The account side does not ask for anything, because there is nothing here to
+ * ask for. The app has no OAuth: it reads the calendars the operating system
+ * already syncs, so the honest form of "connect Google" is a way into the
+ * system settings and the promise that what is added there turns up here on its
+ * own, which is what the read on returning to the foreground does.
  *
- * Mock: there is no OAuth and no `.ics` download; the source is only added to
- * local state.
+ * The subscription side does take a name and a URL. Subscribing is nothing more
+ * than keeping that address and downloading it again every so often, which is
+ * what `useSubscriptionSync` does from the moment it is added.
  */
 export function AddSourceSheet({
   open,
   onClose,
-  initialProvider,
+  initialMode,
 }: AddSourceSheetProps) {
-  const connectAccount = useAppStore((state) => state.connectAccount);
   const subscribeCalendar = useAppStore((state) => state.subscribeCalendar);
+  const refresh = useAppStore((state) => state.refresh);
   const toast = useToast();
 
-  const [mode, setMode] = useState<SourceMode>('account');
-  const [provider, setProvider] = useState<Provider>('GOOGLE');
-  const [email, setEmail] = useState('');
+  const [mode, setMode] = useState<SourceMode>(initialMode ?? 'account');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
   /**
-   * Opening from Settings › Conectar preselects the provider. It is adjusted
-   * during render (derived state) instead of in an effect, which would trigger
-   * a second paint.
+   * Opening from Settings chooses the tab. It is adjusted during render
+   * (derived state) instead of in an effect, which would trigger a second
+   * paint.
    */
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open && initialProvider) {
-      setMode('account');
-      setProvider(initialProvider);
-    }
+    if (open && initialMode) setMode(initialMode);
   }
 
   const close = () => {
-    setEmail('');
     setName('');
     setUrl('');
     onClose();
   };
 
-  const isValid =
-    mode === 'account'
-      ? EMAIL_PATTERN.test(email.trim())
-      : name.trim().length > 0 && url.trim().length > 0;
+  const isValid = name.trim().length > 0 && url.trim().length > 0;
 
-  const submit = () => {
-    if (mode === 'account') {
-      connectAccount(provider, email.trim());
-      toast.show(`Cuenta ${email.trim()} conectada`);
-    } else {
-      subscribeCalendar(
-        name.trim(),
-        url.trim().endsWith('.ics') ? 'ICS' : 'CALDAV',
-      );
-      toast.show(`${name.trim()} suscrito`);
-    }
+  /**
+   * Hands over to the system settings and closes: what happens next happens
+   * outside the app, and the sheet has nothing left to say.
+   */
+  const goToSettings = () => {
+    close();
+    openAccountSettings().then((opened) => {
+      if (!opened) toast.show('No se pudieron abrir los ajustes');
+    });
+  };
+
+  /**
+   * Adds the calendar and asks for a sync, which is what downloads it: the
+   * refresh is the one signal both the device read and the subscriptions
+   * listen to.
+   */
+  const subscribe = () => {
+    subscribeCalendar(name.trim(), url.trim());
+    refresh();
+    toast.show(`${name.trim()} añadido`);
     close();
   };
 
@@ -116,29 +122,12 @@ export function AddSourceSheet({
 
       {mode === 'account' ? (
         <View style={styles.body}>
-          <Label size={9}>Proveedor</Label>
-          <View style={styles.row}>
-            {PROVIDERS.map((option) => (
-              <Chip
-                key={option.value}
-                grow
-                label={option.label}
-                selected={provider === option.value}
-                onPress={() => setProvider(option.value)}
-              />
-            ))}
-          </View>
-          <Field
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="tu@correo.com"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <AppText style={styles.note}>
-            En esta versión no se abre el navegador: la cuenta se añade en local
-            para poder probar la interfaz.
+          <AppText style={styles.explain}>
+            Las cuentas se añaden al teléfono, no a la app: la app lee los
+            calendarios que el sistema ya sincroniza. Al volver aparecerán aquí
+            solos.
           </AppText>
+          <AppText style={styles.note}>{ACCOUNT_PATH}</AppText>
         </View>
       ) : (
         <View style={styles.body}>
@@ -155,17 +144,17 @@ export function AddSourceSheet({
             onChangeText={setUrl}
           />
           <AppText style={styles.note}>
-            Los calendarios suscritos por URL son de solo lectura.
+            Los calendarios por URL son de solo lectura. Se descargan al añadirlos
+            y cada vez que abres la app.
           </AppText>
         </View>
       )}
 
-      <Cta
-        primary
-        disabled={!isValid}
-        label={mode === 'account' ? 'CONECTAR' : 'SUSCRIBIR'}
-        onPress={submit}
-      />
+      {mode === 'account' ? (
+        <Cta primary label="ABRIR AJUSTES" onPress={goToSettings} />
+      ) : (
+        <Cta primary disabled={!isValid} label="AÑADIR" onPress={subscribe} />
+      )}
     </Sheet>
   );
 }
@@ -173,7 +162,12 @@ export function AddSourceSheet({
 const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 5 },
   body: { gap: 7 },
-  row: { flexDirection: 'row', gap: 5 },
+  explain: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: color.textNote,
+    paddingHorizontal: 2,
+  },
   note: {
     fontSize: 10,
     lineHeight: 15,

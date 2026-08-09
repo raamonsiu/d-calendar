@@ -72,12 +72,14 @@ export const TOPICS: Topic[] = [
     icon: ArrowsClockwiseIcon,
     blocks: [
       paragraph(
-        'Puedes conectar tantas cuentas como necesites y decidir, calendario a calendario, cuáles se muestran.',
+        'La app no conecta cuentas: lee las que tu teléfono ya sincroniza. Añade allí las que quieras y decide aquí, calendario a calendario, cuáles se muestran.',
       ),
       step('Abre el menú lateral y pulsa Añadir cuenta o calendario.'),
-      step('Elige Google y completa el acceso en el navegador.'),
       step(
-        'De vuelta en el menú, marca las casillas de los calendarios que quieres ver.',
+        'En la pestaña Cuenta, pulsa Abrir ajustes y añade la cuenta en el teléfono.',
+      ),
+      step(
+        'Vuelve a la app: sus calendarios aparecen solos en el menú lateral, donde marcas los que quieres ver.',
       ),
       note(
         'Desmarcar un calendario solo lo oculta: no borra nada ni deja de sincronizar en el servidor.',
@@ -150,7 +152,7 @@ export const TOPICS: Topic[] = [
         'Para exportar: Ajustes › Calendarios › menú de la cuenta › Exportar.',
       ),
       note(
-        'Los calendarios suscritos por URL son de solo lectura: no podrás crear eventos dentro de ellos.',
+        'Los calendarios suscritos por URL son de solo lectura: no podrás crear eventos dentro de ellos. Se descargan al añadirlos, al abrir la app y al pulsar sincronizar en el menú lateral.',
       ),
     ],
   },

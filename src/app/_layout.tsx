@@ -45,6 +45,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useDeviceCalendarSync } from '@/services/useDeviceCalendarSync';
 import { useNotificationSync } from '@/services/useNotificationSync';
+import { useSubscriptionSync } from '@/services/useSubscriptionSync';
 import { useStoreHydrated } from '@/store/useAppStore';
 import { PreferencesProvider } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
@@ -53,16 +54,21 @@ import { ToastProvider } from '@/ui/Toast';
 SplashScreen.preventAutoHideAsync();
 
 /**
- * Mounts the two background jobs: reading the device calendars and scheduling
- * the reminders. It draws nothing, and it has to live inside
- * `PreferencesProvider` because the notifications hook reads the preference,
- * which `RootLayout` itself creates.
+ * Mounts the three background jobs: reading the calendars of the device,
+ * downloading the ones subscribed by URL, and scheduling the reminders. It draws
+ * nothing, and it has to live inside `PreferencesProvider` because the
+ * notifications hook reads the preference, which `RootLayout` itself creates.
  *
- * The order matters: the calendars are read first so the first reminder plan is
+ * It is only mounted once the stored state has been read, because `RootLayout`
+ * draws nothing before that: the subscriptions are in there, and a download that
+ * ran first would find no calendars to download.
+ *
+ * The order matters: the calendars come in first so the first reminder plan is
  * built with everything already in the store.
  */
 function BackgroundSync() {
   useDeviceCalendarSync();
+  useSubscriptionSync();
   useNotificationSync();
   return null;
 }

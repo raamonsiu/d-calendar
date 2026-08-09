@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { toggleInList, withoutId } from '@/lib/collections';
 import { MONTHS, withTime } from '@/lib/date';
-import { isDeviceId } from '@/lib/deviceIds';
 import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
+import { isDeviceId, isForeignId, isSubscriptionId } from '@/lib/sourceIds';
 import { avatarInitial } from '@/lib/text';
 import {
   DEVICE_REPEAT_RULES,
@@ -170,14 +170,19 @@ export function useItemForm(editing?: Editing) {
   const [guests, setGuests] = useState<Guest[]>(editedEvent?.guests ?? []);
 
   const isDeviceEvent = !!editedEvent && isDeviceId(editedEvent.id);
+  const isSubscribedEvent = !!editedEvent && isSubscriptionId(editedEvent.id);
   const deviceEventId = isDeviceEvent ? editedEvent.id : null;
 
   /**
    * An event of the device that the user did not create is shown but not
    * changed. Being in a calendar of theirs is not the same as being theirs: a
    * colleague's invitation lands there and is still the colleague's event.
+   *
+   * A subscribed one is never editable: it is a copy of a file on a server, and
+   * a change here would last until the next download.
    */
-  const readOnly = isDeviceEvent && !canEditDeviceEvent(editedEvent.id);
+  const readOnly =
+    isSubscribedEvent || (isDeviceEvent && !canEditDeviceEvent(editedEvent.id));
 
   /**
    * An event of the device arrives without guests, because asking for them
@@ -315,11 +320,12 @@ export function useItemForm(editing?: Editing) {
    * on the phone and invites nobody, so it would look like the guest was told
    * when nothing was sent.
    */
-  const guestsNote = isDeviceEvent
-    ? 'Los invitados vienen del calendario y se cambian allí.'
-    : isDeviceTarget
-      ? 'La app no puede invitar a nadie en un calendario del dispositivo.'
-      : null;
+  const guestsNote =
+    isDeviceEvent || isSubscribedEvent
+      ? 'Los invitados vienen del calendario y se cambian allí.'
+      : isDeviceTarget
+        ? 'La app no puede invitar a nadie en un calendario del dispositivo.'
+        : null;
 
   /** The next five months plus "Sin mes". */
   const monthOptions = useMemo(() => {
@@ -461,7 +467,7 @@ export function useItemForm(editing?: Editing) {
     if (kind === 'event') {
       const payload = buildEvent();
 
-      if (editing && isDeviceId(editing.item.id)) {
+      if (editing && isForeignId(editing.item.id)) {
         /**
          * The reminders are the app's, so they are stored whatever the event
          * is; the rest only reaches the device when it belongs to the user.
@@ -577,7 +583,7 @@ export function useItemForm(editing?: Editing) {
        * event is created and never again, so the chips would be asking for
        * something a save would throw away.
        */
-      visibilityShown: !isDeviceEvent,
+      visibilityShown: !isDeviceEvent && !isSubscribedEvent,
       guests,
       /**
        * The guest list is shown but not touched whenever the event lives, or is

@@ -8,15 +8,23 @@
  *
  * The calendars of the device are the real part of this screen: their group
  * reports the system permission and is the way back in when it has been denied.
+ * Adding an account leads out to the system settings, which is where accounts
+ * are actually added; the app has no OAuth of its own.
  *
- * Mock: connecting an account opens no browser and asks for no permissions, and
- * exporting generates no files. Disconnecting does remove the account and its
- * calendars from the store, and local items are kept.
+ * The calendars subscribed by URL are listed with their own group, which is
+ * where one gets refreshed on demand or removed: they can be added from two
+ * places, so being able to take one away had to live somewhere.
+ *
+ * Mock: exporting generates no files. Disconnecting does remove the account and
+ * its calendars from the store, and local items are kept.
  */
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
+import {
+  AddSourceSheet,
+  type SourceMode,
+} from '@/features/calendars/AddSourceSheet';
 import { DeviceCalendarsGroup } from '@/features/settings/DeviceCalendarsGroup';
 import { groupRadius } from '@/lib/groupRadius';
 import { countLabel } from '@/lib/text';
@@ -32,27 +40,31 @@ import { Sheet } from '@/ui/Sheet';
 import { useToast } from '@/ui/Toast';
 import { GroupRow, OptionRow } from '@/ui/controls';
 import {
-  AppleLogoIcon,
+  ArrowUpRightIcon,
   DotsThreeVerticalIcon,
-  GoogleLogoIcon,
-  MicrosoftOutlookLogoIcon,
+  GearSixIcon,
+  LinkIcon,
   PlusIcon,
   type Icon,
 } from '@/ui/icons';
-import type { Provider } from '@/types';
 
-/** Providers that can be connected, each with its logo. */
-const CONNECTORS: { label: string; provider: Provider; Logo: Icon }[] = [
+/**
+ * The two ways a calendar gets in, and neither is an account form: one leads
+ * out to the system settings, where the phone's accounts are added, and the
+ * other opens the subscription tab.
+ */
+const SOURCES: { label: string; mode: SourceMode; Logo: Icon; Mark: Icon }[] = [
   {
-    label: 'Conectar cuenta de Google',
-    provider: 'GOOGLE',
-    Logo: GoogleLogoIcon,
+    label: 'Añadir una cuenta al teléfono',
+    mode: 'account',
+    Logo: GearSixIcon,
+    Mark: ArrowUpRightIcon,
   },
-  { label: 'Conectar iCloud', provider: 'ICLOUD', Logo: AppleLogoIcon },
   {
-    label: 'Conectar Outlook',
-    provider: 'OUTLOOK',
-    Logo: MicrosoftOutlookLogoIcon,
+    label: 'Suscribirse a un calendario por URL',
+    mode: 'subscription',
+    Logo: LinkIcon,
+    Mark: PlusIcon,
   },
 ];
 
@@ -64,12 +76,15 @@ export default function CalendarsScreen() {
   const accounts = useAppStore((state) => state.accounts);
   const calendars = useAppStore((state) => state.calendars);
   const disconnectAccount = useAppStore((state) => state.disconnectAccount);
+  const removeSubscription = useAppStore((state) => state.removeSubscription);
+  const refresh = useAppStore((state) => state.refresh);
 
   const [defaultSheetOpen, setDefaultSheetOpen] = useState(false);
   const [accountSheetId, setAccountSheetId] = useState<string | null>(null);
-  const [connectingProvider, setConnectingProvider] = useState<Provider | null>(
+  const [subscriptionSheetId, setSubscriptionSheetId] = useState<string | null>(
     null,
   );
+  const [sourceMode, setSourceMode] = useState<SourceMode | null>(null);
 
   /**
    * What can be a destination: the app's own calendars and the ones of the
@@ -83,11 +98,26 @@ export default function CalendarsScreen() {
     [calendars],
   );
 
+  /**
+   * The calendars subscribed from here, which are the ones carrying an address.
+   *
+   * A subscription the phone itself holds is not one of them: it also shows up
+   * in the side menu, but it is removed where it was added, the same as an
+   * account.
+   */
+  const subscriptions = useMemo(
+    () => calendars.filter((calendar) => calendar.url),
+    [calendars],
+  );
+
   const defaultCalendar = calendars.find(
     (calendar) => calendar.id === prefs.defaultCalendarId,
   );
   const accountInSheet = accounts.find(
     (account) => account.id === accountSheetId,
+  );
+  const subscriptionInSheet = subscriptions.find(
+    (calendar) => calendar.id === subscriptionSheetId,
   );
 
   const disconnect = () => {
@@ -96,6 +126,14 @@ export default function CalendarsScreen() {
       toast.show(`${accountInSheet.email} desconectada`);
     }
     setAccountSheetId(null);
+  };
+
+  const unsubscribe = () => {
+    if (subscriptionInSheet) {
+      removeSubscription(subscriptionInSheet.id);
+      toast.show(`${subscriptionInSheet.name} eliminado`);
+    }
+    setSubscriptionSheetId(null);
   };
 
   return (
@@ -145,10 +183,34 @@ export default function CalendarsScreen() {
             </View>
           </Sheet>
 
+          <Sheet
+            open={!!subscriptionSheetId}
+            onClose={() => setSubscriptionSheetId(null)}
+            title={subscriptionInSheet?.name ?? ''}>
+            <AppText numberOfLines={2} style={styles.subscriptionUrl}>
+              {subscriptionInSheet?.url ?? ''}
+            </AppText>
+            <View style={styles.options}>
+              <OptionRow
+                label="Actualizar ahora"
+                selected={false}
+                onPress={() => {
+                  setSubscriptionSheetId(null);
+                  refresh();
+                }}
+              />
+              <OptionRow
+                label="Eliminar la suscripción"
+                selected={false}
+                onPress={unsubscribe}
+              />
+            </View>
+          </Sheet>
+
           <AddSourceSheet
-            open={!!connectingProvider}
-            initialProvider={connectingProvider ?? undefined}
-            onClose={() => setConnectingProvider(null)}
+            open={!!sourceMode}
+            initialMode={sourceMode ?? undefined}
+            onClose={() => setSourceMode(null)}
           />
         </>
       }>
@@ -204,19 +266,51 @@ export default function CalendarsScreen() {
         })}
       </Group>
 
-      <Group title="Conectar" gap={6}>
-        {CONNECTORS.map(({ label, provider, Logo }) => (
+      {subscriptions.length ? (
+        <Group title="Suscripciones">
+          {subscriptions.map((calendar, index) => (
+            <Pressable
+              key={calendar.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Opciones de ${calendar.name}`}
+              onPress={() => setSubscriptionSheetId(calendar.id)}
+              style={({ pressed }) => [
+                styles.accountRow,
+                groupRadius(index, subscriptions.length),
+                { backgroundColor: pressed ? color.cardHover : color.surface },
+              ]}>
+              <CalendarDot color={calendar.dotColor} />
+              <View style={styles.accountBody}>
+                <AppText numberOfLines={1} style={styles.accountEmail}>
+                  {calendar.name}
+                </AppText>
+                <AppText numberOfLines={1} style={styles.accountMeta}>
+                  {calendar.kind} · SOLO LECTURA
+                </AppText>
+              </View>
+              <DotsThreeVerticalIcon
+                size={19}
+                color={color.label}
+                weight="bold"
+              />
+            </Pressable>
+          ))}
+        </Group>
+      ) : null}
+
+      <Group title="Añadir" gap={6}>
+        {SOURCES.map(({ label, mode, Logo, Mark }) => (
           <Pressable
-            key={provider}
+            key={mode}
             accessibilityRole="button"
-            onPress={() => setConnectingProvider(provider)}
+            onPress={() => setSourceMode(mode)}
             style={({ pressed }) => [
               styles.connector,
               { borderColor: pressed ? accent : color.borderStrong },
             ]}>
             <Logo size={15} color={color.textMuted} />
             <AppText style={styles.connectorLabel}>{label}</AppText>
-            <PlusIcon size={12} color={accent} />
+            <Mark size={12} color={accent} />
           </Pressable>
         ))}
       </Group>
@@ -235,6 +329,12 @@ const styles = StyleSheet.create({
   accountBody: { flex: 1, gap: 2 },
   accountEmail: { fontSize: 12, color: color.textBody },
   accountMeta: { fontSize: 9, letterSpacing: 1.1, color: color.labelDim },
+  subscriptionUrl: {
+    fontSize: 10,
+    lineHeight: 15,
+    color: color.labelDim,
+    paddingHorizontal: 6,
+  },
   connector: {
     height: 48,
     borderRadius: radius.card,

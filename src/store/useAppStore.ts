@@ -2,14 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import {
-  insertAt,
-  patchById,
-  withoutId,
-} from '@/lib/collections';
-import { isDeviceId } from '@/lib/deviceIds';
+import { insertAt, patchById, withoutId } from '@/lib/collections';
 import { nextHabitProgress, nextHabitStreak, isHabitDone } from '@/lib/habits';
-import { avatarInitial } from '@/lib/text';
+import { isDeviceId } from '@/lib/sourceIds';
 import { color } from '@/theme/tokens';
 import type {
   Account,
@@ -17,7 +12,6 @@ import type {
   Calendar,
   Habit,
   ItemKind,
-  Provider,
   RelativeReminder,
   Task,
 } from '@/types';
@@ -88,6 +82,16 @@ type AppState = {
    */
   deviceEvents: CalEvent[];
   /**
+   * Events downloaded from the calendars subscribed by URL.
+   *
+   * Unlike the device's, these **are** stored. The device is asked again on
+   * every launch and always answers; a server may not be there, and a timetable
+   * that disappears on the underground would be worse than a stale one.
+   */
+  subscriptionEvents: CalEvent[];
+  /** True while the subscribed calendars are being downloaded. */
+  syncingSubscriptions: boolean;
+  /**
    * Accounts of the device the user disconnected. Taking one out of the lists
    * is not enough, because the next read of the device would bring it straight
    * back: this is what makes the decision last.
@@ -128,7 +132,6 @@ type AppActions = {
   restoreItem: (removed: RemovedItem) => void;
 
   toggleCalendar: (id: string) => void;
-  connectAccount: (provider: Provider, email: string) => void;
   /**
    * Removes the account and its calendars. Local items are kept.
    *
@@ -144,7 +147,21 @@ type AppActions = {
    * the event's, so they can be changed even on one it may not edit.
    */
   setEventReminders: (eventId: string, reminders: RelativeReminder[]) => void;
-  subscribeCalendar: (name: string, kind: 'CALDAV' | 'ICS') => void;
+  /**
+   * Adds a calendar subscribed by URL. It arrives empty; the download that
+   * fills it is set off by `useSubscriptionSync`.
+   */
+  subscribeCalendar: (name: string, url: string) => void;
+  /** Removes a subscribed calendar together with everything downloaded for it. */
+  removeSubscription: (id: string) => void;
+  /**
+   * Closes the download of one subscribed calendar, replacing its events.
+   *
+   * Only that calendar's are touched: the others may have failed, or may still
+   * be on their way, and their events have to stay where they are.
+   */
+  finishSubscription: (calendarId: string, events: CalEvent[]) => void;
+  setSyncingSubscriptions: (syncing: boolean) => void;
 
   /**
    * Closes a read of the device calendars, replacing the previous one.
@@ -186,6 +203,29 @@ function extractById<Item extends { id: string }>(list: Item[], id: string) {
   return { index, item: list[index], rest: withoutId(list, id) };
 }
 
+/**
+ * Lays the reminders the user chose back over events that have just been read.
+ *
+ * Both the device and the subscriptions hand over events with whatever alarms
+ * they carry, and both are replaced whole on every read. A reminder set here
+ * belongs to the app, so it has to be put back on top afterwards or it would
+ * last until the next read and no longer.
+ *
+ * Postcondition: returns a new list; events with no reminder of their own are
+ * returned untouched, not copied.
+ *
+ * @param events Events as they were just read.
+ * @param overrides Reminders the user set, by event id.
+ */
+function withReminders(
+  events: CalEvent[],
+  overrides: Record<string, RelativeReminder[]>,
+) {
+  return events.map((event) =>
+    overrides[event.id] ? { ...event, reminders: overrides[event.id] } : event,
+  );
+}
+
 export const useAppStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
@@ -198,6 +238,8 @@ export const useAppStore = create<AppState & AppActions>()(
       refreshing: false,
       hydrated: false,
       deviceEvents: [],
+      subscriptionEvents: [],
+      syncingSubscriptions: false,
       ignoredAccounts: [],
       eventReminders: {},
 
@@ -294,29 +336,6 @@ export const useAppStore = create<AppState & AppActions>()(
           ),
         })),
 
-      connectAccount: (provider, email) => {
-        const accountId = createId('acc');
-        const account: Account = {
-          id: accountId,
-          email,
-          initial: avatarInitial(email),
-          provider,
-        };
-        const calendar: Calendar = {
-          id: createId('cal'),
-          name: email.split('@')[0] || 'Calendario',
-          dotColor: color.textMuted,
-          kind: '',
-          accountId,
-          visible: true,
-        };
-
-        set((state) => ({
-          accounts: [...state.accounts, account],
-          calendars: [...state.calendars, calendar],
-        }));
-      },
-
       disconnectAccount: (id) =>
         set((state) => ({
           accounts: withoutId(state.accounts, id),
@@ -337,14 +356,16 @@ export const useAppStore = create<AppState & AppActions>()(
         set({ ignoredAccounts: [], refreshing: true }),
 
       setEventReminders: (eventId, reminders) =>
-        set((state) => ({
-          eventReminders: { ...state.eventReminders, [eventId]: reminders },
-          deviceEvents: state.deviceEvents.map((event) =>
-            event.id === eventId ? { ...event, reminders } : event,
-          ),
-        })),
+        set((state) => {
+          const applied = { [eventId]: reminders };
+          return {
+            eventReminders: { ...state.eventReminders, ...applied },
+            deviceEvents: withReminders(state.deviceEvents, applied),
+            subscriptionEvents: withReminders(state.subscriptionEvents, applied),
+          };
+        }),
 
-      subscribeCalendar: (name, kind) =>
+      subscribeCalendar: (name, url) =>
         set((state) => ({
           calendars: [
             ...state.calendars,
@@ -352,13 +373,36 @@ export const useAppStore = create<AppState & AppActions>()(
               id: createId('cal'),
               name,
               dotColor: color.textDisabled,
-              kind,
+              /** A file is an `.ics`; anything else is taken for a CalDAV. */
+              kind: url.endsWith('.ics') ? 'ICS' : 'CALDAV',
               accountId: null,
               visible: true,
               readOnly: true,
+              url,
             },
           ],
         })),
+
+      removeSubscription: (id) =>
+        set((state) => ({
+          calendars: withoutId(state.calendars, id),
+          subscriptionEvents: state.subscriptionEvents.filter(
+            (event) => event.calendarId !== id,
+          ),
+        })),
+
+      finishSubscription: (calendarId, events) =>
+        set((state) => ({
+          subscriptionEvents: [
+            ...state.subscriptionEvents.filter(
+              (event) => event.calendarId !== calendarId,
+            ),
+            ...withReminders(events, state.eventReminders),
+          ],
+        })),
+
+      setSyncingSubscriptions: (syncing) =>
+        set({ syncingSubscriptions: syncing }),
 
       finishRefresh: (data) =>
         set((state) => {
@@ -394,16 +438,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 visible: wasVisible.get(calendar.id) ?? calendar.visible,
               })),
             ],
-            /**
-             * The reminders the user set win over the alarms the event carries:
-             * the read brings the device's, and this puts the app's back on
-             * top.
-             */
-            deviceEvents: data.events.map((event) =>
-              state.eventReminders[event.id]
-                ? { ...event, reminders: state.eventReminders[event.id] }
-                : event,
-            ),
+            deviceEvents: withReminders(data.events, state.eventReminders),
             refreshing: false,
             lastSync: Date.now(),
           };
@@ -435,11 +470,15 @@ export const useAppStore = create<AppState & AppActions>()(
         useAppStore.setState({ hydrated: true });
       },
       /**
-       * Three things are left out on purpose. `refreshing` and `hydrated` only
-       * describe what is going on right now: restoring them would show the side
-       * menu syncing with nothing running, or claim the state was read before
-       * reading it. And `deviceEvents` belongs to the device, which is asked
-       * again on every launch.
+       * What is left out, and why. `refreshing`, `syncingSubscriptions` and
+       * `hydrated` only describe what is going on right now: restoring them
+       * would show the side menu syncing with nothing running, or claim the
+       * state was read before reading it. And `deviceEvents` belongs to the
+       * device, which is asked again on every launch and always answers.
+       *
+       * `subscriptionEvents` is stored, unlike those: it came from a server that
+       * may not be reachable next time, and a timetable that vanishes without a
+       * signal would be worse than one a few hours old.
        */
       partialize: ({
         accounts,
@@ -448,6 +487,7 @@ export const useAppStore = create<AppState & AppActions>()(
         tasks,
         habits,
         lastSync,
+        subscriptionEvents,
         ignoredAccounts,
         eventReminders,
       }) => ({
@@ -457,6 +497,7 @@ export const useAppStore = create<AppState & AppActions>()(
         tasks,
         habits,
         lastSync,
+        subscriptionEvents,
         ignoredAccounts,
         eventReminders,
       }),

@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { AppState, Linking } from 'react-native';
 
-import { isDeviceId } from '@/lib/deviceIds';
+import { isDeviceId } from '@/lib/sourceIds';
 import { countLabel } from '@/lib/text';
 import {
   ensureCalendarPermission,

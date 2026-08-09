@@ -25,11 +25,12 @@ export default function ItemScreen() {
 
   const events = useAppStore((state) => state.events);
   const deviceEvents = useAppStore((state) => state.deviceEvents);
+  const subscriptionEvents = useAppStore((state) => state.subscriptionEvents);
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
 
   const editing = useMemo<Editing | null>(() => {
-    const event = [...events, ...deviceEvents].find(
+    const event = [...events, ...deviceEvents, ...subscriptionEvents].find(
       (candidate) => candidate.id === id,
     );
     if (event) return { kind: 'event', item: event };
@@ -41,7 +42,7 @@ export default function ItemScreen() {
     if (habit) return { kind: 'habit', item: habit };
 
     return null;
-  }, [id, events, deviceEvents, tasks, habits]);
+  }, [id, events, deviceEvents, subscriptionEvents, tasks, habits]);
 
   if (!editing) return <Redirect href="/" />;
 

@@ -62,17 +62,21 @@ export function useNotificationSync() {
       const state = useAppStore.getState();
 
       /**
-       * The alarms an event of the device brings with it only enter the plan
-       * when the user asks for them, because the calendar they came from
+       * The alarms an event brought with it from somewhere else only enter the
+       * plan when the user asks for them, because the calendar they came from
        * already announces them. A reminder they set themselves is a different
        * matter: they asked for that one on this phone, so it is scheduled
        * whatever the switch says.
+       *
+       * A subscribed calendar rarely carries alarms at all, and the ones it does
+       * belong to whoever published it, so the same rule reads well for both.
        */
-      const chosenDeviceEvents = deviceReminders
-        ? state.deviceEvents
-        : state.deviceEvents.filter((event) => state.eventReminders[event.id]);
+      const brought = [...state.deviceEvents, ...state.subscriptionEvents];
+      const chosen = deviceReminders
+        ? brought
+        : brought.filter((event) => state.eventReminders[event.id]);
 
-      const events = [...state.events, ...chosenDeviceEvents];
+      const events = [...state.events, ...chosen];
 
       const plan = planNotifications(
         {
