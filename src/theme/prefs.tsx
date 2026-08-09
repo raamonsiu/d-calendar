@@ -18,6 +18,11 @@ export type Preferences = {
   /** Default duration of an event, in minutes. */
   defaultDuration: number;
   defaultCalendarId: string;
+  /**
+   * Whether reminders reach the system. Turning it off empties the queue; it
+   * says nothing about the system permission, which is asked for separately.
+   */
+  notifications: boolean;
   reduceMotion: boolean;
   mono: boolean;
 };
@@ -36,6 +41,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   weekStart: 'Lunes',
   defaultDuration: 30,
   defaultCalendarId: 'cal-personal',
+  notifications: true,
   reduceMotion: false,
   mono: false,
 };

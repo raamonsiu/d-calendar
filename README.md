@@ -37,12 +37,22 @@ laid out for 412×892, so Android is the reference.
 **Everything is mock and lives in memory.** The store
 (`src/store/useAppStore.ts`) starts seeded with the events, tasks, habits,
 accounts and calendars from the prototype, and returns to that state when the app
-is closed. Creating or editing something only writes locally: there is no OAuth,
-no upload to Google/iCloud and no scheduled notifications. "Añadir cuenta o
-calendario" and "Añadir invitado" are sheets that add the source to local state.
+is closed. Creating or editing something only writes locally: there is no OAuth
+and no upload to Google/iCloud. "Añadir cuenta o calendario" and "Añadir
+invitado" are sheets that add the source to local state.
 
 The next iteration replaces that layer with the real connection; the UI should
 not change.
+
+## Reminders
+
+**These are real.** The reminders of an event, a task or a habit are scheduled as
+local notifications on the device, with no server anywhere: the operating system
+holds the queue and fires it with the app closed. The rules live in
+`src/lib/notifications.ts` and the platform side in `src/services/`.
+
+Still missing: the events of the calendars the user added, which were created in
+other apps. They come in as a second source for the same planner.
 
 ## Commands
 

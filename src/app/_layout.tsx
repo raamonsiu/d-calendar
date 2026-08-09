@@ -43,11 +43,22 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useNotificationSync } from '@/services/useNotificationSync';
 import { PreferencesProvider } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
 import { ToastProvider } from '@/ui/Toast';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Mounts the reminder scheduling. It draws nothing, and it has to live inside
+ * `PreferencesProvider` because the hook reads the notifications preference,
+ * which `RootLayout` itself creates.
+ */
+function NotificationSync() {
+  useNotificationSync();
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -73,6 +84,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PreferencesProvider>
           <ToastProvider>
+            <NotificationSync />
             <StatusBar style="light" />
             <Stack
               screenOptions={{

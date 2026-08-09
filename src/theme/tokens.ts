@@ -152,9 +152,9 @@ export const OVERLAY_OPACITY = 0.55;
  *
  * `zIndex` only orders siblings, but Android leaves out of the view tree any
  * `View` carrying layout props alone, so a raised child ends up competing
- * against its parent's siblings. Anything that lifts itself over the rest of the
- * screen takes its value from here, so the comparison holds whichever level it
- * is flattened into.
+ * against its parent's siblings. Anything that lifts itself over the rest of
+ * the screen takes its value from here, so the comparison holds whichever level
+ * it is flattened into.
  */
 export const layer = {
   /** Screen header, over the box that follows it. */

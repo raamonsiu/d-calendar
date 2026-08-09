@@ -8,11 +8,16 @@
  *
  * Everything on this screen is an in-memory preference (`usePrefs`): closing
  * the app restores the defaults.
+ *
+ * The last group is temporary: it is the manual check on notifications and goes
+ * away with `DebugNotifications`.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { DebugNotifications } from '@/features/settings/DebugNotifications';
+import { NotificationsGroup } from '@/features/settings/NotificationsGroup';
 import { countLabel } from '@/lib/text';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText } from '@/theme/Text';
@@ -178,6 +183,8 @@ export default function SettingsScreen() {
         />
       </Group>
 
+      <NotificationsGroup />
+
       <Group title="Integraciones">
         <GroupRow
           index={0}
@@ -227,6 +234,8 @@ export default function SettingsScreen() {
           }
         />
       </Group>
+
+      <DebugNotifications />
     </SecondaryScreen>
   );
 }
