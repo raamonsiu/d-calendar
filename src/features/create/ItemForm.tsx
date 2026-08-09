@@ -59,9 +59,20 @@ const REVEAL_DELAY_MS = 60;
 /**
  * Form for an event, a task or a habit.
  *
- * It is the same screen in both modes: without `editing` it creates a new item
+ * It is the same screen in three modes: without `editing` it creates a new item
  * and the type selector is active; with `editing` it edits the given item,
- * locks the type (an event does not become a task) and adds Eliminar.
+ * locks the type (an event does not become a task) and adds Eliminar; and when
+ * the item belongs to somebody else it is only shown, with a line saying why and
+ * no Eliminar.
+ *
+ * Read only turns the form off in one stroke, wrapping the blocks in a view that
+ * takes no touches, instead of disabling control by control: no field, chip or
+ * picker responds, and the list still scrolls, because the ScrollView is the one
+ * that keeps receiving the gesture.
+ *
+ * The reminders are left outside that view on purpose, and the button says
+ * GUARDAR AVISOS: they belong to the app rather than to the event, so they can
+ * be changed on an event the app may not touch.
  *
  * State and save rules live in `useItemForm`; this file only draws.
  */
@@ -127,22 +138,35 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}>
-          <TitleBlock form={form} />
+          {form.readOnly ? (
+            <AppText style={styles.readOnlyNote}>
+              Este evento lo creó otra persona: se ve, pero se edita donde se
+              creó. Los avisos sí son tuyos y puedes cambiarlos.
+            </AppText>
+          ) : null}
+
+          <View pointerEvents={form.readOnly ? 'none' : 'auto'}>
+            <TitleBlock form={form} />
+          </View>
 
           <View style={styles.blocks}>
-            {form.kind === 'event' ? (
-              <EventBlocks
-                form={form}
-                picker={picker}
-                onAddGuest={() => setGuestSheetOpen(true)}
-              />
-            ) : null}
+            <View
+              style={styles.blocks}
+              pointerEvents={form.readOnly ? 'none' : 'auto'}>
+              {form.kind === 'event' ? (
+                <EventBlocks
+                  form={form}
+                  picker={picker}
+                  onAddGuest={() => setGuestSheetOpen(true)}
+                />
+              ) : null}
 
-            {form.kind === 'task' ? (
-              <TaskBlock form={form} picker={picker} />
-            ) : null}
+              {form.kind === 'task' ? (
+                <TaskBlock form={form} picker={picker} />
+              ) : null}
 
-            {form.kind === 'habit' ? <HabitBlock form={form} /> : null}
+              {form.kind === 'habit' ? <HabitBlock form={form} /> : null}
+            </View>
 
             {form.kind === 'habit' ? (
               <RemindersBlock
@@ -174,7 +198,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
             )}
           </View>
 
-          {form.isEditing ? (
+          {form.isEditing && !form.readOnly ? (
             <Pressable
               accessibilityRole="button"
               onPress={() => setConfirmDelete(true)}
@@ -190,14 +214,16 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           ) : null}
         </ScrollView>
 
-        <Cta
-          primary
-          disabled={!form.canSave}
-          label={
-            form.isEditing ? 'GUARDAR CAMBIOS' : COPY[form.kind].cta
-          }
-          onPress={form.save}
-        />
+        {form.readOnly ? (
+          <Cta primary label="GUARDAR AVISOS" onPress={form.save} />
+        ) : (
+          <Cta
+            primary
+            disabled={!form.canSave}
+            label={form.isEditing ? 'GUARDAR CAMBIOS' : COPY[form.kind].cta}
+            onPress={form.save}
+          />
+        )}
       </View>
 
       <Sheet
@@ -367,6 +393,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   deleteLabel: { fontSize: 12.5 },
+  readOnlyNote: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: color.textMuted,
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+  },
   confirmText: {
     fontSize: 12,
     lineHeight: 18,

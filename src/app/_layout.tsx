@@ -43,6 +43,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useDeviceCalendarSync } from '@/services/useDeviceCalendarSync';
 import { useNotificationSync } from '@/services/useNotificationSync';
 import { useStoreHydrated } from '@/store/useAppStore';
 import { PreferencesProvider } from '@/theme/prefs';
@@ -52,11 +53,16 @@ import { ToastProvider } from '@/ui/Toast';
 SplashScreen.preventAutoHideAsync();
 
 /**
- * Mounts the reminder scheduling. It draws nothing, and it has to live inside
- * `PreferencesProvider` because the hook reads the notifications preference,
+ * Mounts the two background jobs: reading the device calendars and scheduling
+ * the reminders. It draws nothing, and it has to live inside
+ * `PreferencesProvider` because the notifications hook reads the preference,
  * which `RootLayout` itself creates.
+ *
+ * The order matters: the calendars are read first so the first reminder plan is
+ * built with everything already in the store.
  */
-function NotificationSync() {
+function BackgroundSync() {
+  useDeviceCalendarSync();
   useNotificationSync();
   return null;
 }
@@ -90,7 +96,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PreferencesProvider>
           <ToastProvider>
-            <NotificationSync />
+            <BackgroundSync />
             <StatusBar style="light" />
             <Stack
               screenOptions={{

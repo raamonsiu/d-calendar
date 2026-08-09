@@ -17,7 +17,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_VERSION } from '@/data/releases';
+import { ownerLabel } from '@/lib/calendarSources';
 import { formatAgo } from '@/lib/date';
+import { isDeviceId } from '@/lib/deviceIds';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText, Label } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
@@ -139,8 +141,38 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
     [accounts, calendars],
   );
 
+  /**
+   * The app's own calendars, which are the ones it did not read from the device
+   * and where everything it creates goes.
+   */
+  const ownCalendars = useMemo(
+    () => calendars.filter((calendar) => !isDeviceId(calendar.id)),
+    [calendars],
+  );
+
+  /**
+   * The calendars of the device that hang from no account split in two: the
+   * ones somebody shared, which carry who did, and the subscriptions.
+   */
+  const shared = useMemo(
+    () =>
+      calendars.filter(
+        (calendar) =>
+          isDeviceId(calendar.id) &&
+          calendar.accountId === null &&
+          calendar.sharedBy,
+      ),
+    [calendars],
+  );
+
   const subscriptions = useMemo(
-    () => calendars.filter((calendar) => calendar.accountId === null),
+    () =>
+      calendars.filter(
+        (calendar) =>
+          isDeviceId(calendar.id) &&
+          calendar.accountId === null &&
+          !calendar.sharedBy,
+      ),
     [calendars],
   );
 
@@ -234,6 +266,36 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 }
               />
             ))}
+
+            {ownCalendars.length > 0 ? (
+              <CalendarGroup
+                calendars={ownCalendars}
+                onToggle={toggleCalendar}
+                header={
+                  <View style={styles.otherHead}>
+                    <Label>En esta app</Label>
+                    <AppText style={styles.count}>
+                      {visibilitySummary(ownCalendars)}
+                    </AppText>
+                  </View>
+                }
+              />
+            ) : null}
+
+            {shared.length > 0 ? (
+              <CalendarGroup
+                calendars={shared}
+                onToggle={toggleCalendar}
+                header={
+                  <View style={styles.otherHead}>
+                    <Label>Compartidos contigo</Label>
+                    <AppText style={styles.count}>
+                      {visibilitySummary(shared)}
+                    </AppText>
+                  </View>
+                }
+              />
+            ) : null}
 
             <CalendarGroup
               calendars={subscriptions}
@@ -330,8 +392,10 @@ function CalendarGroup({
 /**
  * Calendar row: checkbox, colour dot and name.
  *
- * While unchecked, the dot and the name dim; the label on the right only
- * appears on calendars that have a kind (TAREAS, CALDAV, ICS).
+ * While unchecked, the dot and the name dim. The label on the right says the
+ * kind (TAREAS, CALDAV, ICS) or, on a calendar somebody shared, who did: with
+ * several colleagues in the same group, the name alone does not say whose it
+ * is.
  */
 function CalendarRow({
   calendar,
@@ -385,7 +449,11 @@ function CalendarRow({
         {calendar.name}
       </AppText>
 
-      {calendar.kind ? (
+      {calendar.sharedBy ? (
+        <AppText numberOfLines={1} style={styles.calendarKind}>
+          {ownerLabel(calendar.sharedBy)}
+        </AppText>
+      ) : calendar.kind ? (
         <AppText style={styles.calendarKind}>{calendar.kind}</AppText>
       ) : null}
     </Pressable>

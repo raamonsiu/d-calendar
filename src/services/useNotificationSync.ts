@@ -36,7 +36,7 @@ const REBUILD_DEBOUNCE_MS = 400;
  * outside React.
  */
 export function useNotificationSync() {
-  const { notifications } = usePrefs();
+  const { notifications, deviceReminders } = usePrefs();
   const rebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignature = useRef<string | null>(null);
 
@@ -60,9 +60,23 @@ export function useNotificationSync() {
       if (!active || !granted) return;
 
       const state = useAppStore.getState();
+
+      /**
+       * The alarms an event of the device brings with it only enter the plan
+       * when the user asks for them, because the calendar they came from
+       * already announces them. A reminder they set themselves is a different
+       * matter: they asked for that one on this phone, so it is scheduled
+       * whatever the switch says.
+       */
+      const chosenDeviceEvents = deviceReminders
+        ? state.deviceEvents
+        : state.deviceEvents.filter((event) => state.eventReminders[event.id]);
+
+      const events = [...state.events, ...chosenDeviceEvents];
+
       const plan = planNotifications(
         {
-          events: visibleEvents(state.events, state.calendars),
+          events: visibleEvents(events, state.calendars),
           tasks: state.tasks,
           habits: state.habits,
         },
@@ -101,7 +115,7 @@ export function useNotificationSync() {
       unsubscribeStore();
       appStateSubscription.remove();
     };
-  }, [notifications]);
+  }, [notifications, deviceReminders]);
 
   useEffect(
     () =>

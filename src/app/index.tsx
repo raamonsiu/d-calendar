@@ -66,15 +66,20 @@ export default function HomeScreen() {
   const [focusDay, setFocusDay] = useState<Date | null>(null);
 
   const events = useAppStore((state) => state.events);
+  const deviceEvents = useAppStore((state) => state.deviceEvents);
   const calendars = useAppStore((state) => state.calendars);
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
   const toggleTask = useAppStore((state) => state.toggleTask);
   const bumpHabit = useAppStore((state) => state.bumpHabit);
 
+  /**
+   * The app's own events and the ones read from the device are drawn the same:
+   * they only differ in where they came from and in what tapping one does.
+   */
   const shownEvents = useMemo(
-    () => visibleEvents(events, calendars),
-    [events, calendars],
+    () => visibleEvents([...events, ...deviceEvents], calendars),
+    [events, deviceEvents, calendars],
   );
   const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);
   const days = useMemo(() => weekDays(new Date(), weekStart), [weekStart]);
@@ -109,6 +114,10 @@ export default function HomeScreen() {
     setExpanded(true);
   };
 
+  /**
+   * Everything opens in the app, whoever it belongs to. The detail screen is
+   * the one that decides whether it can be changed.
+   */
   const openItem = (id: string) => router.push(`/item/${id}`);
 
   const modeColumn = (

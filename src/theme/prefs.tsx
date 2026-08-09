@@ -27,6 +27,13 @@ export type Preferences = {
    * says nothing about the system permission, which is asked for separately.
    */
   notifications: boolean;
+  /**
+   * Whether the alarms an event of the device brings with it are scheduled too.
+   * Off by default: the calendar those events came from already announces them,
+   * so turning it on means being told twice. It says nothing about a reminder
+   * the user sets by hand on one of those events, which is always scheduled.
+   */
+  deviceReminders: boolean;
   reduceMotion: boolean;
   mono: boolean;
 };
@@ -46,6 +53,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   defaultDuration: 30,
   defaultCalendarId: 'cal-personal',
   notifications: true,
+  deviceReminders: false,
   reduceMotion: false,
   mono: false,
 };

@@ -7,6 +7,7 @@ import {
   patchById,
   withoutId,
 } from '@/lib/collections';
+import { isDeviceId } from '@/lib/deviceIds';
 import { nextHabitProgress, nextHabitStreak, isHabitDone } from '@/lib/habits';
 import { avatarInitial } from '@/lib/text';
 import { color } from '@/theme/tokens';
@@ -17,6 +18,7 @@ import type {
   Habit,
   ItemKind,
   Provider,
+  RelativeReminder,
   Task,
 } from '@/types';
 import { ACCOUNTS, CALENDARS, seedEvents, seedHabits, seedTasks } from './seed';
@@ -36,11 +38,14 @@ import { ACCOUNTS, CALENDARS, seedEvents, seedHabits, seedTasks } from './seed';
 const STORAGE_KEY = 'dcalendar-state';
 
 /**
- * Bumping this throws away what is stored and starts from the seed again. The
- * seed is written relative to the day it first ran, so it ages: this is the way
- * to refresh the demo data without clearing the app by hand.
+ * Bumping this throws away what is stored and starts from the seed again, which
+ * is the way to push a change in the seed onto a phone that already ran the
+ * app.
+ *
+ * 2: the demo data is gone. Events now come from the calendars of the device,
+ * and the made-up ones sat next to them pretending to be real.
  */
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 let idCounter = 0;
 
@@ -56,9 +61,6 @@ export function createId(prefix: string) {
   idCounter += 1;
   return `${prefix}-${Date.now().toString(36)}-${idCounter.toString(36)}`;
 }
-
-/** How long the sync mock takes to "finish". */
-const MOCK_REFRESH_MS = 1400;
 
 /** Age of the last sync at startup, for the side menu. */
 const INITIAL_SYNC_AGE_MS = 4 * 60 * 1000;
@@ -79,6 +81,28 @@ type AppState = {
   refreshing: boolean;
   /** True once the stored state has been read; see `useStoreHydrated`. */
   hydrated: boolean;
+  /**
+   * Events read from the calendars of the device. They are kept apart from the
+   * app's own and are not stored: they are a cache of something that already
+   * lives somewhere else, and re-reading them is cheap.
+   */
+  deviceEvents: CalEvent[];
+  /**
+   * Accounts of the device the user disconnected. Taking one out of the lists
+   * is not enough, because the next read of the device would bring it straight
+   * back: this is what makes the decision last.
+   */
+  ignoredAccounts: string[];
+  /**
+   * Reminders the user set on events of the device, by event id.
+   *
+   * A reminder belongs to the app and not to the event: it is this phone
+   * deciding when to be told, so it applies just as well to an event somebody
+   * else created and the app must not touch. It is kept here because the events
+   * themselves are a cache that every read rebuilds, alarms included, and an
+   * override written into them would be gone by the next one.
+   */
+  eventReminders: Record<string, RelativeReminder[]>;
 };
 
 type AppActions = {
@@ -105,11 +129,42 @@ type AppActions = {
 
   toggleCalendar: (id: string) => void;
   connectAccount: (provider: Provider, email: string) => void;
-  /** Removes the account and its calendars. Local items are kept. */
+  /**
+   * Removes the account and its calendars. Local items are kept.
+   *
+   * An account of the device is also remembered as ignored, because it cannot
+   * be removed from the phone from here: what the app can do is stop reading
+   * it, and that has to survive the next read.
+   */
   disconnectAccount: (id: string) => void;
+  /** Reads the disconnected device accounts again. */
+  restoreIgnoredAccounts: () => void;
+  /**
+   * Sets the reminders of an event of the device, which are the app's and not
+   * the event's, so they can be changed even on one it may not edit.
+   */
+  setEventReminders: (eventId: string, reminders: RelativeReminder[]) => void;
   subscribeCalendar: (name: string, kind: 'CALDAV' | 'ICS') => void;
 
+  /**
+   * Closes a read of the device calendars, replacing the previous one.
+   *
+   * The user's checkboxes are respected: a calendar already known keeps whether
+   * it was checked, because that is a decision of theirs and not something the
+   * system reports. With `null`, which is what a read without permission
+   * returns, everything is left as it was and only the syncing state is
+   * cleared.
+   */
+  finishRefresh: (data: DeviceData | null) => void;
+
   refresh: () => void;
+};
+
+/** What one read of the device calendars brings in. */
+export type DeviceData = {
+  accounts: Account[];
+  calendars: Calendar[];
+  events: CalEvent[];
 };
 
 /**
@@ -142,6 +197,9 @@ export const useAppStore = create<AppState & AppActions>()(
       lastSync: Date.now() - INITIAL_SYNC_AGE_MS,
       refreshing: false,
       hydrated: false,
+      deviceEvents: [],
+      ignoredAccounts: [],
+      eventReminders: {},
 
       addEvent: (draft) => {
         const id = createId('ev');
@@ -216,13 +274,15 @@ export const useAppStore = create<AppState & AppActions>()(
 
       restoreItem: (removed) =>
         set((state) => {
+          const { index } = removed;
+
           if (removed.kind === 'event') {
-            return { events: insertAt(state.events, removed.index, removed.item) };
+            return { events: insertAt(state.events, index, removed.item) };
           }
           if (removed.kind === 'task') {
-            return { tasks: insertAt(state.tasks, removed.index, removed.item) };
+            return { tasks: insertAt(state.tasks, index, removed.item) };
           }
-          return { habits: insertAt(state.habits, removed.index, removed.item) };
+          return { habits: insertAt(state.habits, index, removed.item) };
         }),
 
       toggleCalendar: (id) =>
@@ -263,6 +323,25 @@ export const useAppStore = create<AppState & AppActions>()(
           calendars: state.calendars.filter(
             (calendar) => calendar.accountId !== id,
           ),
+          ignoredAccounts:
+            isDeviceId(id) && !state.ignoredAccounts.includes(id)
+              ? [...state.ignoredAccounts, id]
+              : state.ignoredAccounts,
+        })),
+
+      /**
+       * Empties the ignored list and asks for a read, which is what brings the
+       * accounts and their calendars back.
+       */
+      restoreIgnoredAccounts: () =>
+        set({ ignoredAccounts: [], refreshing: true }),
+
+      setEventReminders: (eventId, reminders) =>
+        set((state) => ({
+          eventReminders: { ...state.eventReminders, [eventId]: reminders },
+          deviceEvents: state.deviceEvents.map((event) =>
+            event.id === eventId ? { ...event, reminders } : event,
+          ),
         })),
 
       subscribeCalendar: (name, kind) =>
@@ -281,17 +360,66 @@ export const useAppStore = create<AppState & AppActions>()(
           ],
         })),
 
+      finishRefresh: (data) =>
+        set((state) => {
+          if (!data) return { refreshing: false };
+
+          const wasVisible = new Map(
+            state.calendars.map((calendar) => [calendar.id, calendar.visible]),
+          );
+
+          /**
+           * A disconnected account comes back from the system on every read, so
+           * it is left out here. Its calendars go with it; the shared ones and
+           * the subscriptions hang from no account and stay.
+           */
+          const ignored = new Set(state.ignoredAccounts);
+          const accounts = data.accounts.filter(
+            (account) => !ignored.has(account.id),
+          );
+          const calendars = data.calendars.filter(
+            (calendar) =>
+              calendar.accountId === null || !ignored.has(calendar.accountId),
+          );
+
+          return {
+            accounts: [
+              ...state.accounts.filter((account) => !isDeviceId(account.id)),
+              ...accounts,
+            ],
+            calendars: [
+              ...state.calendars.filter((calendar) => !isDeviceId(calendar.id)),
+              ...calendars.map((calendar) => ({
+                ...calendar,
+                visible: wasVisible.get(calendar.id) ?? calendar.visible,
+              })),
+            ],
+            /**
+             * The reminders the user set win over the alarms the event carries:
+             * the read brings the device's, and this puts the app's back on
+             * top.
+             */
+            deviceEvents: data.events.map((event) =>
+              state.eventReminders[event.id]
+                ? { ...event, reminders: state.eventReminders[event.id] }
+                : event,
+            ),
+            refreshing: false,
+            lastSync: Date.now(),
+          };
+        }),
+
       /**
-       * Sync mock: there is no network yet, only the momentary state the side
-       * menu shows while it "refreshes".
+       * Rereads the calendars of the device, which is the only syncing there
+       * is: the app's own data never leaves the phone, so there is nothing else
+       * to bring in.
+       *
+       * The read itself belongs to `services`, so what is left here is the
+       * state the side menu shows while it happens. `finishRefresh` closes it.
        */
       refresh: () => {
         if (get().refreshing) return;
         set({ refreshing: true });
-        setTimeout(
-          () => set({ refreshing: false, lastSync: Date.now() }),
-          MOCK_REFRESH_MS,
-        );
       },
     }),
     {
@@ -307,18 +435,30 @@ export const useAppStore = create<AppState & AppActions>()(
         useAppStore.setState({ hydrated: true });
       },
       /**
-       * `refreshing` and `hydrated` are left out on purpose: they only describe
-       * what is going on right now. Restoring `refreshing` would show the side
-       * menu syncing after a restart with nothing running, and restoring
-       * `hydrated` would claim the state was read before reading it.
+       * Three things are left out on purpose. `refreshing` and `hydrated` only
+       * describe what is going on right now: restoring them would show the side
+       * menu syncing with nothing running, or claim the state was read before
+       * reading it. And `deviceEvents` belongs to the device, which is asked
+       * again on every launch.
        */
-      partialize: ({ accounts, calendars, events, tasks, habits, lastSync }) => ({
+      partialize: ({
         accounts,
         calendars,
         events,
         tasks,
         habits,
         lastSync,
+        ignoredAccounts,
+        eventReminders,
+      }) => ({
+        accounts,
+        calendars,
+        events,
+        tasks,
+        habits,
+        lastSync,
+        ignoredAccounts,
+        eventReminders,
       }),
     },
   ),

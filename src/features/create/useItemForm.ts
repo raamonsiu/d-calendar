@@ -1,10 +1,17 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { toggleInList, withoutId } from '@/lib/collections';
 import { MONTHS, withTime } from '@/lib/date';
+import { isDeviceId } from '@/lib/deviceIds';
 import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
 import { avatarInitial } from '@/lib/text';
+import {
+  canEditDeviceEvent,
+  deleteDeviceEvent,
+  readDeviceGuests,
+  updateDeviceEvent,
+} from '@/services/deviceCalendars';
 import { createId, useAppStore } from '@/store/useAppStore';
 import { usePrefs } from '@/theme/prefs';
 import { useToast } from '@/ui/Toast';
@@ -111,6 +118,7 @@ export function useItemForm(editing?: Editing) {
       ? new Date(editedEvent.endsAt)
       : new Date(nextSlot().getTime() + prefs.defaultDuration * 60000),
   );
+  const [location, setLocation] = useState(editedEvent?.location ?? '');
   const [allDay, setAllDay] = useState(editedEvent?.allDay ?? false);
   const [repeat, setRepeat] = useState<RepeatRule>(editedEvent?.repeat ?? 'No');
   const [eventWeekdays, setEventWeekdays] = useState<number[]>(
@@ -126,6 +134,35 @@ export function useItemForm(editing?: Editing) {
     editedEvent?.visibility ?? 'Predet.',
   );
   const [guests, setGuests] = useState<Guest[]>(editedEvent?.guests ?? []);
+
+  const isDeviceEvent = !!editedEvent && isDeviceId(editedEvent.id);
+  const deviceEventId = isDeviceEvent ? editedEvent.id : null;
+
+  /**
+   * An event of the device that the user did not create is shown but not
+   * changed. Being in a calendar of theirs is not the same as being theirs: a
+   * colleague's invitation lands there and is still the colleague's event.
+   */
+  const readOnly = isDeviceEvent && !canEditDeviceEvent(editedEvent.id);
+
+  /**
+   * An event of the device arrives without guests, because asking for them
+   * while reading hundreds would make every read crawl. They are fetched when
+   * one is opened, which is asking something outside React and so belongs in an
+   * effect and not in the render.
+   */
+  useEffect(() => {
+    if (!deviceEventId) return;
+
+    let active = true;
+    readDeviceGuests(deviceEventId).then((loaded) => {
+      if (active) setGuests(loaded);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [deviceEventId]);
 
   const [vague, setVague] = useState(!!editedTask?.vagueMonth);
   const [dueAt, setDueAt] = useState(() =>
@@ -196,6 +233,7 @@ export function useItemForm(editing?: Editing) {
   const buildEvent = (): Omit<CalEvent, 'id'> => ({
     title: title.trim(),
     description: description.trim(),
+    location: location.trim(),
     startsAt: startsAt.getTime(),
     endsAt: Math.max(endsAt.getTime(), startsAt.getTime() + MIN_EVENT_MS),
     allDay,
@@ -232,7 +270,31 @@ export function useItemForm(editing?: Editing) {
   });
 
   /**
+   * Writes an event of the device back to the calendar it came from, and closes
+   * either way.
+   *
+   * The store is not touched: the device is the source of truth for its own
+   * events, so the way to see the change is to read it again, which `refresh`
+   * sets off. A refusal is reported instead of being swallowed, because the
+   * screen has already closed and the user would be left believing it saved.
+   *
+   * @param id Id of the event being edited.
+   * @param payload What the form built.
+   */
+  const saveToDevice = (id: string, payload: Omit<CalEvent, 'id'>) => {
+    close();
+
+    updateDeviceEvent(id, payload).then((saved) => {
+      if (saved) useAppStore.getState().refresh();
+      toast.show(saved ? 'Cambios guardados' : 'No se pudo guardar el cambio');
+    });
+  };
+
+  /**
    * Saves the item and navigates back.
+   *
+   * On an event of the device that belongs to somebody else, the only thing
+   * that gets saved is the reminders, which are the app's and not the event's.
    *
    * Precondition: does nothing when the title is empty, the same criterion that
    * disables the CTA. Postcondition: in edit mode it updates the item, in
@@ -245,6 +307,22 @@ export function useItemForm(editing?: Editing) {
 
     if (kind === 'event') {
       const payload = buildEvent();
+
+      if (editing && isDeviceId(editing.item.id)) {
+        /**
+         * The reminders are the app's, so they are stored whatever the event
+         * is; the rest only reaches the device when it belongs to the user.
+         */
+        store.setEventReminders(editing.item.id, relativeReminders);
+        if (readOnly) {
+          close();
+          toast.show('Avisos guardados');
+          return;
+        }
+        saveToDevice(editing.item.id, payload);
+        return;
+      }
+
       if (editing) store.updateEvent(editing.item.id, payload);
       else store.addEvent(payload);
       toast.show(editing ? 'Cambios guardados' : 'Evento creado');
@@ -273,6 +351,21 @@ export function useItemForm(editing?: Editing) {
   const remove = () => {
     if (!editing) return;
     const store = useAppStore.getState();
+
+    /**
+     * There is no undo for an event of the device: it is gone from the phone
+     * and from every other one syncing that account, so offering to bring it
+     * back would be a promise the app cannot keep.
+     */
+    if (isDeviceId(editing.item.id)) {
+      close();
+      deleteDeviceEvent(editing.item.id).then((deleted) => {
+        if (deleted) store.refresh();
+        toast.show(deleted ? 'Evento eliminado' : 'No se pudo eliminar');
+      });
+      return;
+    }
+
     const removed = store.removeItem(editing.kind, editing.item.id);
     close();
     if (removed) {
@@ -282,6 +375,8 @@ export function useItemForm(editing?: Editing) {
 
   return {
     isEditing: !!editing,
+    /** The item is shown but cannot be changed; see `readOnly` above. */
+    readOnly,
     kind,
     setKind,
     title,
@@ -295,6 +390,8 @@ export function useItemForm(editing?: Editing) {
     writableCalendars,
 
     event: {
+      location,
+      setLocation,
       startsAt,
       setStartsAt,
       endsAt,
@@ -313,6 +410,12 @@ export function useItemForm(editing?: Editing) {
       visibility,
       setVisibility,
       guests,
+      /**
+       * The guest list of an event of the device is shown but not touched: the
+       * app does not write attendees yet, and letting them be edited would
+       * throw the change away without saying so.
+       */
+      guestsReadOnly: isDeviceEvent,
       addGuest: (name: string) =>
         setGuests((current) => [
           ...current,

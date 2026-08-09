@@ -6,6 +6,7 @@ import { useAccent } from '@/theme/prefs';
 import { color, hitSlopFor, radius } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
 import { Chip } from '@/ui/Chip';
+import { Field } from '@/ui/Field';
 import { DashedButton, Divider } from '@/ui/controls';
 import { UserPlusIcon, XIcon } from '@/ui/icons';
 import type { DateTimePicker } from '@/ui/pickers';
@@ -121,6 +122,14 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
         </View>
       </FormBlock>
 
+      <FormBlock title="UBICACIÓN">
+        <Field
+          placeholder="Dónde"
+          value={event.location}
+          onChangeText={event.setLocation}
+        />
+      </FormBlock>
+
       <FormBlock title="CALENDARIO">
         <ChipWrap>
           {form.writableCalendars.map((calendar) => (
@@ -176,24 +185,28 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
                   {guest.name}
                 </AppText>
                 <AppText style={styles.guestState}>{guest.state}</AppText>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Quitar a ${guest.name}`}
-                  hitSlop={hitSlopFor(24)}
-                  onPress={() => event.removeGuest(guest.id)}
-                  style={styles.removeGuest}>
-                  <XIcon size={12} color={color.iconFaint} />
-                </Pressable>
+                {event.guestsReadOnly ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Quitar a ${guest.name}`}
+                    hitSlop={hitSlopFor(24)}
+                    onPress={() => event.removeGuest(guest.id)}
+                    style={styles.removeGuest}>
+                    <XIcon size={12} color={color.iconFaint} />
+                  </Pressable>
+                )}
               </View>
             ))}
           </View>
         ) : null}
 
-        <DashedButton
-          label="AÑADIR INVITADO"
-          icon={<UserPlusIcon size={13} color={color.textMuted} />}
-          onPress={onAddGuest}
-        />
+        {event.guestsReadOnly ? null : (
+          <DashedButton
+            label="AÑADIR INVITADO"
+            icon={<UserPlusIcon size={13} color={color.textMuted} />}
+            onPress={onAddGuest}
+          />
+        )}
       </FormBlock>
     </>
   );

@@ -6,6 +6,9 @@
  * Where it leads: nowhere. The default calendar, the account options and adding
  * a new source are all resolved in bottom sheets.
  *
+ * The calendars of the device are the real part of this screen: their group
+ * reports the system permission and is the way back in when it has been denied.
+ *
  * Mock: connecting an account opens no browser and asks for no permissions, and
  * exporting generates no files. Disconnecting does remove the account and its
  * calendars from the store, and local items are kept.
@@ -14,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
+import { DeviceCalendarsGroup } from '@/features/settings/DeviceCalendarsGroup';
 import { groupRadius } from '@/lib/groupRadius';
 import { countLabel } from '@/lib/text';
 import { useAppStore } from '@/store/useAppStore';
@@ -161,6 +165,8 @@ export default function CalendarsScreen() {
           }
         />
       </Group>
+
+      <DeviceCalendarsGroup />
 
       <Group title="Cuentas conectadas">
         {accounts.map((account, index) => {

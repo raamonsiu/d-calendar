@@ -52,8 +52,15 @@ local notifications on the device, with no server anywhere: the operating system
 holds the queue and fires it with the app closed. The rules live in
 `src/lib/notifications.ts` and the platform side in `src/services/`.
 
-Still missing: the events of the calendars the user added, which were created in
-other apps. They come in as a second source for the same planner.
+## Calendars of the device
+
+Also real. The events of whatever calendars the phone already syncs — Google,
+Outlook, iCloud — are read with `expo-calendar` and shown next to the app's own.
+No OAuth and no server: the operating system already keeps those accounts in
+sync, so it is enough to read its calendar database.
+
+They are read only, and their reminders are off by default, because the calendar
+they came from already announces them.
 
 ## Commands
 

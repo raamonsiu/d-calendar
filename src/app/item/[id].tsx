@@ -9,7 +9,9 @@
  * left in the history.
  *
  * Reuses `ItemForm` in edit mode: the item type is derived from the id by
- * looking it up in the three store lists.
+ * looking it up in the store lists, the app's own and the events read from the
+ * device. Only the events of a calendar the system lets the app write to get
+ * here; the rest open in the calendar app they came from, which Home decides.
  */
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
@@ -22,11 +24,14 @@ export default function ItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const events = useAppStore((state) => state.events);
+  const deviceEvents = useAppStore((state) => state.deviceEvents);
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
 
   const editing = useMemo<Editing | null>(() => {
-    const event = events.find((candidate) => candidate.id === id);
+    const event = [...events, ...deviceEvents].find(
+      (candidate) => candidate.id === id,
+    );
     if (event) return { kind: 'event', item: event };
 
     const task = tasks.find((candidate) => candidate.id === id);
@@ -36,7 +41,7 @@ export default function ItemScreen() {
     if (habit) return { kind: 'habit', item: habit };
 
     return null;
-  }, [id, events, tasks, habits]);
+  }, [id, events, deviceEvents, tasks, habits]);
 
   if (!editing) return <Redirect href="/" />;
 

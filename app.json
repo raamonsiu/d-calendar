@@ -40,6 +40,12 @@
         {
           "color": "#e5252f"
         }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "D-Calendar muestra los eventos de los calendarios que ya tienes en el dispositivo."
+        }
       ]
     ],
     "experiments": {

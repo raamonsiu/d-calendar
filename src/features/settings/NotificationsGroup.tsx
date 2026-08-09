@@ -22,7 +22,7 @@ import { color } from '@/theme/tokens';
 import { Group } from '@/ui/Group';
 import { Switch } from '@/ui/Switch';
 import { GroupRow } from '@/ui/controls';
-import { BellIcon, GearSixIcon } from '@/ui/icons';
+import { BellIcon, CalendarBlankIcon, GearSixIcon } from '@/ui/icons';
 
 /** Icon size of a settings row, the same one the screen uses. */
 const ROW_ICON = 15;
@@ -69,7 +69,7 @@ export function NotificationsGroup() {
   };
 
   const showDeniedRow = prefs.notifications && permission === 'denied';
-  const rowCount = showDeniedRow ? 2 : 1;
+  const rowCount = 1 + (prefs.notifications ? 1 : 0) + (showDeniedRow ? 1 : 0);
 
   return (
     <Group title="Notificaciones">
@@ -91,9 +91,31 @@ export function NotificationsGroup() {
         }
       />
 
-      {showDeniedRow ? (
+      {prefs.notifications ? (
         <GroupRow
           index={1}
+          count={rowCount}
+          height={SWITCH_ROW_HEIGHT}
+          caret={false}
+          icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
+          label="Avisos de los calendarios"
+          hint="Usar también los que ya traen sus eventos"
+          onPress={() =>
+            prefs.setPreference('deviceReminders', !prefs.deviceReminders)
+          }
+          right={
+            <Switch
+              standalone={false}
+              value={prefs.deviceReminders}
+              onChange={() => {}}
+            />
+          }
+        />
+      ) : null}
+
+      {showDeniedRow ? (
+        <GroupRow
+          index={rowCount - 1}
           count={rowCount}
           icon={<GearSixIcon size={ROW_ICON} color={color.textMuted} />}
           label="Permiso denegado"
