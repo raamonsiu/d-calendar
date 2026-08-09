@@ -34,12 +34,13 @@ laid out for 412×892, so Android is the reference.
 
 ## Data status
 
-**Everything is mock and lives in memory.** The store
-(`src/store/useAppStore.ts`) starts seeded with the events, tasks, habits,
-accounts and calendars from the prototype, and returns to that state when the app
-is closed. Creating or editing something only writes locally: there is no OAuth
-and no upload to Google/iCloud. "Añadir cuenta o calendario" and "Añadir
-invitado" are sheets that add the source to local state.
+**Everything is mock, but it is stored on the device.** On a fresh install the
+store (`src/store/useAppStore.ts`) is seeded with the events, tasks, habits,
+accounts and calendars from the prototype; from there on it is persisted with
+AsyncStorage, so what you create survives closing the app. Creating or editing
+something only writes locally: there is no OAuth and no upload to Google/iCloud.
+"Añadir cuenta o calendario" and "Añadir invitado" are sheets that add the source
+to local state.
 
 The next iteration replaces that layer with the real connection; the UI should
 not change.

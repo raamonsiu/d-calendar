@@ -1,4 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import {
   insertAt,
@@ -24,9 +26,21 @@ import { ACCOUNTS, CALENDARS, seedEvents, seedHabits, seedTasks } from './seed';
  * writes on its own, so replacing this layer with real syncing does not touch
  * the interface.
  *
- * The whole implementation is mock and in memory. Every action makes exactly
- * one `set` call, so an action never leaves the state half done.
+ * The data is still made up, but it no longer lives only in memory: it is
+ * written to the device, so what the user creates survives closing the app, and
+ * with it the reminders scheduled from it. Every action makes exactly one `set`
+ * call, so an action never leaves the state half done.
  */
+
+/** Key the state is stored under on the device. */
+const STORAGE_KEY = 'dcalendar-state';
+
+/**
+ * Bumping this throws away what is stored and starts from the seed again. The
+ * seed is written relative to the day it first ran, so it ages: this is the way
+ * to refresh the demo data without clearing the app by hand.
+ */
+const STORAGE_VERSION = 1;
 
 let idCounter = 0;
 
@@ -63,6 +77,8 @@ type AppState = {
   habits: Habit[];
   lastSync: number | null;
   refreshing: boolean;
+  /** True once the stored state has been read; see `useStoreHydrated`. */
+  hydrated: boolean;
 };
 
 type AppActions = {
@@ -115,163 +131,204 @@ function extractById<Item extends { id: string }>(list: Item[], id: string) {
   return { index, item: list[index], rest: withoutId(list, id) };
 }
 
-export const useAppStore = create<AppState & AppActions>()((set, get) => ({
-  accounts: ACCOUNTS,
-  calendars: CALENDARS,
-  events: seedEvents(),
-  tasks: seedTasks(),
-  habits: seedHabits(),
-  lastSync: Date.now() - INITIAL_SYNC_AGE_MS,
-  refreshing: false,
+export const useAppStore = create<AppState & AppActions>()(
+  persist(
+    (set, get) => ({
+      accounts: ACCOUNTS,
+      calendars: CALENDARS,
+      events: seedEvents(),
+      tasks: seedTasks(),
+      habits: seedHabits(),
+      lastSync: Date.now() - INITIAL_SYNC_AGE_MS,
+      refreshing: false,
+      hydrated: false,
 
-  addEvent: (draft) => {
-    const id = createId('ev');
-    set((state) => ({ events: [...state.events, { ...draft, id }] }));
-    return id;
-  },
-  updateEvent: (id, patch) =>
-    set((state) => ({ events: patchById(state.events, id, patch) })),
+      addEvent: (draft) => {
+        const id = createId('ev');
+        set((state) => ({ events: [...state.events, { ...draft, id }] }));
+        return id;
+      },
+      updateEvent: (id, patch) =>
+        set((state) => ({ events: patchById(state.events, id, patch) })),
 
-  addTask: (draft) => {
-    const id = createId('task');
-    set((state) => ({ tasks: [...state.tasks, { ...draft, id }] }));
-    return id;
-  },
-  updateTask: (id, patch) =>
-    set((state) => ({ tasks: patchById(state.tasks, id, patch) })),
-  toggleTask: (id) =>
-    set((state) => ({
-      tasks: state.tasks.map((task) =>
-        task.id === id ? { ...task, done: !task.done } : task,
-      ),
-    })),
+      addTask: (draft) => {
+        const id = createId('task');
+        set((state) => ({ tasks: [...state.tasks, { ...draft, id }] }));
+        return id;
+      },
+      updateTask: (id, patch) =>
+        set((state) => ({ tasks: patchById(state.tasks, id, patch) })),
+      toggleTask: (id) =>
+        set((state) => ({
+          tasks: state.tasks.map((task) =>
+            task.id === id ? { ...task, done: !task.done } : task,
+          ),
+        })),
 
-  addHabit: (draft) => {
-    const id = createId('habit');
-    set((state) => ({ habits: [...state.habits, { ...draft, id }] }));
-    return id;
-  },
-  updateHabit: (id, patch) =>
-    set((state) => ({ habits: patchById(state.habits, id, patch) })),
+      addHabit: (draft) => {
+        const id = createId('habit');
+        set((state) => ({ habits: [...state.habits, { ...draft, id }] }));
+        return id;
+      },
+      updateHabit: (id, patch) =>
+        set((state) => ({ habits: patchById(state.habits, id, patch) })),
 
-  bumpHabit: (id, delta) => {
-    const habit = get().habits.find((candidate) => candidate.id === id);
-    if (!habit) return false;
+      bumpHabit: (id, delta) => {
+        const habit = get().habits.find((candidate) => candidate.id === id);
+        if (!habit) return false;
 
-    const progress = nextHabitProgress(habit.progress, habit.target, delta);
-    const wasDone = isHabitDone(habit);
-    const isDone = progress >= habit.target;
+        const progress = nextHabitProgress(habit.progress, habit.target, delta);
+        const wasDone = isHabitDone(habit);
+        const isDone = progress >= habit.target;
 
-    set((state) => ({
-      habits: patchById(state.habits, id, {
-        progress,
-        streak: nextHabitStreak(habit.streak, wasDone, isDone),
-      }),
-    }));
+        set((state) => ({
+          habits: patchById(state.habits, id, {
+            progress,
+            streak: nextHabitStreak(habit.streak, wasDone, isDone),
+          }),
+        }));
 
-    return isDone && !wasDone;
-  },
+        return isDone && !wasDone;
+      },
 
-  removeItem: (kind, id) => {
-    const state = get();
+      removeItem: (kind, id) => {
+        const state = get();
 
-    if (kind === 'event') {
-      const removed = extractById(state.events, id);
-      if (!removed) return null;
-      set({ events: removed.rest });
-      return { kind, index: removed.index, item: removed.item };
-    }
+        if (kind === 'event') {
+          const removed = extractById(state.events, id);
+          if (!removed) return null;
+          set({ events: removed.rest });
+          return { kind, index: removed.index, item: removed.item };
+        }
 
-    if (kind === 'task') {
-      const removed = extractById(state.tasks, id);
-      if (!removed) return null;
-      set({ tasks: removed.rest });
-      return { kind, index: removed.index, item: removed.item };
-    }
+        if (kind === 'task') {
+          const removed = extractById(state.tasks, id);
+          if (!removed) return null;
+          set({ tasks: removed.rest });
+          return { kind, index: removed.index, item: removed.item };
+        }
 
-    const removed = extractById(state.habits, id);
-    if (!removed) return null;
-    set({ habits: removed.rest });
-    return { kind, index: removed.index, item: removed.item };
-  },
+        const removed = extractById(state.habits, id);
+        if (!removed) return null;
+        set({ habits: removed.rest });
+        return { kind, index: removed.index, item: removed.item };
+      },
 
-  restoreItem: (removed) =>
-    set((state) => {
-      if (removed.kind === 'event') {
-        return { events: insertAt(state.events, removed.index, removed.item) };
-      }
-      if (removed.kind === 'task') {
-        return { tasks: insertAt(state.tasks, removed.index, removed.item) };
-      }
-      return { habits: insertAt(state.habits, removed.index, removed.item) };
-    }),
+      restoreItem: (removed) =>
+        set((state) => {
+          if (removed.kind === 'event') {
+            return { events: insertAt(state.events, removed.index, removed.item) };
+          }
+          if (removed.kind === 'task') {
+            return { tasks: insertAt(state.tasks, removed.index, removed.item) };
+          }
+          return { habits: insertAt(state.habits, removed.index, removed.item) };
+        }),
 
-  toggleCalendar: (id) =>
-    set((state) => ({
-      calendars: state.calendars.map((calendar) =>
-        calendar.id === id
-          ? { ...calendar, visible: !calendar.visible }
-          : calendar,
-      ),
-    })),
+      toggleCalendar: (id) =>
+        set((state) => ({
+          calendars: state.calendars.map((calendar) =>
+            calendar.id === id
+              ? { ...calendar, visible: !calendar.visible }
+              : calendar,
+          ),
+        })),
 
-  connectAccount: (provider, email) => {
-    const accountId = createId('acc');
-    const account: Account = {
-      id: accountId,
-      email,
-      initial: avatarInitial(email),
-      provider,
-    };
-    const calendar: Calendar = {
-      id: createId('cal'),
-      name: email.split('@')[0] || 'Calendario',
-      dotColor: color.textMuted,
-      kind: '',
-      accountId,
-      visible: true,
-    };
-
-    set((state) => ({
-      accounts: [...state.accounts, account],
-      calendars: [...state.calendars, calendar],
-    }));
-  },
-
-  disconnectAccount: (id) =>
-    set((state) => ({
-      accounts: withoutId(state.accounts, id),
-      calendars: state.calendars.filter(
-        (calendar) => calendar.accountId !== id,
-      ),
-    })),
-
-  subscribeCalendar: (name, kind) =>
-    set((state) => ({
-      calendars: [
-        ...state.calendars,
-        {
+      connectAccount: (provider, email) => {
+        const accountId = createId('acc');
+        const account: Account = {
+          id: accountId,
+          email,
+          initial: avatarInitial(email),
+          provider,
+        };
+        const calendar: Calendar = {
           id: createId('cal'),
-          name,
-          dotColor: color.textDisabled,
-          kind,
-          accountId: null,
+          name: email.split('@')[0] || 'Calendario',
+          dotColor: color.textMuted,
+          kind: '',
+          accountId,
           visible: true,
-          readOnly: true,
-        },
-      ],
-    })),
+        };
 
-  /**
-   * Sync mock: there is no network yet, only the momentary state the side menu
-   * shows while it "refreshes".
-   */
-  refresh: () => {
-    if (get().refreshing) return;
-    set({ refreshing: true });
-    setTimeout(
-      () => set({ refreshing: false, lastSync: Date.now() }),
-      MOCK_REFRESH_MS,
-    );
-  },
-}));
+        set((state) => ({
+          accounts: [...state.accounts, account],
+          calendars: [...state.calendars, calendar],
+        }));
+      },
+
+      disconnectAccount: (id) =>
+        set((state) => ({
+          accounts: withoutId(state.accounts, id),
+          calendars: state.calendars.filter(
+            (calendar) => calendar.accountId !== id,
+          ),
+        })),
+
+      subscribeCalendar: (name, kind) =>
+        set((state) => ({
+          calendars: [
+            ...state.calendars,
+            {
+              id: createId('cal'),
+              name,
+              dotColor: color.textDisabled,
+              kind,
+              accountId: null,
+              visible: true,
+              readOnly: true,
+            },
+          ],
+        })),
+
+      /**
+       * Sync mock: there is no network yet, only the momentary state the side
+       * menu shows while it "refreshes".
+       */
+      refresh: () => {
+        if (get().refreshing) return;
+        set({ refreshing: true });
+        setTimeout(
+          () => set({ refreshing: false, lastSync: Date.now() }),
+          MOCK_REFRESH_MS,
+        );
+      },
+    }),
+    {
+      name: STORAGE_KEY,
+      version: STORAGE_VERSION,
+      storage: createJSONStorage(() => AsyncStorage),
+      /**
+       * Marks the state as read, whether something was stored or not: on a
+       * fresh install there is nothing to restore and the seed is already the
+       * right answer.
+       */
+      onRehydrateStorage: () => () => {
+        useAppStore.setState({ hydrated: true });
+      },
+      /**
+       * `refreshing` and `hydrated` are left out on purpose: they only describe
+       * what is going on right now. Restoring `refreshing` would show the side
+       * menu syncing after a restart with nothing running, and restoring
+       * `hydrated` would claim the state was read before reading it.
+       */
+      partialize: ({ accounts, calendars, events, tasks, habits, lastSync }) => ({
+        accounts,
+        calendars,
+        events,
+        tasks,
+        habits,
+        lastSync,
+      }),
+    },
+  ),
+);
+
+/**
+ * Whether the stored state has already been read from the device.
+ *
+ * Reading it is asynchronous, so for an instant the store still holds the seed.
+ * The navigation root waits on this before drawing anything: otherwise a
+ * returning user would see the demo data flash by and be replaced by their own.
+ */
+export const useStoreHydrated = () => useAppStore((state) => state.hydrated);

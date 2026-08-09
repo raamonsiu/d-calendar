@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   useContext,
@@ -9,6 +10,9 @@ import {
 import { AccessibilityInfo } from 'react-native';
 
 import { color } from './tokens';
+
+/** Key the preferences are stored under on the device. */
+const PREFERENCES_KEY = 'dcalendar-preferences';
 
 export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
 
@@ -60,14 +64,54 @@ const PreferencesContext = createContext<PreferencesContextValue>({
 
 /**
  * Keeps the app preferences and combines them with the system accessibility
- * settings. In this iteration they live in memory: closing the app restores the
- * defaults.
+ * settings. They are stored on the device, so the accent, the week start and
+ * the reminders switch survive closing the app.
+ *
+ * Nothing is drawn until they have been read: the preferences decide the accent
+ * and the typeface, and starting with the defaults would repaint the whole
+ * interface a moment later.
  */
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<Preferences>(
     DEFAULT_PREFERENCES,
   );
+  const [hydrated, setHydrated] = useState(false);
   const [systemReduceMotion, setSystemReduceMotion] = useState(false);
+
+  /**
+   * Reads what was stored, falling back to the defaults for anything missing so
+   * a preference added later does not arrive as `undefined`.
+   */
+  useEffect(() => {
+    let subscribed = true;
+
+    AsyncStorage.getItem(PREFERENCES_KEY)
+      .then((stored) => {
+        if (!subscribed) return;
+        if (stored) {
+          setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(stored) });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (subscribed) setHydrated(true);
+      });
+
+    return () => {
+      subscribed = false;
+    };
+  }, []);
+
+  /**
+   * Writes on every change, never before reading: otherwise the first render
+   * would overwrite what is stored with the defaults.
+   */
+  useEffect(() => {
+    if (!hydrated) return;
+    AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences)).catch(
+      () => {},
+    );
+  }, [preferences, hydrated]);
 
   useEffect(() => {
     let subscribed = true;
@@ -93,6 +137,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }),
     [preferences, systemReduceMotion],
   );
+
+  if (!hydrated) return null;
 
   return (
     <PreferencesContext.Provider value={value}>

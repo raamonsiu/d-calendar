@@ -44,6 +44,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useNotificationSync } from '@/services/useNotificationSync';
+import { useStoreHydrated } from '@/store/useAppStore';
 import { PreferencesProvider } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
 import { ToastProvider } from '@/ui/Toast';
@@ -70,14 +71,19 @@ export default function RootLayout() {
     RobotoMono_500Medium,
   });
 
+  const storeHydrated = useStoreHydrated();
+  const ready = fontsLoaded && storeHydrated;
+
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
 
   /**
-   * Without fonts nothing is drawn: the splash screen still covers everything.
+   * Without the fonts and the stored data nothing is drawn: the splash screen
+   * still covers everything. Drawing earlier would show the seed data for an
+   * instant before the user's own replaced it.
    */
-  if (!fontsLoaded) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>
