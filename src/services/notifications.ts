@@ -57,10 +57,15 @@ export async function configureNotifications() {
 
   if (Platform.OS !== 'android') return;
 
+  /**
+   * `sound` is left out on purpose: in a channel it names a file that has to be
+   * bundled through the config plugin, and any other value is reported as a
+   * missing resource. Without it the channel takes the system notification
+   * sound, which is what the app wants.
+   */
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Recordatorios',
     importance: Notifications.AndroidImportance.HIGH,
-    sound: 'default',
     enableVibrate: true,
   });
 }

@@ -29,8 +29,8 @@ export const HORIZON_DAYS = 30;
 
 /**
  * How many notifications the plan may hold. iOS drops everything past 64
- * pending requests, so the margin leaves room for the debug ones and for
- * anything the system counts that we do not.
+ * pending requests, so the margin leaves room for anything else the app may
+ * schedule and for whatever the system counts that we do not.
  */
 export const PENDING_LIMIT = 60;
 
@@ -122,37 +122,119 @@ function atHour(day: Date, hour: number) {
 }
 
 /**
- * Lowercases the first letter, to drop a label into the middle of a sentence.
+ * A reminder closer than this is announced as a countdown ("en 15 min") instead
+ * of as a time of day: with the event nearly on top of you, how long is left
+ * says more than at what time it starts.
  */
-function lowerFirst(text: string) {
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
+const COUNTDOWN_LEAD_MS = MS_PER_HOUR;
 
 /**
- * When something happens, as the body of a notification reads it: "Hoy ·
- * 09:30", "Mañana · 09:30" or "Miércoles 5 agosto · 09:30".
+ * Which day an item falls on, seen from the notification that announces it.
  *
  * The day is named relative to `firesAt` and not to the moment the plan is
  * built, because that is when the text gets read: a reminder two days ahead of
- * an event must not say "Hoy".
+ * an event must not say "hoy".
  *
- * Precondition: `instant` and `firesAt` are instants in ms. Postcondition: the
- * time is left out of all-day items, which have none.
+ * Precondition: `instant` and `firesAt` are instants in ms. Postcondition:
+ * 'other' for anything past tomorrow, including days already gone.
  *
  * @param instant When the item happens.
  * @param firesAt When the notification arrives.
- * @param allDay Whether the item takes the whole day.
  */
-function whenLabel(instant: number, firesAt: number, allDay: boolean) {
+function dayKindOf(instant: number, firesAt: number) {
   const date = new Date(instant);
   const fireDay = startOfDay(new Date(firesAt));
 
-  let dayLabel = formatLongDate(date);
-  if (isSameDay(date, fireDay)) dayLabel = 'Hoy';
-  else if (isSameDay(date, addDays(fireDay, 1))) dayLabel = 'Mañana';
+  if (isSameDay(date, fireDay)) return 'today';
+  if (isSameDay(date, addDays(fireDay, 1))) return 'tomorrow';
+  return 'other';
+}
 
-  if (allDay) return `${dayLabel}, todo el día`;
-  return `${dayLabel} · ${formatTime(date)}`;
+/**
+ * The day of an item as the start of a sentence: "Hoy", "Mañana" or "Miércoles
+ * 5 agosto".
+ *
+ * @param instant When the item happens.
+ * @param firesAt When the notification arrives.
+ */
+function dayTitle(instant: number, firesAt: number) {
+  const kind = dayKindOf(instant, firesAt);
+  if (kind === 'today') return 'Hoy';
+  if (kind === 'tomorrow') return 'Mañana';
+  return formatLongDate(new Date(instant));
+}
+
+/**
+ * The day of an item as the complement of a verb: "hoy", "mañana" or "el
+ * miércoles 5 agosto". This is the same decision as `dayTitle`, written to be
+ * read after a word instead of before one.
+ *
+ * @param instant When the item happens.
+ * @param firesAt When the notification arrives.
+ */
+function dayComplement(instant: number, firesAt: number) {
+  const kind = dayKindOf(instant, firesAt);
+  if (kind === 'today') return 'hoy';
+  if (kind === 'tomorrow') return 'mañana';
+  return `el ${formatLongDate(new Date(instant)).toLowerCase()}`;
+}
+
+/**
+ * When an item happens, ready to follow a verb: "ahora", "en 15 min", "a las
+ * 09:30", "mañana a las 09:30" or "el miércoles 5 agosto a las 09:30".
+ *
+ * The day is left out when the item falls on the same day the notification
+ * arrives, because there it only gets in the way: "Empieza a las 09:30" already
+ * says everything.
+ *
+ * Precondition: `instant` and `firesAt` are instants in ms. Postcondition:
+ * returns a countdown for anything under `COUNTDOWN_LEAD_MS`, and 'ahora' when
+ * the notification arrives at the very moment, which is what a reminder with no
+ * offset does.
+ *
+ * @param instant When the item happens.
+ * @param firesAt When the notification arrives.
+ */
+function whenPhrase(instant: number, firesAt: number) {
+  const lead = instant - firesAt;
+  if (lead <= 0) return 'ahora';
+  if (lead < COUNTDOWN_LEAD_MS) {
+    return `en ${Math.round(lead / MS_PER_MINUTE)} min`;
+  }
+
+  const time = formatTime(new Date(instant));
+  if (dayKindOf(instant, firesAt) === 'today') return `a las ${time}`;
+  return `${dayComplement(instant, firesAt)} a las ${time}`;
+}
+
+/**
+ * Body of an event reminder: "Empieza en 15 min", "Empieza mañana a las 09:30".
+ *
+ * An all-day event has no time to announce, so it is named by its day instead:
+ * "Hoy, todo el día".
+ *
+ * @param instant When the event starts.
+ * @param firesAt When the notification arrives.
+ * @param allDay Whether the event takes the whole day.
+ */
+function eventBody(instant: number, firesAt: number, allDay: boolean) {
+  if (allDay) return `${dayTitle(instant, firesAt)}, todo el día`;
+  return `Empieza ${whenPhrase(instant, firesAt)}`;
+}
+
+/**
+ * Body of a task reminder: "Vence en 15 min", "Vence mañana a las 12:00".
+ *
+ * A task with no time is due on a day and not at an hour, so announcing an hour
+ * would be inventing one: "Vence hoy".
+ *
+ * @param instant When the task is due.
+ * @param firesAt When the notification arrives.
+ * @param hasTime Whether the due date carries a time.
+ */
+function taskBody(instant: number, firesAt: number, hasTime: boolean) {
+  if (!hasTime) return `Vence ${dayComplement(instant, firesAt)}`;
+  return `Vence ${whenPhrase(instant, firesAt)}`;
 }
 
 /**
@@ -245,7 +327,7 @@ function planEvent(event: CalEvent, now: number, horizonEnd: number) {
       planned.push({
         id: `event:${event.id}:${occurrence}:${reminder.id}`,
         title: event.title,
-        body: whenLabel(instant, firesAt, event.allDay),
+        body: eventBody(instant, firesAt, event.allDay),
         itemId: event.id,
         trigger: { kind: 'date', at: firesAt },
       });
@@ -280,7 +362,7 @@ function planTask(task: Task, now: number, horizonEnd: number) {
     planned.push({
       id: `task:${task.id}:${reminder.id}`,
       title: task.title,
-      body: `Vence ${lowerFirst(whenLabel(dueAt, firesAt, !task.hasTime))}`,
+      body: taskBody(dueAt, firesAt, task.hasTime),
       itemId: task.id,
       trigger: { kind: 'date', at: firesAt },
     });
@@ -297,13 +379,13 @@ function planTask(task: Task, now: number, horizonEnd: number) {
 function habitBody(habit: Habit) {
   switch (habit.frequency) {
     case 'Diario':
-      return 'Recordatorio diario';
+      return 'Hábito diario';
     case 'Semanal':
-      return 'Recordatorio semanal';
+      return 'Hábito semanal';
     case 'X por día':
-      return `${habit.target} veces al día`;
+      return `Hábito · ${habit.target} veces al día`;
     case 'X por semana':
-      return `${habit.target} veces a la semana`;
+      return `Hábito · ${habit.target} veces a la semana`;
   }
 }
 
