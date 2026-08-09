@@ -32,6 +32,7 @@ import {
   radius,
 } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
+import { CalendarDot } from '@/ui/CalendarDot';
 import { DashedButton } from '@/ui/controls';
 import { usePanelTransition } from '@/ui/usePanelTransition';
 import {
@@ -58,6 +59,9 @@ const CLOSE_VELOCITY = 800;
 
 /** Gesture threshold: below this the touch is still a tap. */
 const DRAG_ACTIVATION = 10;
+
+/** The calendar dots of the menu are smaller than the ones in the form. */
+const DRAWER_DOT_SIZE = 6;
 
 /** Destinations in the menu footer. */
 const MENU_ITEMS = [
@@ -429,15 +433,9 @@ function CalendarRow({
         ) : null}
       </View>
 
-      <View
-        style={[
-          styles.calendarDot,
-          {
-            backgroundColor: calendar.visible
-              ? (calendar.dotColor ?? accent)
-              : color.edge,
-          },
-        ]}
+      <CalendarDot
+        size={DRAWER_DOT_SIZE}
+        color={calendar.visible ? calendar.dotColor : color.edge}
       />
 
       <AppText
@@ -541,7 +539,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calendarDot: { width: 6, height: 6, borderRadius: 3 },
   calendarName: { flex: 1, fontSize: 12 },
   calendarKind: { fontSize: 8, letterSpacing: 1.1, color: color.faint },
   footer: {

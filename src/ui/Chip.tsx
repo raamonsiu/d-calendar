@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
 import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
@@ -8,8 +8,6 @@ type ChipProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
-  /** Colour dot on the left, on the calendar chips. */
-  dotColor?: string;
   /** `grow` splits the width evenly (options and weekdays). */
   grow?: boolean;
   height?: number;
@@ -18,14 +16,12 @@ type ChipProps = {
 
 /**
  * Selection chip. Once selected it is marked with the border and an accent
- * tint; the colour dot only appears when `dotColor` is passed, and with `grow`
- * the chip stretches to share out the row.
+ * tint, and with `grow` it stretches to share out the row.
  */
 export function Chip({
   label,
   selected,
   onPress,
-  dotColor,
   grow,
   height = 31,
   style,
@@ -50,9 +46,6 @@ export function Chip({
         },
         style,
       ]}>
-      {dotColor ? (
-        <View style={[styles.dot, { backgroundColor: dotColor }]} />
-      ) : null}
       <AppText
         numberOfLines={1}
         style={{
@@ -73,5 +66,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
     borderWidth: 1,
   },
-  dot: { width: 6, height: 6, borderRadius: 3 },
 });

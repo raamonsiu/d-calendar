@@ -21,9 +21,10 @@ import {
   space,
   tint,
 } from '@/theme/tokens';
+import { CalendarDot } from '@/ui/CalendarDot';
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
-import { Cta, Divider } from '@/ui/controls';
+import { Cta, Divider, OptionRow } from '@/ui/controls';
 import { TrashIcon, XIcon } from '@/ui/icons';
 import { useDateTimePicker } from '@/ui/pickers';
 import type { ItemKind } from '@/types';
@@ -57,6 +58,13 @@ const CLOSE_SIZE = 30;
 const REVEAL_DELAY_MS = 60;
 
 /**
+ * Room the destination calendar list gets before it starts scrolling. A phone
+ * with several accounts holds dozens of calendars, and a sheet as tall as the
+ * screen stops looking like a sheet.
+ */
+const CALENDAR_LIST_MAX_HEIGHT = 320;
+
+/**
  * Form for an event, a task or a habit.
  *
  * It is the same screen in three modes: without `editing` it creates a new item
@@ -74,6 +82,9 @@ const REVEAL_DELAY_MS = 60;
  * GUARDAR AVISOS: they belong to the app rather than to the event, so they can
  * be changed on an event the app may not touch.
  *
+ * The sheets live here rather than inside the blocks: they have to sit above the
+ * form, not inside the list that scrolls.
+ *
  * State and save rules live in `useItemForm`; this file only draws.
  */
 export function ItemForm({ editing }: { editing?: Editing }) {
@@ -85,6 +96,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
 
   const scrollRef = useRef<ScrollView>(null);
   const [guestSheetOpen, setGuestSheetOpen] = useState(false);
+  const [calendarSheetOpen, setCalendarSheetOpen] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -158,6 +170,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
                   form={form}
                   picker={picker}
                   onAddGuest={() => setGuestSheetOpen(true)}
+                  onPickCalendar={() => setCalendarSheetOpen(true)}
                 />
               ) : null}
 
@@ -243,6 +256,29 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           label="INVITAR"
           onPress={confirmGuest}
         />
+      </Sheet>
+
+      <Sheet
+        open={calendarSheetOpen}
+        onClose={() => setCalendarSheetOpen(false)}
+        title="Calendario del evento">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.calendarList}>
+          {form.calendarOptions.map((calendar) => (
+            <OptionRow
+              key={calendar.id}
+              label={calendar.name}
+              hint={calendar.hint}
+              leading={<CalendarDot color={calendar.dotColor} />}
+              selected={form.event.calendarId === calendar.id}
+              onPress={() => {
+                form.event.setCalendarId(calendar.id);
+                setCalendarSheetOpen(false);
+              }}
+            />
+          ))}
+        </ScrollView>
       </Sheet>
 
       <Sheet
@@ -400,6 +436,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 4,
   },
+  calendarList: { maxHeight: CALENDAR_LIST_MAX_HEIGHT },
   confirmText: {
     fontSize: 12,
     lineHeight: 18,

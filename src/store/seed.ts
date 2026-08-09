@@ -6,9 +6,8 @@ import type { Account, CalEvent, Calendar, Habit, Task } from '@/types';
  *
  * There is no demo data any more: the events come from the calendars of the
  * device, and putting made-up ones next to them made it impossible to tell what
- * was real. What is left is the two calendars the app needs to have somewhere
- * to put what it creates itself, since it does not write to the device's
- * calendars.
+ * was real. What is left is the two calendars the app needs to have somewhere of
+ * its own to put things in, next to the ones of the device it can now write to.
  *
  * They carry no account: they belong to the app and to this phone, which is
  * what the side menu draws them as.

@@ -208,13 +208,22 @@ export function GroupRow({
 
 /**
  * Single choice row inside a bottom sheet; the chosen one carries the check.
+ *
+ * `leading` and the second line are drawn only when given. They are what makes a
+ * long list readable: two accounts can both have a calendar called "Trabajo",
+ * and then the name alone does not say which one is which.
  */
 export function OptionRow({
   label,
+  hint,
+  leading,
   selected,
   onPress,
 }: {
   label: string;
+  hint?: string;
+  /** Goes before the label: the colour dot of a calendar, a logo. */
+  leading?: ReactNode;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -234,14 +243,22 @@ export function OptionRow({
               : 'transparent',
         },
       ]}>
-      <AppText
-        style={{
-          flex: 1,
-          fontSize: 13,
-          color: selected ? color.text : color.textNote,
-        }}>
-        {label}
-      </AppText>
+      {leading}
+      <View style={styles.optionBody}>
+        <AppText
+          numberOfLines={1}
+          style={{
+            fontSize: 13,
+            color: selected ? color.text : color.textNote,
+          }}>
+          {label}
+        </AppText>
+        {hint ? (
+          <AppText numberOfLines={1} style={styles.optionHint}>
+            {hint}
+          </AppText>
+        ) : null}
+      </View>
       {selected ? <CheckIcon size={13} color={accent} /> : null}
     </Pressable>
   );
@@ -286,8 +303,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    height: 46,
+    minHeight: 46,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 17,
   },
+  optionBody: { flex: 1, gap: 2 },
+  optionHint: { fontSize: 10, color: color.labelDim },
 });

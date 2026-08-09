@@ -31,16 +31,11 @@ export type Calendar = {
   accountId: string | null;
   visible: boolean;
   /**
-   * The app does not write new items here: subscriptions, and for now every
-   * calendar read from the device.
+   * The app does not create items here, so it is not offered as a destination
+   * in the form: subscriptions, and the calendars of the device the system
+   * refuses to let it write to.
    */
   readOnly?: boolean;
-  /**
-   * The system allows changing the events already in it. It is not the opposite
-   * of `readOnly`: a calendar of the device may perfectly well take changes to
-   * its events while the app still refuses to create new ones in it.
-   */
-  allowsEditing?: boolean;
   /**
    * Address of whoever shared the calendar, when it is not the user's own. It
    * is what tells a colleague's calendar from a subscription, since neither of

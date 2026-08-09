@@ -10,11 +10,11 @@
  * The only module that imports `expo-calendar`. Everything it returns is
  * already in the app's own model, so no screen ever sees a library type.
  *
- * It reads, and it writes back changes to the events it read, but it creates
- * nothing: what the app makes itself stays in its own store, which is why every
- * calendar coming from here is marked `readOnly`. Whether an event already
- * there can be changed is a separate question, and the system is the one that
- * answers it.
+ * It reads, it writes back changes to the events it read, and it creates new
+ * ones: a calendar the system lets the app write to is offered in the form like
+ * any other, and what the user creates there reaches their account and every
+ * other device syncing it. The system is the one that decides, calendar by
+ * calendar and event by event, what may be touched.
  */
 import * as ExpoCalendar from 'expo-calendar';
 import { Platform } from 'react-native';
@@ -28,7 +28,7 @@ import {
   type CalendarOrigin,
   type CalendarPlacement,
 } from '@/lib/calendarSources';
-import { toDeviceId } from '@/lib/deviceIds';
+import { fromDeviceId, toDeviceId } from '@/lib/deviceIds';
 import { avatarInitial } from '@/lib/text';
 import type {
   Account,
@@ -39,15 +39,28 @@ import type {
   GuestState,
   RelativeReminder,
   ReminderUnit,
+  RepeatRule,
   Visibility,
 } from '@/types';
 
 /** Calendars can only be read on the native targets. */
 export const DEVICE_CALENDARS_SUPPORTED = Platform.OS !== 'web';
 
-/** How far back and forward the device is read, in days. */
-const WINDOW_BEFORE_DAYS = 30;
-const WINDOW_AFTER_DAYS = 60;
+/**
+ * How far back and forward the device is read, in days.
+ *
+ * A year ahead so an event created here does not vanish the moment it is saved:
+ * what the app writes to a calendar of the device only comes back to it through
+ * this read, and a birthday six months out has to be inside the window. Three
+ * months back is enough to look over the recent past without dragging in years
+ * of history.
+ *
+ * The month view still scrolls further than this, and there those months come
+ * out empty; reading on demand, following what the user is looking at, is what
+ * closes that gap.
+ */
+const WINDOW_BEFORE_DAYS = 90;
+const WINDOW_AFTER_DAYS = 365;
 
 const MS_PER_DAY = 86400000;
 const MINUTES_PER_HOUR = 60;
@@ -70,6 +83,13 @@ export type DeviceCalendarData = {
  * interface draws goes through the store.
  */
 const readEvents = new Map<string, ExpoCalendar.ExpoCalendarEvent>();
+
+/**
+ * The calendars of the last read, kept for the same reason as the events:
+ * creating one goes through the object the system handed over, which is the only
+ * thing that can be written to.
+ */
+const readCalendars = new Map<string, ExpoCalendar.ExpoCalendar>();
 
 /**
  * Ids of the events of the last read the user may change. It is worked out
@@ -142,6 +162,26 @@ function toReminder(
 }
 
 /**
+ * Turns a reminder of the app into the alarm the device stores, the way back
+ * from `toReminder`.
+ *
+ * Postcondition: the offset is negative, because every reminder the app can
+ * express fires before the event.
+ *
+ * @param reminder Reminder as the app stores it.
+ */
+function toAlarm(reminder: RelativeReminder): ExpoCalendar.Alarm {
+  const minutes =
+    reminder.unit === 2
+      ? reminder.value * MINUTES_PER_DAY
+      : reminder.unit === 1
+        ? reminder.value * MINUTES_PER_HOUR
+        : reminder.value;
+
+  return { relativeOffset: -minutes };
+}
+
+/**
  * Turns a device event into the app's own.
  *
  * Repetitions need no expanding here: the system is asked for a date range and
@@ -203,6 +243,18 @@ function toAvailability(
 }
 
 /**
+ * How the event shows up in the user's availability, the way back from
+ * `toAvailability`.
+ *
+ * @param availability Availability as the app stores it.
+ */
+function toDeviceAvailability(availability: Availability) {
+  return availability === 'Libre'
+    ? ExpoCalendar.Availability.FREE
+    : ExpoCalendar.Availability.BUSY;
+}
+
+/**
  * Who can see the event, in the three values of the app's model.
  *
  * Postcondition: the system's 'confidential' comes back as private, which is
@@ -219,6 +271,122 @@ function toVisibility(
     return 'Privado';
   }
   return 'Predet.';
+}
+
+/**
+ * Turns the app's visibility into the access level the device stores, the way
+ * back from `toVisibility`.
+ *
+ * Postcondition: 'Privado' comes out as private and never as confidential,
+ * which is the value the round trip preserves.
+ *
+ * @param visibility Visibility as the app stores it.
+ */
+function toAccessLevel(visibility: Visibility) {
+  if (visibility === 'Público') return ExpoCalendar.EventAccessLevel.PUBLIC;
+  if (visibility === 'Privado') return ExpoCalendar.EventAccessLevel.PRIVATE;
+  return ExpoCalendar.EventAccessLevel.DEFAULT;
+}
+
+/**
+ * Repeat rules a calendar of the device can hold.
+ *
+ * Not every one of them survives the trip. What reaches Android is a rule made
+ * of frequency, interval and end, and nothing else: the list of chosen weekdays
+ * is dropped along the way, so a repetition on Tuesdays and Thursdays would
+ * silently become a weekly one. Rather than let that happen it is not offered
+ * there. iOS does take it.
+ *
+ * The form reads this to decide which chips to draw, so what cannot be written
+ * is never asked for.
+ */
+export const DEVICE_REPEAT_RULES: RepeatRule[] =
+  Platform.OS === 'ios'
+    ? ['No', 'Cada día', 'Días de la semana', 'Cada mes']
+    : ['No', 'Cada día', 'Cada mes'];
+
+/**
+ * Turns the app's repeat rule into the one the device stores.
+ *
+ * Precondition: `repeat` is one of `DEVICE_REPEAT_RULES`, which is what the
+ * form offers when the destination is a calendar of the device. Postcondition:
+ * returns null for an event that happens once, which is what the system reads
+ * as "no repetition"; the rule it returns has no end, so the repetition goes on
+ * for as long as the calendar it lives in does.
+ *
+ * @param repeat Repeat rule as the app stores it.
+ * @param weekdays `getDay()` indexes, used only by the weekday rule.
+ */
+function toRecurrenceRule(
+  repeat: RepeatRule,
+  weekdays: number[],
+): ExpoCalendar.RecurrenceRule | null {
+  if (repeat === 'Cada día') {
+    return { frequency: ExpoCalendar.Frequency.DAILY };
+  }
+  if (repeat === 'Cada mes') {
+    return { frequency: ExpoCalendar.Frequency.MONTHLY };
+  }
+  if (repeat === 'Días de la semana' && weekdays.length > 0) {
+    return {
+      frequency: ExpoCalendar.Frequency.WEEKLY,
+      /** The system counts from Sunday = 1, the app from Sunday = 0. */
+      daysOfTheWeek: weekdays.map((weekday) => ({
+        dayOfTheWeek: (weekday + 1) as ExpoCalendar.DayOfTheWeek,
+      })),
+    };
+  }
+  return null;
+}
+
+/**
+ * Start and end of an event in the form the device keeps them.
+ *
+ * An all-day event is not a day of the user's time zone but a day of the
+ * calendar, and Android says so plainly: it wants the two ends at midnight UTC,
+ * with the event's zone set to UTC and the end on the following day. Handing it
+ * local midnight instead moves the event a day whenever the phone is not on UTC,
+ * which is most of the year here.
+ *
+ * That is an Android rule, and only Android gets it: on iOS EventKit works out
+ * an all-day event from the calendar's own zone, and forcing UTC on it would be
+ * the very mistake this avoids.
+ *
+ * Postcondition: for a timed event it returns the two instants untouched and no
+ * zone, leaving the device's own. The end is always after the start.
+ *
+ * @param bounds When the event starts and ends, and whether it lasts all day.
+ */
+function deviceBounds(bounds: {
+  startsAt: number;
+  endsAt: number;
+  allDay: boolean;
+}): { startDate: Date; endDate: Date; timeZone?: string } {
+  if (!bounds.allDay || Platform.OS !== 'android') {
+    return {
+      startDate: new Date(bounds.startsAt),
+      endDate: new Date(bounds.endsAt),
+    };
+  }
+
+  const firstDay = utcMidnight(bounds.startsAt);
+  const lastDay = utcMidnight(bounds.endsAt);
+
+  return {
+    startDate: new Date(firstDay),
+    endDate: new Date(Math.max(lastDay, firstDay) + MS_PER_DAY),
+    timeZone: 'UTC',
+  };
+}
+
+/**
+ * Midnight UTC of the day an instant falls on, read in the phone's time zone.
+ *
+ * @param timestamp Instant in ms.
+ */
+function utcMidnight(timestamp: number) {
+  const day = new Date(timestamp);
+  return Date.UTC(day.getFullYear(), day.getMonth(), day.getDate());
 }
 
 /**
@@ -296,9 +464,9 @@ function originOf(calendar: ExpoCalendar.ExpoCalendar): CalendarOrigin {
  * and the subscriptions have none, and the first are told from the second by
  * carrying who shared them.
  *
- * Postcondition: always read only, because the app does not write to the
- * device's calendars; that is what keeps them out of the destination picker in
- * the form.
+ * Postcondition: read only exactly when the system refuses writing, which is
+ * what keeps a subscription of holidays out of the destination picker in the
+ * form and lets the user's own calendar into it.
  *
  * @param calendar Calendar as the device stores it.
  * @param placement Where the rules put it.
@@ -318,16 +486,11 @@ function toAppCalendar(
     /** Starts checked unless the system itself has it hidden. */
     visible: calendar.isVisible !== false,
     /**
-     * Always read only for now: the app does not create events on the device
-     * yet, so no calendar of the device is offered as a destination.
+     * The system decides. A calendar it does not let the app write to is not
+     * offered as a destination, which is the case of every subscription and of
+     * the calendars someone shared without giving away control.
      */
-    readOnly: true,
-    /**
-     * Whether the system lets the events already in it be changed, which is
-     * what separates a calendar of the user's own from one they were merely
-     * shown.
-     */
-    allowsEditing: calendar.allowsModifications,
+    readOnly: !calendar.allowsModifications,
     ...(placement === 'shared' && calendar.ownerAccount
       ? { sharedBy: calendar.ownerAccount }
       : {}),
@@ -401,7 +564,10 @@ export async function readDeviceCalendarData(
   const calendars: Calendar[] = [];
   const primaryIds = new Set<string>();
 
+  readCalendars.clear();
+
   for (const calendar of kept) {
+    readCalendars.set(toDeviceId(calendar.id), calendar);
     const origin = originOf(calendar);
     const placement = placeCalendar(origin, ownAccounts);
     const accountName =
@@ -502,7 +668,13 @@ function sortForDisplay(calendars: Calendar[], primaryIds: Set<string>) {
  * costs one line per calendar in the Metro console and nothing in a release
  * build.
  *
+ * Whether the system allows writing goes in the same line, because that is what
+ * decides which calendars the form offers as a destination: a list that comes
+ * out short is answered here.
+ *
  * @param deviceCalendars Calendars as the device stores them.
+ * @param ownAccounts Addresses of the accounts on the device.
+ * @param keptIds Ids that survived deduplication.
  */
 function logPlacements(
   deviceCalendars: ExpoCalendar.ExpoCalendar[],
@@ -518,6 +690,7 @@ function logPlacements(
 
     console.log(
       `[calendario] ${placement} | ${calendar.title}` +
+        ` | escribible=${calendar.allowsModifications}` +
         ` | sección=${accountOf(origin, ownAccounts)}` +
         ` | cuenta=${origin.accountName} | dueño=${origin.ownerAccount}` +
         ` | tipo=${origin.accountType} | id=${origin.internalName}${dropped}`,
@@ -580,11 +753,94 @@ export type DeviceEventChanges = {
 };
 
 /**
+ * Everything the app knows how to write when it creates an event on the device.
+ *
+ * It is the editable part plus the two things that can only be decided when the
+ * event is born: how it repeats, which the app refuses to change afterwards
+ * because an occurrence does not know whether it speaks for its series, and the
+ * visibility, which the library only accepts here and not on a save.
+ */
+export type DeviceEventDraft = DeviceEventChanges & {
+  visibility: Visibility;
+  repeat: RepeatRule;
+  weekdays: number[];
+  reminders: RelativeReminder[];
+};
+
+/**
+ * The calendar an event is about to be created in.
+ *
+ * The cache of the last read answers almost always. It does not in the moment
+ * right after a launch, before that read has finished, and asking the system by
+ * id is what keeps a save from failing in that gap.
+ *
+ * Postcondition: returns null when the system does not know that id either,
+ * which is what a calendar removed from the phone looks like.
+ *
+ * @param calendarId Id of the calendar in the app's model.
+ */
+async function destinationCalendar(calendarId: string) {
+  const cached = readCalendars.get(calendarId);
+  if (cached) return cached;
+
+  try {
+    return await ExpoCalendar.ExpoCalendar.get(fromDeviceId(calendarId));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Creates an event in one of the calendars of the device.
+ *
+ * This is the only way anything the app makes leaves the phone: what is written
+ * here reaches the account the calendar belongs to and, through it, every other
+ * device and every other app the user opens that account in.
+ *
+ * The guests are not written, and neither is the app's own list of reminders
+ * kept apart: the alarms travel with the event, so it is the calendar it now
+ * lives in that announces it.
+ *
+ * Precondition: `calendarId` names a calendar that is not `readOnly`, which is
+ * what the form offers. Postcondition: returns false when the system does not
+ * know that calendar or refuses the write, and nothing is created. The new
+ * event only shows up in the app after the next read.
+ *
+ * @param calendarId Id of the destination calendar in the app's model.
+ * @param draft Event the form built.
+ */
+export async function createDeviceEvent(
+  calendarId: string,
+  draft: DeviceEventDraft,
+) {
+  const calendar = await destinationCalendar(calendarId);
+  if (!calendar) return false;
+
+  try {
+    await calendar.createEvent({
+      title: draft.title,
+      notes: draft.description,
+      location: draft.location,
+      allDay: draft.allDay,
+      ...deviceBounds(draft),
+      availability: toDeviceAvailability(draft.availability),
+      accessLevel: toAccessLevel(draft.visibility),
+      recurrenceRule: toRecurrenceRule(draft.repeat, draft.weekdays),
+      alarms: draft.reminders.map(toAlarm),
+    });
+    return true;
+  } catch (error) {
+    console.warn('No se pudo crear el evento en el calendario', error);
+    return false;
+  }
+}
+
+/**
  * Writes the changes of an event back to the calendar it came from.
  *
  * Only the fields the app can express are touched, so anything the system holds
- * and the model does not — the location, the guests, the repetition — is left
- * exactly as it was instead of being wiped by omission.
+ * and the model does not — the guests, the repetition — is left exactly as it
+ * was instead of being wiped by omission.
  *
  * Precondition: `canEditDeviceEvent` said yes. Postcondition: returns false
  * when the event is no longer in the last read or the system refuses the
@@ -605,13 +861,9 @@ export async function updateDeviceEvent(
       title: changes.title,
       notes: changes.description,
       location: changes.location,
-      startDate: new Date(changes.startsAt),
-      endDate: new Date(changes.endsAt),
       allDay: changes.allDay,
-      availability:
-        changes.availability === 'Libre'
-          ? ExpoCalendar.Availability.FREE
-          : ExpoCalendar.Availability.BUSY,
+      ...deviceBounds(changes),
+      availability: toDeviceAvailability(changes.availability),
     });
     return true;
   } catch {

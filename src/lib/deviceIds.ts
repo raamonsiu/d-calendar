@@ -26,3 +26,16 @@ export const isDeviceId = (id: string) => id.startsWith(DEVICE_ID_PREFIX);
  * @param id Id the system gave it.
  */
 export const toDeviceId = (id: string) => `${DEVICE_ID_PREFIX}${id}`;
+
+/**
+ * Recovers the id the system gave something, undoing `toDeviceId`.
+ *
+ * It is needed to ask the system about something by id, which is the one place
+ * the app has to speak its language instead of its own.
+ *
+ * Postcondition: returns the id untouched when it carries no prefix.
+ *
+ * @param id Id in the app's model.
+ */
+export const fromDeviceId = (id: string) =>
+  id.startsWith(DEVICE_ID_PREFIX) ? id.slice(DEVICE_ID_PREFIX.length) : id;

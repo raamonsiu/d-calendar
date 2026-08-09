@@ -2,15 +2,15 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { formatLongDate, formatTime, withTime } from '@/lib/date';
 import { AppText, Label } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
 import { color, hitSlopFor, radius } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
+import { CalendarDot } from '@/ui/CalendarDot';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
 import { DashedButton, Divider } from '@/ui/controls';
-import { UserPlusIcon, XIcon } from '@/ui/icons';
+import { CaretDownIcon, UserPlusIcon, XIcon } from '@/ui/icons';
 import type { DateTimePicker } from '@/ui/pickers';
-import type { Availability, RepeatRule, Visibility } from '@/types';
+import type { Availability, Visibility } from '@/types';
 import { WeekdayChips } from './WeekdayChips';
 import {
   BlockSwitch,
@@ -21,12 +21,6 @@ import {
 } from './blocks';
 import type { ItemFormState } from './useItemForm';
 
-const REPEAT_OPTIONS: RepeatRule[] = [
-  'No',
-  'Cada día',
-  'Días de la semana',
-  'Cada mes',
-];
 const AVAILABILITY_OPTIONS: Availability[] = ['Ocupado', 'Libre'];
 const VISIBILITY_OPTIONS: Visibility[] = ['Predet.', 'Privado', 'Público'];
 
@@ -41,6 +35,8 @@ type EventBlocksProps = {
   picker: DateTimePicker;
   /** Opens the add-guest sheet, which lives on the screen. */
   onAddGuest: () => void;
+  /** Opens the destination calendar sheet, which lives on the screen too. */
+  onPickCalendar: () => void;
 };
 
 /**
@@ -50,9 +46,19 @@ type EventBlocksProps = {
  * With "TODO EL DÍA" on, the time controls dim and stop opening the picker. The
  * weekday row only shows up with the "Días de la semana" repeat rule, and the
  * guest list only when there is at least one guest.
+ *
+ * Three things follow the destination calendar. The repeat rules offered are the
+ * ones that calendar can hold, so choosing one of the device may leave fewer
+ * chips; where the guest list cannot be touched, the button to add one is
+ * replaced by the line saying why; and the visibility row disappears on an event
+ * of the device, which is the one place a save cannot carry it.
  */
-export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
-  const accent = useAccent();
+export function EventBlocks({
+  form,
+  picker,
+  onAddGuest,
+  onPickCalendar,
+}: EventBlocksProps) {
   const { event } = form;
 
   const bounds = [
@@ -103,7 +109,7 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
         <View style={styles.rows}>
           <Label>Repetir</Label>
           <ChipWrap>
-            {REPEAT_OPTIONS.map((option) => (
+            {event.repeatOptions.map((option) => (
               <Chip
                 key={option}
                 height={29}
@@ -131,17 +137,14 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
       </FormBlock>
 
       <FormBlock title="CALENDARIO">
-        <ChipWrap>
-          {form.writableCalendars.map((calendar) => (
-            <Chip
-              key={calendar.id}
-              label={calendar.name}
-              dotColor={calendar.dotColor ?? accent}
-              selected={event.calendarId === calendar.id}
-              onPress={() => event.setCalendarId(calendar.id)}
-            />
-          ))}
-        </ChipWrap>
+        <ControlButton
+          label={form.selectedCalendar?.name ?? 'Sin calendario'}
+          leading={
+            <CalendarDot color={form.selectedCalendar?.dotColor ?? null} />
+          }
+          icon={<CaretDownIcon size={11} color={color.caret} />}
+          onPress={onPickCalendar}
+        />
 
         <Divider />
 
@@ -159,19 +162,21 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
               ))}
             </View>
           </FieldRow>
-          <FieldRow label="VISIBILIDAD" labelWidth={WIDE_LABEL}>
-            <View style={styles.optionRow}>
-              {VISIBILITY_OPTIONS.map((option) => (
-                <Chip
-                  key={option}
-                  grow
-                  label={option}
-                  selected={event.visibility === option}
-                  onPress={() => event.setVisibility(option)}
-                />
-              ))}
-            </View>
-          </FieldRow>
+          {event.visibilityShown ? (
+            <FieldRow label="VISIBILIDAD" labelWidth={WIDE_LABEL}>
+              <View style={styles.optionRow}>
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <Chip
+                    key={option}
+                    grow
+                    label={option}
+                    selected={event.visibility === option}
+                    onPress={() => event.setVisibility(option)}
+                  />
+                ))}
+              </View>
+            </FieldRow>
+          ) : null}
         </View>
       </FormBlock>
 
@@ -200,7 +205,9 @@ export function EventBlocks({ form, picker, onAddGuest }: EventBlocksProps) {
           </View>
         ) : null}
 
-        {event.guestsReadOnly ? null : (
+        {event.guestsNote ? (
+          <AppText style={styles.guestNote}>{event.guestsNote}</AppText>
+        ) : (
           <DashedButton
             label="AÑADIR INVITADO"
             icon={<UserPlusIcon size={13} color={color.textMuted} />}
@@ -220,6 +227,7 @@ const styles = StyleSheet.create({
   guestRow: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 36 },
   guestName: { flex: 1, fontSize: 12.5, color: color.textSoft },
   guestState: { fontSize: 9, letterSpacing: 1.1, color: color.labelDim },
+  guestNote: { fontSize: 11, lineHeight: 16, color: color.textMuted },
   removeGuest: {
     width: 26,
     height: 30,

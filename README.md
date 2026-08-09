@@ -59,8 +59,10 @@ Outlook, iCloud — are read with `expo-calendar` and shown next to the app's ow
 No OAuth and no server: the operating system already keeps those accounts in
 sync, so it is enough to read its calendar database.
 
-They are read only, and their reminders are off by default, because the calendar
-they came from already announces them.
+It is not read only. An event the user owns can be edited and deleted, and a new
+one can be created in any calendar the system allows, from where the account
+syncs it on its own. Their inherited reminders are off by default, because the
+calendar they came from already announces them.
 
 ## Commands
 

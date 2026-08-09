@@ -13,6 +13,7 @@ export { ArrowsOutSimpleIcon } from 'phosphor-react-native/src/icons/ArrowsOutSi
 export { AppleLogoIcon } from 'phosphor-react-native/src/icons/AppleLogo';
 export { BellIcon } from 'phosphor-react-native/src/icons/Bell';
 export { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank';
+export { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
 export { CaretLeftIcon } from 'phosphor-react-native/src/icons/CaretLeft';
 export { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
 export { CheckIcon } from 'phosphor-react-native/src/icons/Check';

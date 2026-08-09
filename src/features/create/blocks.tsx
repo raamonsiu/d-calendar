@@ -133,6 +133,9 @@ export function FieldRow({
  * `muted` dims it without disabling it, which is what is needed when the value
  * does not apply (an all-day event, a task with no time) but tapping it still
  * has to bring it back.
+ *
+ * `leading` goes before the label and `icon` after it; with either of them the
+ * label takes the room in between, so the two ends stay put whatever the text.
  */
 export function ControlButton({
   label,
@@ -141,6 +144,7 @@ export function ControlButton({
   grow,
   center,
   muted,
+  leading,
   icon,
   height = size.control,
 }: {
@@ -150,6 +154,7 @@ export function ControlButton({
   grow?: boolean;
   center?: boolean;
   muted?: boolean;
+  leading?: ReactNode;
   icon?: ReactNode;
   height?: number;
 }) {
@@ -179,9 +184,14 @@ export function ControlButton({
               : color.border,
         },
       ]}>
+      {leading}
       <AppText
         numberOfLines={1}
-        style={{ fontSize: 12.5, color: muted ? color.ghost : color.text }}>
+        style={{
+          flex: icon && !center ? 1 : undefined,
+          fontSize: 12.5,
+          color: muted ? color.ghost : color.text,
+        }}>
         {label}
       </AppText>
       {icon}

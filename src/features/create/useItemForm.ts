@@ -7,7 +7,9 @@ import { isDeviceId } from '@/lib/deviceIds';
 import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
 import { avatarInitial } from '@/lib/text';
 import {
+  DEVICE_REPEAT_RULES,
   canEditDeviceEvent,
+  createDeviceEvent,
   deleteDeviceEvent,
   readDeviceGuests,
   updateDeviceEvent,
@@ -16,8 +18,10 @@ import { createId, useAppStore } from '@/store/useAppStore';
 import { usePrefs } from '@/theme/prefs';
 import { useToast } from '@/ui/Toast';
 import type {
+  Account,
   Availability,
   CalEvent,
+  Calendar,
   Guest,
   Habit,
   HabitFrequency,
@@ -45,6 +49,17 @@ export type Editing =
 
 /** How many upcoming months are offered as a task's approximate month. */
 const VAGUE_MONTH_OPTIONS = 5;
+
+/**
+ * Repeat rules of an event of the app. A calendar of the device takes fewer,
+ * which is what `DEVICE_REPEAT_RULES` says.
+ */
+const REPEAT_RULES: RepeatRule[] = [
+  'No',
+  'Cada día',
+  'Días de la semana',
+  'Cada mes',
+];
 
 /** Approximate month label used when the task has no month at all. */
 const NO_MONTH = 'Sin mes';
@@ -86,6 +101,24 @@ function nextSlot() {
 }
 
 /**
+ * Second line of a calendar in the destination list: the account it belongs to,
+ * who shared it, or that it is one of the app's own.
+ *
+ * Postcondition: never empty, so every row in the list has the same two lines.
+ *
+ * @param calendar Calendar being offered.
+ * @param accounts Accounts in the store, the device's among them.
+ */
+function calendarHint(calendar: Calendar, accounts: Account[]) {
+  if (calendar.sharedBy) return `Compartido por ${calendar.sharedBy}`;
+
+  const account = accounts.find(
+    (candidate) => candidate.id === calendar.accountId,
+  );
+  return account ? account.email : 'En esta app';
+}
+
+/**
  * State of the whole form. It is grouped by item type so each block of the
  * interface only receives its own part.
  */
@@ -94,6 +127,7 @@ export type ItemFormState = ReturnType<typeof useItemForm>;
 export function useItemForm(editing?: Editing) {
   const prefs = usePrefs();
   const toast = useToast();
+  const accounts = useAppStore((state) => state.accounts);
   const calendars = useAppStore((state) => state.calendars);
 
   const [kind, setKind] = useState<ItemKind>(editing?.kind ?? 'event');
@@ -202,7 +236,8 @@ export function useItemForm(editing?: Editing) {
   );
 
   /**
-   * Calendars that can be written to: neither subscriptions nor the tasks one.
+   * Calendars that can be written to: neither subscriptions nor the tasks one,
+   * nor the ones of the device the system keeps under lock.
    */
   const writableCalendars = useMemo(
     () =>
@@ -211,6 +246,80 @@ export function useItemForm(editing?: Editing) {
       ),
     [calendars],
   );
+
+  /**
+   * Calendar the item is saved to.
+   *
+   * When creating, a destination that can no longer be written to falls back to
+   * the first one that can: the default calendar is a preference, and the
+   * calendar it names may be one the phone has stopped syncing. Saving into it
+   * would produce an item nothing shows, because no calendar of that id is
+   * checked in the side menu.
+   */
+  const targetCalendarId =
+    editing || writableCalendars.some((calendar) => calendar.id === calendarId)
+      ? calendarId
+      : (writableCalendars[0]?.id ?? calendarId);
+
+  /**
+   * What the destination list offers: the calendars that can be written to,
+   * plus the one the item already lives in when that is not one of them, so an
+   * event of somebody else's calendar still shows where it is instead of
+   * nowhere.
+   *
+   * Each one carries the line that tells it apart, because with several accounts
+   * on the phone the names repeat and "Trabajo" alone does not say where an
+   * event would land.
+   */
+  const calendarOptions = useMemo(() => {
+    const current = calendars.find(
+      (calendar) => calendar.id === targetCalendarId,
+    );
+    const offered =
+      !current || writableCalendars.includes(current)
+        ? writableCalendars
+        : [current, ...writableCalendars];
+
+    return offered.map((calendar) => ({
+      id: calendar.id,
+      name: calendar.name,
+      dotColor: calendar.dotColor,
+      hint: calendarHint(calendar, accounts),
+    }));
+  }, [accounts, calendars, writableCalendars, targetCalendarId]);
+
+  const selectedCalendar = calendarOptions.find(
+    (option) => option.id === targetCalendarId,
+  );
+
+  const isDeviceTarget = isDeviceId(targetCalendarId);
+
+  /**
+   * Chooses the destination calendar.
+   *
+   * Moving the event to a calendar of the device may leave its repetition
+   * unwritable there, and rather than save a different one it goes back to an
+   * event that happens once.
+   */
+  const chooseCalendar = (id: string) => {
+    setCalendarId(id);
+    if (isDeviceId(id) && !DEVICE_REPEAT_RULES.includes(repeat)) {
+      setRepeat('No');
+    }
+  };
+
+  /**
+   * Why the guest list cannot be touched, or null when it can.
+   *
+   * The app writes no attendees to the device: what it could write there stays
+   * on the phone and invites nobody, so it would look like the guest was told
+   * when nothing was sent.
+   */
+  const guestsNote = isDeviceEvent
+    ? 'Los invitados vienen del calendario y se cambian allí.'
+    : isDeviceTarget
+      ? 'La app no puede invitar a nadie en un calendario del dispositivo.'
+      : null;
 
   /** The next five months plus "Sin mes". */
   const monthOptions = useMemo(() => {
@@ -237,7 +346,7 @@ export function useItemForm(editing?: Editing) {
     startsAt: startsAt.getTime(),
     endsAt: Math.max(endsAt.getTime(), startsAt.getTime() + MIN_EVENT_MS),
     allDay,
-    calendarId,
+    calendarId: targetCalendarId,
     availability,
     visibility,
     repeat,
@@ -250,7 +359,8 @@ export function useItemForm(editing?: Editing) {
     title: title.trim(),
     description: description.trim(),
     calendarId:
-      calendars.find((calendar) => calendar.kind === 'TAREAS')?.id ?? calendarId,
+      calendars.find((calendar) => calendar.kind === 'TAREAS')?.id ??
+      targetCalendarId,
     dueAt: vague ? null : dueAt.getTime(),
     hasTime: vague ? false : hasTime,
     vagueMonth: vague ? (vagueMonth ?? NO_MONTH) : null,
@@ -291,15 +401,58 @@ export function useItemForm(editing?: Editing) {
   };
 
   /**
+   * Creates the event in a calendar of the device, and takes it out of the
+   * store when it was living there.
+   *
+   * This is the one thing the app makes that leaves the phone: it lands in the
+   * account the calendar belongs to and turns up in every other device and app
+   * signed into it.
+   *
+   * Moving an event of the app to a calendar of the device is a create plus a
+   * delete, because the two live in different places and there is nothing to
+   * update; and it is not offered as undoable, since half of it already
+   * happened outside the phone.
+   *
+   * @param payload What the form built, with a device calendar as destination.
+   * @param movedFrom Id of the event of the app being moved, or null when it is
+   * a new one.
+   */
+  const createOnDevice = (
+    payload: Omit<CalEvent, 'id'>,
+    movedFrom: string | null,
+  ) => {
+    close();
+
+    createDeviceEvent(payload.calendarId, payload).then((created) => {
+      const store = useAppStore.getState();
+
+      if (created) {
+        if (movedFrom) store.removeItem('event', movedFrom);
+        store.refresh();
+      }
+
+      toast.show(
+        !created
+          ? 'No se pudo crear el evento'
+          : movedFrom
+            ? 'Evento movido'
+            : 'Evento creado',
+      );
+    });
+  };
+
+  /**
    * Saves the item and navigates back.
    *
-   * On an event of the device that belongs to somebody else, the only thing
-   * that gets saved is the reminders, which are the app's and not the event's.
+   * Where it ends up depends on the destination calendar. One of the app's own
+   * keeps it in the store; one of the device gets it written there, which is the
+   * only way anything created here leaves the phone. On an event of the device
+   * that belongs to somebody else, the only thing that gets saved is the
+   * reminders, which are the app's and not the event's.
    *
    * Precondition: does nothing when the title is empty, the same criterion that
    * disables the CTA. Postcondition: in edit mode it updates the item, in
-   * create mode it adds a new one. Everything stays in the store: there is no
-   * upload in this iteration.
+   * create mode it adds a new one.
    */
   const save = () => {
     if (!canSave) return;
@@ -320,6 +473,11 @@ export function useItemForm(editing?: Editing) {
           return;
         }
         saveToDevice(editing.item.id, payload);
+        return;
+      }
+
+      if (isDeviceId(payload.calendarId)) {
+        createOnDevice(payload, editing?.item.id ?? null);
         return;
       }
 
@@ -387,7 +545,9 @@ export function useItemForm(editing?: Editing) {
     save,
     remove,
     close,
-    writableCalendars,
+    calendarOptions,
+    /** The chosen one, for the button that opens the list. */
+    selectedCalendar,
 
     event: {
       location,
@@ -400,22 +560,32 @@ export function useItemForm(editing?: Editing) {
       setAllDay,
       repeat,
       setRepeat,
+      /** Rules the destination calendar can hold; see `DEVICE_REPEAT_RULES`. */
+      repeatOptions: isDeviceTarget ? DEVICE_REPEAT_RULES : REPEAT_RULES,
       weekdays: eventWeekdays,
       toggleWeekday: (day: number) =>
         setEventWeekdays((current) => toggleInList(current, day)),
-      calendarId,
-      setCalendarId,
+      calendarId: targetCalendarId,
+      setCalendarId: chooseCalendar,
       availability,
       setAvailability,
       visibility,
       setVisibility,
+      /**
+       * The visibility is only offered where it can be saved. On an event that
+       * already lives in the device it cannot: the library takes it when the
+       * event is created and never again, so the chips would be asking for
+       * something a save would throw away.
+       */
+      visibilityShown: !isDeviceEvent,
       guests,
       /**
-       * The guest list of an event of the device is shown but not touched: the
-       * app does not write attendees yet, and letting them be edited would
-       * throw the change away without saying so.
+       * The guest list is shown but not touched whenever the event lives, or is
+       * about to live, in a calendar of the device: letting it be edited would
+       * throw the change away without saying so. `guestsNote` says why.
        */
-      guestsReadOnly: isDeviceEvent,
+      guestsReadOnly: guestsNote !== null,
+      guestsNote,
       addGuest: (name: string) =>
         setGuests((current) => [
           ...current,

@@ -25,6 +25,7 @@ import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
+import { CalendarDot } from '@/ui/CalendarDot';
 import { Group } from '@/ui/Group';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
@@ -70,7 +71,10 @@ export default function CalendarsScreen() {
     null,
   );
 
-  /** Only own calendars that are not the tasks one can be written to. */
+  /**
+   * What can be a destination: the app's own calendars and the ones of the
+   * device the system lets it write to, never a subscription or the tasks one.
+   */
   const writableCalendars = useMemo(
     () =>
       calendars.filter(
@@ -155,14 +159,7 @@ export default function CalendarsScreen() {
           label={defaultCalendar?.name ?? 'Sin calendario'}
           value="CAMBIAR"
           onPress={() => setDefaultSheetOpen(true)}
-          icon={
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: defaultCalendar?.dotColor ?? accent },
-              ]}
-            />
-          }
+          icon={<CalendarDot color={defaultCalendar?.dotColor ?? null} />}
         />
       </Group>
 
@@ -228,7 +225,6 @@ export default function CalendarsScreen() {
 }
 
 const styles = StyleSheet.create({
-  dot: { width: 7, height: 7, borderRadius: 3.5 },
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
