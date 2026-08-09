@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { MONTHS, addMonths, dayKey, isToday, monthRows } from '@/lib/date';
 import { gridCellSize } from '@/lib/layout';
@@ -8,6 +15,7 @@ import { useAccent, usePrefs } from '@/theme/prefs';
 import { alpha, color, radius, tint } from '@/theme/tokens';
 import { WeekdayRow } from '@/ui/WeekdayRow';
 import { EventDots } from './EventDots';
+import { useShownIndex } from './useShownIndex';
 
 /** Months that can be scrolled through backwards and forwards. */
 const MONTHS_BEFORE = 12;
@@ -15,6 +23,9 @@ const MONTHS_AFTER = 24;
 
 const COLUMNS = 7;
 const CELL_GAP = 4;
+
+/** Used to turn a distance between two dates into a number of months. */
+const MONTHS_PER_YEAR = 12;
 
 /** Fixed heights that feed the `getItemLayout` calculation. */
 const TITLE_HEIGHT = 18;
@@ -27,6 +38,10 @@ const WINDOW_SIZE = 5;
 
 type MonthExpandedProps = {
   counts: Map<string, number>;
+  /** Month the view opens on is the one holding this day. Read once. */
+  initialDay: Date;
+  /** Reports the first day of the month the view has been scrolled to. */
+  onShowMonth: (firstDay: Date) => void;
   onPressDay: (day: Date) => void;
 };
 
@@ -38,7 +53,12 @@ type MonthExpandedProps = {
  * comes from the available width. Today is marked with the accent and every
  * cell carries the dots for its events.
  */
-export function MonthExpanded({ counts, onPressDay }: MonthExpandedProps) {
+export function MonthExpanded({
+  counts,
+  initialDay,
+  onShowMonth,
+  onPressDay,
+}: MonthExpandedProps) {
   const accent = useAccent();
   const { weekStart } = usePrefs();
   const [width, setWidth] = useState(0);
@@ -84,6 +104,36 @@ export function MonthExpanded({ counts, onPressDay }: MonthExpandedProps) {
     });
   }, [months, cellSize]);
 
+  /**
+   * Month the view opens on, worked out once: like the other views, the day the
+   * screen passes is a starting position and not a command.
+   */
+  const [openingIndex] = useState(() => {
+    const first = months[0].date;
+    const offset =
+      (initialDay.getFullYear() - first.getFullYear()) * MONTHS_PER_YEAR +
+      (initialDay.getMonth() - first.getMonth());
+    return Math.min(months.length - 1, Math.max(0, offset));
+  });
+
+  const reportIndex = useShownIndex(openingIndex, (index) => {
+    const month = months[index].date;
+    onShowMonth(new Date(month.getFullYear(), month.getMonth(), 1));
+  });
+
+  /**
+   * The month being shown is the one whose grid the scroll is inside. Only a
+   * change is reported: opening on the month of a day already chosen must not
+   * move that day to the first of the month behind the user's back.
+   */
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const top = event.nativeEvent.contentOffset.y;
+    const index = layouts.findIndex(
+      (layout) => top < layout.offset + layout.length,
+    );
+    if (index >= 0) reportIndex(index);
+  };
+
   return (
     <View
       style={styles.root}
@@ -95,7 +145,9 @@ export function MonthExpanded({ counts, onPressDay }: MonthExpandedProps) {
             `${month.date.getFullYear()}-${month.date.getMonth()}`
           }
           showsVerticalScrollIndicator={false}
-          initialScrollIndex={MONTHS_BEFORE}
+          initialScrollIndex={openingIndex}
+          onScroll={onScroll}
+          scrollEventThrottle={32}
           getItemLayout={(_, index) => ({
             length: layouts[index].length,
             offset: layouts[index].offset,

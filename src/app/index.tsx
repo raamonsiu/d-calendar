@@ -16,27 +16,28 @@
  * - `/settings`, `/help` and `/about` from the side menu.
  *
  * The calendar box has four states, combining mode (day or week) with size
- * (collapsed or expanded). Tapping a day in the week or month view opens that
- * day in the expanded view.
+ * (collapsed or expanded). All four travel through days, and the one they are
+ * showing is kept here: switching between them keeps the day, and tapping a day
+ * in the week or month view opens it in the day strip.
  */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
 import { AgendaList } from '@/features/home/AgendaList';
-import { DAY_ROW_HEIGHT, DayExpanded } from '@/features/home/DayExpanded';
+import { DayExpanded } from '@/features/home/DayExpanded';
 import { ModeColumn } from '@/features/home/ModeColumn';
 import { MonthExpanded } from '@/features/home/MonthExpanded';
 import { SideDrawer } from '@/features/home/SideDrawer';
 import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
 import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
-import { dayKey, weekDays } from '@/lib/date';
+import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
 import {
   eventCountsByDay,
-  eventsForDay,
+  eventsByDay,
   tasksForHome,
   visibleEvents,
 } from '@/store/selectors';
@@ -47,15 +48,11 @@ import { color, layer, radius, size, space } from '@/theme/tokens';
 import { Cta, IconButton } from '@/ui/controls';
 import { ListIcon, PlusIcon } from '@/ui/icons';
 
-/** Height taken by the header, the CTA and the gaps around the box. */
-const CHROME_HEIGHT = 220;
-
 /** Height of the calendar box while collapsed. */
 const COLLAPSED_BOX_HEIGHT = 200;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
   const { weekStart } = usePrefs();
   const accent = useAccent();
 
@@ -63,7 +60,13 @@ export default function HomeScreen() {
   const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addSourceOpen, setAddSourceOpen] = useState(false);
-  const [focusDay, setFocusDay] = useState<Date | null>(null);
+
+  /**
+   * The day the calendar box is on. The four views report it as they scroll and
+   * read it when they mount, which is what makes switching mode or size keep the
+   * day instead of jumping back to today.
+   */
+  const [shownDay, setShownDay] = useState(() => startOfDay(new Date()));
 
   const events = useAppStore((state) => state.events);
   const deviceEvents = useAppStore((state) => state.deviceEvents);
@@ -81,37 +84,38 @@ export default function HomeScreen() {
     () => visibleEvents([...events, ...deviceEvents], calendars),
     [events, deviceEvents, calendars],
   );
+  const byDay = useMemo(() => eventsByDay(shownEvents), [shownEvents]);
   const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);
-  const days = useMemo(() => weekDays(new Date(), weekStart), [weekStart]);
-  const todaysEvents = useMemo(
-    () => eventsForDay(shownEvents, new Date()),
-    [shownEvents],
-  );
   const visibleTasks = useMemo(() => tasksForHome(tasks), [tasks]);
 
-  const weekEventCount = days.reduce(
+  const shownWeek = useMemo(
+    () => weekDays(shownDay, weekStart),
+    [shownDay, weekStart],
+  );
+  const weekEventCount = shownWeek.reduce(
     (total, day) => total + (counts.get(dayKey(day)) ?? 0),
     0,
   );
 
+  const today = startOfDay(new Date());
   const header = homeHeaderCopy({
     mode,
     expanded,
-    focusDay,
-    today: new Date(),
-    todayEventCount: todaysEvents.length,
+    shownDay,
+    dayEventCount: byDay.get(dayKey(shownDay))?.length ?? 0,
     weekEventCount,
-    visibleDayCount: Math.max(
-      1,
-      Math.round((height - CHROME_HEIGHT) / DAY_ROW_HEIGHT),
-    ),
+    isCurrentWeek: shownWeek.some((day) => isSameDay(day, today)),
   });
 
-  /** Opens a specific day in the expanded day view. */
+  /**
+   * Opens a day tapped in the week or the month view: the day strip, scrolled
+   * to it. It is the view that answers "what is happening that day", which is
+   * the question the tap asked.
+   */
   const openDay = (day: Date) => {
-    setFocusDay(day);
+    setShownDay(day);
     setMode('today');
-    setExpanded(true);
+    setExpanded(false);
   };
 
   /**
@@ -128,10 +132,7 @@ export default function HomeScreen() {
       onToggleMode={() =>
         setMode((current) => (current === 'today' ? 'week' : 'today'))
       }
-      onToggleExpand={() => {
-        setExpanded((current) => !current);
-        setFocusDay(null);
-      }}
+      onToggleExpand={() => setExpanded((current) => !current)}
     />
   );
 
@@ -168,12 +169,18 @@ export default function HomeScreen() {
             {modeColumn}
             {mode === 'today' ? (
               <DayExpanded
-                events={shownEvents}
-                focusDay={focusDay}
+                eventsByDay={byDay}
+                initialDay={shownDay}
+                onShowDay={setShownDay}
                 onPressEvent={(event) => openItem(event.id)}
               />
             ) : (
-              <MonthExpanded counts={counts} onPressDay={openDay} />
+              <MonthExpanded
+                counts={counts}
+                initialDay={shownDay}
+                onShowMonth={setShownDay}
+                onPressDay={openDay}
+              />
             )}
           </View>
         ) : (
@@ -182,11 +189,18 @@ export default function HomeScreen() {
               {modeColumn}
               {mode === 'today' ? (
                 <TodayTimeline
-                  events={todaysEvents}
+                  eventsByDay={byDay}
+                  initialDay={shownDay}
+                  onShowDay={setShownDay}
                   onPressEvent={(event) => openItem(event.id)}
                 />
               ) : (
-                <WeekStrip days={days} counts={counts} onPressDay={openDay} />
+                <WeekStrip
+                  counts={counts}
+                  initialDay={shownDay}
+                  onShowWeek={setShownDay}
+                  onPressDay={openDay}
+                />
               )}
             </View>
 

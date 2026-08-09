@@ -1,91 +1,116 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 
-import { MS_PER_DAY, addDays, isToday, startOfDay, weekdayInitial } from '@/lib/date';
-import { indexOfDay } from '@/lib/layout';
-import { eventsForDay, layoutDay } from '@/store/selectors';
+import {
+  addDays,
+  dayKey,
+  decimalHours,
+  isToday,
+  startOfDay,
+  weekdayInitial,
+} from '@/lib/date';
+import { layoutDayColumn } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
 import {
-  HOUR_WIDTH,
-  HourGridLines,
-  HourRuler,
-  RAIL_WIDTH,
-  START_HOUR,
-} from './hourRail';
+  DAY_HEIGHT,
+  HOUR_GUTTER_WIDTH,
+  HOUR_HEIGHT,
+  HourGridRows,
+  HourGutter,
+  hourToTop,
+} from './hourGrid';
+import { useShownIndex } from './useShownIndex';
 
-/** Days that can be scrolled through backwards and forwards. */
-const DAYS_BEFORE = 7;
-const DAYS_AFTER = 30;
+/**
+ * Days that can be scrolled through, counted from the one the grid opens on.
+ *
+ * The columns are all mounted at once: a grid that pins its hours on the left
+ * and its days on top cannot hand the horizontal axis to a virtualised list
+ * without every column growing its own vertical scroll. Two months either way is
+ * as far as this view is worth reading anyway; beyond that the month view is
+ * what answers.
+ */
+const DAYS_BEFORE = 30;
+const DAYS_AFTER = 60;
 
-/** Height of a day row, of the hour row, and width of the day column. */
-export const DAY_ROW_HEIGHT = 132;
-const RULER_HEIGHT = 18;
-const GUTTER_WIDTH = 44;
+/** Width of a day column and height of the row naming the days. */
+const DAY_COLUMN_WIDTH = 104;
+const HEADER_HEIGHT = 34;
 
-/** The two lanes inside a day row. */
-const LANE_TOP = [8, 68];
+/** Hour the vertical scroll starts at: the beginning of the working day. */
+const OPEN_HOUR = 8;
 
-/** Card height and minimum width for the title to fit. */
-const CARD_HEIGHT = 52;
-const CARD_MIN_WIDTH = 96;
-
-/** Hour the horizontal scroll starts at: the beginning of the working day. */
-const INITIAL_HOUR = 9;
+/** The opening position leaves a little room above the hour it lands on. */
+const OPEN_MARGIN = 20;
 
 type DayExpandedProps = {
-  events: CalEvent[];
-  /** Day to jump to on mount; without it, today. */
-  focusDay?: Date | null;
+  /** Events of every day, from `eventsByDay`. */
+  eventsByDay: Map<string, CalEvent[]>;
+  /** Day the grid opens on. Read once, when it mounts. */
+  initialDay: Date;
+  /** Reports the day the grid has been scrolled to. */
+  onShowDay: (day: Date) => void;
   onPressEvent: (event: CalEvent) => void;
 };
 
 /**
- * Expanded day view (handoff §5.3): several days, one per row, scrolling on
- * both axes.
+ * Expanded day view: hours going down, days going across, which is the way a
+ * calendar is usually read. A card is as tall as its event lasts, so a morning
+ * looks like a morning instead of like a row of equal boxes.
  *
- * The day column stays pinned on the left and the hour row pinned on top. To
+ * The hour column stays pinned on the left and the day names pinned on top. To
  * pull that off, the column lives outside the horizontal scroll and is moved
  * vertically by the same offset as the content, read on the UI thread.
  */
 export function DayExpanded({
-  events,
-  focusDay,
+  eventsByDay,
+  initialDay,
+  onShowDay,
   onPressEvent,
 }: DayExpandedProps) {
-  const accent = useAccent();
   const [height, setHeight] = useState(0);
   const scrollY = useSharedValue(0);
 
+  /**
+   * The days are laid out around the one the grid opens on, which is read once:
+   * `initialDay` is a starting position and not a command, so a later scroll
+   * never fights the day the parent last heard about.
+   */
+  const [openingDay] = useState(() => startOfDay(initialDay));
+
   const days = useMemo(() => {
-    const first = addDays(startOfDay(new Date()), -DAYS_BEFORE);
+    const first = addDays(openingDay, -DAYS_BEFORE);
     return Array.from({ length: DAYS_BEFORE + DAYS_AFTER + 1 }, (_, offset) =>
       addDays(first, offset),
     );
-  }, []);
+  }, [openingDay]);
 
-  const rows = useMemo(
-    () =>
-      days.map((day) => ({
-        day,
-        laidOut: layoutDay(
-          eventsForDay(events, day),
-          START_HOUR,
-          HOUR_WIDTH,
-          CARD_MIN_WIDTH,
-        ),
-      })),
-    [days, events],
+  /** Vertical position it opens at: the current hour today, the day's start otherwise. */
+  const openingTop = useMemo(() => {
+    const hour = isToday(openingDay) ? decimalHours(new Date()) : OPEN_HOUR;
+    return Math.max(0, hourToTop(hour) - OPEN_MARGIN);
+  }, [openingDay]);
+
+  const reportIndex = useShownIndex(DAYS_BEFORE, (index) =>
+    onShowDay(days[index]),
   );
 
-  const onScroll = useAnimatedScrollHandler((event) => {
+  const onScrollVertical = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
 
@@ -93,132 +118,188 @@ export function DayExpanded({
     transform: [{ translateY: -scrollY.value }],
   }));
 
-  const bodyHeight = Math.max(0, height - RULER_HEIGHT);
-  const focusIndex = indexOfDay(days, focusDay, DAYS_BEFORE, MS_PER_DAY);
+  /**
+   * The day being shown is the one under the left edge of the grid: with two or
+   * three columns on screen, that is the one the header is naming.
+   */
+  const onScrollHorizontal = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    reportIndex(
+      Math.min(
+        days.length - 1,
+        Math.max(
+          0,
+          Math.round(event.nativeEvent.contentOffset.x / DAY_COLUMN_WIDTH),
+        ),
+      ),
+    );
+  };
+
+  const bodyHeight = Math.max(0, height - HEADER_HEIGHT);
 
   return (
     <View
       style={styles.root}
       onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
       <View style={styles.gutter}>
-        <View style={{ height: RULER_HEIGHT }} />
+        <View style={{ height: HEADER_HEIGHT }} />
         <View style={[styles.gutterClip, { height: bodyHeight }]}>
           <Animated.View style={gutterStyle}>
-            {days.map((day) => {
-              const today = isToday(day);
-              return (
-                <View key={day.toISOString()} style={styles.gutterRow}>
-                  <AppText
-                    style={[
-                      styles.gutterInitial,
-                      { color: today ? accent : color.textDim },
-                    ]}>
-                    {weekdayInitial(day)}
-                  </AppText>
-                  <AppText
-                    weight={400}
-                    style={[
-                      styles.gutterNumber,
-                      { color: today ? color.text : color.textMuted },
-                    ]}>
-                    {day.getDate()}
-                  </AppText>
-                </View>
-              );
-            })}
+            <HourGutter />
           </Animated.View>
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentOffset={{
-          x: Math.max(0, (INITIAL_HOUR - START_HOUR) * HOUR_WIDTH),
-          y: 0,
-        }}
-        contentContainerStyle={styles.railContent}>
-        <View style={{ width: RAIL_WIDTH, height }}>
-          <HourRuler height={RULER_HEIGHT} background={color.box} />
+      {height > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: DAYS_BEFORE * DAY_COLUMN_WIDTH, y: 0 }}
+          onScroll={onScrollHorizontal}
+          scrollEventThrottle={32}>
+          <View style={{ width: days.length * DAY_COLUMN_WIDTH }}>
+            <View style={styles.header}>
+              {days.map((day) => (
+                <DayHeading key={dayKey(day)} day={day} />
+              ))}
+            </View>
 
-          <Animated.ScrollView
-            onScroll={onScroll}
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator={false}
-            contentOffset={{ x: 0, y: focusIndex * DAY_ROW_HEIGHT }}
-            style={{ height: bodyHeight }}>
-            {rows.map(({ day, laidOut }) => (
-              <View key={day.toISOString()} style={styles.row}>
-                <HourGridLines />
+            <Animated.ScrollView
+              onScroll={onScrollVertical}
+              scrollEventThrottle={16}
+              showsVerticalScrollIndicator={false}
+              contentOffset={{ x: 0, y: openingTop }}
+              style={{ height: bodyHeight }}>
+              <View style={styles.body}>
+                <HourGridRows />
 
-                {laidOut.map(({ event, lane, left, width, startLabel }) => (
-                  <Pressable
-                    key={event.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${event.title}, ${startLabel}`}
-                    onPress={() => onPressEvent(event)}
-                    style={({ pressed }) => [
-                      styles.card,
-                      {
-                        top: LANE_TOP[lane],
-                        left,
-                        width,
-                        borderColor: pressed ? color.outline : color.border,
-                      },
-                    ]}>
-                    <View style={styles.cardHead}>
-                      <View
-                        style={[styles.cardDot, { backgroundColor: accent }]}
-                      />
-                      <AppText style={styles.cardTime}>{startLabel}</AppText>
-                    </View>
-                    <AppText numberOfLines={2} style={styles.cardTitle}>
-                      {event.title}
-                    </AppText>
-                  </Pressable>
+                {days.map((day) => (
+                  <DayColumn
+                    key={dayKey(day)}
+                    day={day}
+                    events={eventsByDay.get(dayKey(day)) ?? []}
+                    onPressEvent={onPressEvent}
+                  />
                 ))}
               </View>
-            ))}
-          </Animated.ScrollView>
-        </View>
-      </ScrollView>
+            </Animated.ScrollView>
+          </View>
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+/** Name and number of a day, in the row pinned above the grid. */
+function DayHeading({ day }: { day: Date }) {
+  const accent = useAccent();
+  const today = isToday(day);
+
+  return (
+    <View style={styles.heading}>
+      <AppText
+        style={[styles.headingInitial, { color: today ? accent : color.textDim }]}>
+        {weekdayInitial(day)}
+      </AppText>
+      <AppText
+        weight={400}
+        style={[
+          styles.headingNumber,
+          { color: today ? color.text : color.textMuted },
+        ]}>
+        {day.getDate()}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * One day of the grid: its own vertical strip, with the events placed by hour
+ * and the "now" line when the day is today.
+ */
+function DayColumn({
+  day,
+  events,
+  onPressEvent,
+}: {
+  day: Date;
+  events: CalEvent[];
+  onPressEvent: (event: CalEvent) => void;
+}) {
+  const accent = useAccent();
+  const laidOut = layoutDayColumn(events, HOUR_HEIGHT, DAY_COLUMN_WIDTH);
+  const nowTop = isToday(day) ? hourToTop(decimalHours(new Date())) : null;
+
+  return (
+    <View style={styles.column}>
+      {nowTop !== null ? (
+        <View style={[styles.nowLine, { top: nowTop, backgroundColor: accent }]} />
+      ) : null}
+
+      {laidOut.map(({ event, top, height, left, width, startLabel }) => (
+        <Pressable
+          key={event.id}
+          accessibilityRole="button"
+          accessibilityLabel={`${event.title}, ${startLabel}`}
+          onPress={() => onPressEvent(event)}
+          style={({ pressed }) => [
+            styles.card,
+            {
+              top,
+              height,
+              left,
+              width,
+              borderColor: pressed ? color.outline : color.border,
+              backgroundColor: pressed ? color.cardPressed : color.cardHover,
+            },
+          ]}>
+          <AppText style={styles.cardTime}>{startLabel}</AppText>
+          <AppText numberOfLines={3} style={styles.cardTitle}>
+            {event.title}
+          </AppText>
+        </Pressable>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row' },
-  railContent: { width: RAIL_WIDTH },
-  gutter: { width: GUTTER_WIDTH, backgroundColor: color.box, zIndex: 2 },
+  gutter: { width: HOUR_GUTTER_WIDTH, backgroundColor: color.box, zIndex: 2 },
   gutterClip: { overflow: 'hidden' },
-  gutterRow: {
-    height: DAY_ROW_HEIGHT,
+  header: {
+    height: HEADER_HEIGHT,
+    flexDirection: 'row',
+    backgroundColor: color.box,
+  },
+  heading: {
+    width: DAY_COLUMN_WIDTH,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingRight: 6,
-    borderTopWidth: 1,
-    borderTopColor: color.lineSoft,
+    gap: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: color.lineSoft,
   },
-  gutterInitial: { fontSize: 8, letterSpacing: 1.4 },
-  gutterNumber: { fontSize: 17 },
-  row: {
-    height: DAY_ROW_HEIGHT,
-    borderTopWidth: 1,
-    borderTopColor: color.lineSoft,
+  headingInitial: { fontSize: 8, letterSpacing: 1.4 },
+  headingNumber: { fontSize: 15 },
+  body: { height: DAY_HEIGHT, flexDirection: 'row' },
+  column: {
+    width: DAY_COLUMN_WIDTH,
+    height: DAY_HEIGHT,
+    borderLeftWidth: 1,
+    borderLeftColor: color.lineSoft,
   },
+  nowLine: { position: 'absolute', left: 0, right: 0, height: 1 },
   card: {
     position: 'absolute',
-    height: CARD_HEIGHT,
     borderWidth: 1,
     borderRadius: radius.chip,
-    backgroundColor: color.cardHover,
-    paddingVertical: 6,
-    paddingHorizontal: 7,
-    gap: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    gap: 1,
     overflow: 'hidden',
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  cardDot: { width: 4, height: 4, borderRadius: 2 },
   cardTime: { fontSize: 8.5, letterSpacing: 0.6, color: color.textSubtle },
   cardTitle: {
     fontSize: 10,

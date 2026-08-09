@@ -1,43 +1,37 @@
 import { StyleSheet, View } from 'react-native';
 
+import { HOURS_PER_DAY } from '@/lib/date';
 import { AppText } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 
 /**
- * The hour rail shared by today's strip (collapsed) and the expanded day view:
- * the same hours, the same width per hour and the same grid lines. The only
- * difference between the two views is what gets drawn on top.
+ * The hour rail of the day strip on Home: one day laid out left to right, from
+ * 00 to 23.
+ *
+ * The strip draws one of these per day and scrolls through them without a break,
+ * so the rail is a tile that has to tesselate: the width of a day is exactly
+ * `DAY_WIDTH`, and nothing here may add a border or a margin that would push the
+ * next day out of place.
  */
-
-/** First and last visible hours of the day. */
-export const START_HOUR = 6;
-const END_HOUR = 23;
 
 /** Width of one hour in px. */
 export const HOUR_WIDTH = 62;
 
-/** How many hour columns the rail has. */
-const HOUR_COUNT = END_HOUR - START_HOUR + 1;
-
-/** Total rail width, which is the content of the horizontal scroll. */
-export const RAIL_WIDTH = HOUR_COUNT * HOUR_WIDTH;
+/** Width of one day, which is the width of a tile in the strip. */
+export const DAY_WIDTH = HOURS_PER_DAY * HOUR_WIDTH;
 
 /** The hours of the rail, ready to be walked while drawing. */
-const HOURS = Array.from(
-  { length: HOUR_COUNT },
-  (_, index) => START_HOUR + index,
-);
+const HOURS = Array.from({ length: HOURS_PER_DAY }, (_, index) => index);
 
 /**
- * Converts an hour of the day into its position inside the rail.
+ * Position of an hour of the day inside its own day tile.
  *
  * Precondition: `hour` is decimal (9.5 = 09:30). Postcondition: returns px from
- * the start of the rail; the result is negative for hours before `START_HOUR`,
- * which is how the caller detects there is nothing to draw.
+ * midnight, between 0 and `DAY_WIDTH`.
  *
  * @param hour Hour of the day, in decimal.
  */
-export const hourToLeft = (hour: number) => (hour - START_HOUR) * HOUR_WIDTH;
+export const hourToLeft = (hour: number) => hour * HOUR_WIDTH;
 
 /** Row of hour labels that sits on top of the rail. */
 export function HourRuler({
@@ -63,14 +57,21 @@ export function HourRuler({
 /**
  * Vertical lines of the hour grid. They are absolutely positioned, so the
  * container has to be relative and have its own height.
+ *
+ * The line at midnight is the one that separates two days and is drawn stronger:
+ * without it a strip that never stops would give no clue where a day ends.
  */
 export function HourGridLines() {
   return (
     <>
-      {HOURS.map((hour, index) => (
+      {HOURS.map((hour) => (
         <View
           key={hour}
-          style={[styles.gridLine, { left: index * HOUR_WIDTH }]}
+          style={[
+            styles.gridLine,
+            { left: hourToLeft(hour) },
+            hour === 0 && styles.dayLine,
+          ]}
         />
       ))}
     </>
@@ -93,4 +94,5 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: color.hairline,
   },
+  dayLine: { backgroundColor: color.line },
 });

@@ -37,6 +37,9 @@ const WEEKDAY_INITIALS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 /** A day in milliseconds, for the offset arithmetic. */
 export const MS_PER_DAY = 86400000;
 
+/** Hours a day is drawn with: all of them, from 00 to 23. */
+export const HOURS_PER_DAY = 24;
+
 const DAYS_PER_WEEK = 7;
 
 /**

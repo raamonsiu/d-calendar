@@ -1,4 +1,4 @@
-import { MONTHS, formatDayTitle } from '@/lib/date';
+import { MONTHS, formatDayTitle, isoWeek } from '@/lib/date';
 
 /**
  * Texts of the Home header.
@@ -6,6 +6,10 @@ import { MONTHS, formatDayTitle } from '@/lib/date';
  * The header says four different things depending on the state of the calendar
  * box (collapsed or expanded, in day or week mode). It is resolved in a pure
  * function so the screen does not pile up nested conditions.
+ *
+ * Every one of them is about the day the box has been scrolled to, not about
+ * today: the views travel through days now, and a header still naming today
+ * while the box shows next Tuesday would be worse than no header at all.
  */
 
 /** The two modes of the calendar box. */
@@ -13,7 +17,7 @@ export type CalendarMode = 'today' | 'week';
 
 export type HomeHeaderCopy = {
   title: string;
-  /** Micro label under the title: the month, the year or the visible days. */
+  /** Micro label under the title: the month, or the year in the month view. */
   subtitle: string;
   /** Micro label on the right; empty while the box is expanded. */
   right: string;
@@ -32,13 +36,14 @@ const MODE_LABELS = {
 type HomeHeaderParams = {
   mode: CalendarMode;
   expanded: boolean;
-  /** Day opened from the week or month view; without it, today is described. */
-  focusDay: Date | null;
-  today: Date;
-  todayEventCount: number;
+  /** Day the box has been scrolled to. */
+  shownDay: Date;
+  /** Events of `shownDay`, for the counter in day mode. */
+  dayEventCount: number;
+  /** Events of the week holding `shownDay`, for the counter in week mode. */
   weekEventCount: number;
-  /** How many days fit in the expanded day view. */
-  visibleDayCount: number;
+  /** Whether the week holding `shownDay` also holds today. */
+  isCurrentWeek: boolean;
 };
 
 /**
@@ -54,32 +59,34 @@ export function homeHeaderCopy(params: HomeHeaderParams): HomeHeaderCopy {
   const {
     mode,
     expanded,
-    focusDay,
-    today,
-    todayEventCount,
+    shownDay,
+    dayEventCount,
     weekEventCount,
-    visibleDayCount,
+    isCurrentWeek,
   } = params;
 
-  const monthName = MONTHS[today.getMonth()];
   const labels = expanded ? MODE_LABELS.expanded : MODE_LABELS.collapsed;
   const otherMode: CalendarMode = mode === 'today' ? 'week' : 'today';
 
-  const title = expanded
-    ? mode === 'week'
-      ? monthName
-      : formatDayTitle(focusDay ?? today)
+  /**
+   * The month view is the one place the title is not about a single day: it
+   * scrolls through whole months and names the year underneath.
+   */
+  const isMonthView = expanded && mode === 'week';
+
+  const title = isMonthView
+    ? MONTHS[shownDay.getMonth()]
     : mode === 'week'
-      ? 'Esta semana'
-      : formatDayTitle(today);
+      ? isCurrentWeek
+        ? 'Esta semana'
+        : `Semana ${isoWeek(shownDay)}`
+      : formatDayTitle(shownDay);
 
-  const subtitle = expanded
-    ? mode === 'today'
-      ? `${visibleDayCount} DÍAS`
-      : String(today.getFullYear())
-    : monthName.toUpperCase();
+  const subtitle = isMonthView
+    ? String(shownDay.getFullYear())
+    : MONTHS[shownDay.getMonth()].toUpperCase();
 
-  const eventCount = mode === 'today' ? todayEventCount : weekEventCount;
+  const eventCount = mode === 'today' ? dayEventCount : weekEventCount;
 
   return {
     title,
