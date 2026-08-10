@@ -13,6 +13,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
+import { windowReach } from '@/lib/calendarWindow';
 import {
   addDays,
   dayKey,
@@ -37,16 +38,17 @@ import {
 import { useShownIndex } from './useShownIndex';
 
 /**
- * Days that can be scrolled through, counted from the one the grid opens on.
+ * Days that can be scrolled through, counted from the one the grid opens on and
+ * cut short by the read window when the grid opens near one of its edges.
  *
  * The columns are all mounted at once: a grid that pins its hours on the left
  * and its days on top cannot hand the horizontal axis to a virtualised list
- * without every column growing its own vertical scroll. Two months either way is
- * as far as this view is worth reading anyway; beyond that the month view is
- * what answers.
+ * without every column growing its own vertical scroll. A month back and two
+ * forward is as far as this view is worth reading anyway; beyond that the month
+ * view is what answers.
  */
-const DAYS_BEFORE = 30;
-const DAYS_AFTER = 60;
+const MAX_DAYS_BEFORE = 30;
+const MAX_DAYS_AFTER = 60;
 
 /** Width of a day column and height of the row naming the days. */
 const DAY_COLUMN_WIDTH = 104;
@@ -93,11 +95,18 @@ export function DayExpanded({
    */
   const [openingDay] = useState(() => startOfDay(initialDay));
 
-  const days = useMemo(() => {
-    const first = addDays(openingDay, -DAYS_BEFORE);
-    return Array.from({ length: DAYS_BEFORE + DAYS_AFTER + 1 }, (_, offset) =>
-      addDays(first, offset),
-    );
+  const { days, daysBefore } = useMemo(() => {
+    const reach = windowReach(openingDay, Date.now());
+    const before = Math.min(MAX_DAYS_BEFORE, reach.before);
+    const after = Math.min(MAX_DAYS_AFTER, reach.after);
+    const first = addDays(openingDay, -before);
+
+    return {
+      daysBefore: before,
+      days: Array.from({ length: before + after + 1 }, (_, offset) =>
+        addDays(first, offset),
+      ),
+    };
   }, [openingDay]);
 
   /** Vertical position it opens at: the current hour today, the day's start otherwise. */
@@ -106,7 +115,7 @@ export function DayExpanded({
     return Math.max(0, hourToTop(hour) - OPEN_MARGIN);
   }, [openingDay]);
 
-  const reportIndex = useShownIndex(DAYS_BEFORE, (index) =>
+  const reportIndex = useShownIndex(daysBefore, (index) =>
     onShowDay(days[index]),
   );
 
@@ -155,7 +164,7 @@ export function DayExpanded({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: DAYS_BEFORE * DAY_COLUMN_WIDTH, y: 0 }}
+          contentOffset={{ x: daysBefore * DAY_COLUMN_WIDTH, y: 0 }}
           onScroll={onScrollHorizontal}
           scrollEventThrottle={32}>
           <View style={{ width: days.length * DAY_COLUMN_WIDTH }}>

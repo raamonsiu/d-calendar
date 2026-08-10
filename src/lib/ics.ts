@@ -1,5 +1,6 @@
 import ICAL from 'ical.js';
 
+import { MS_PER_DAY } from '@/lib/date';
 import { SUBSCRIPTION_ID_PREFIX } from '@/lib/sourceIds';
 import type { Availability, CalEvent, Visibility } from '@/types';
 
@@ -25,19 +26,25 @@ import type { Availability, CalEvent, Visibility } from '@/types';
  */
 
 /**
- * Occurrences taken from a single repeating event.
+ * Occurrences taken from a single repeating event, as a share of the window.
  *
  * A rule with no end repeats for ever, and the window is what normally stops
  * it; this stops the pathological cases, like a rule that repeats every minute.
+ * One a day is the honest bound: a class that meets twice a day is two entries
+ * with a rule each, not one rule firing twice, so anything denser than this is a
+ * data feed rather than a calendar. Tying it to the window and not to a round
+ * number is what keeps a daily event from stopping halfway through the year the
+ * moment the window grows.
  */
-const MAX_OCCURRENCES = 500;
+const OCCURRENCES_PER_DAY = 1;
 
 /**
  * Steps the expansion of one rule may take before giving up.
  *
  * It is not the same as the number kept: a daily event that started years ago
  * has to be walked from its first day to reach the window, and that walking is
- * cheap, but it cannot be unbounded.
+ * cheap, but it cannot be unbounded. At one step a day this reaches some twenty
+ * years back, which is further than any rule worth expanding was written.
  */
 const MAX_STEPS = 8000;
 
@@ -45,11 +52,16 @@ const MAX_STEPS = 8000;
  * Events taken from a single calendar, whatever it holds.
  *
  * What is read gets stored, and the store is one entry in AsyncStorage with a
- * few megabytes to live in. A year of a busy timetable is a few hundred events,
- * so this leaves room to spare while stopping a calendar that lists every train
- * in the country from filling the phone.
+ * few megabytes to live in. An event of this app weighs a few hundred bytes as
+ * JSON, so this is somewhere around a megabyte per subscribed calendar: room for
+ * three years of a timetable that meets twenty times a week, and a stop for the
+ * calendar that lists every train in the country.
+ *
+ * When it bites, what is lost is whatever came last in the file, which is not
+ * the same as the furthest away in time. A calendar that reaches it is one this
+ * app is the wrong reader for.
  */
-const MAX_EVENTS = 1500;
+const MAX_EVENTS = 4000;
 
 /**
  * Turns the text of an `.ics` into events of the app.
@@ -83,12 +95,13 @@ export function parseIcs(
   const events = relateExceptions(components);
 
   const found: CalEvent[] = [];
+  const maxOccurrences = windowOccurrences(from, to);
 
   for (const event of events) {
     if (found.length >= MAX_EVENTS) break;
 
     if (event.isRecurring()) {
-      collectOccurrences(event, calendarId, from, to, found);
+      collectOccurrences(event, calendarId, from, to, found, maxOccurrences);
     } else {
       const single = toAppEvent(
         event,
@@ -101,6 +114,20 @@ export function parseIcs(
   }
 
   return found.sort((first, second) => first.startsAt - second.startsAt);
+}
+
+/**
+ * How many occurrences of one rule the window has room for.
+ *
+ * Postcondition: at least 1, so a window shorter than a day still lets the
+ * single occurrence inside it through.
+ *
+ * @param from Start of the window being read.
+ * @param to End of the window being read.
+ */
+function windowOccurrences(from: Date, to: Date) {
+  const days = Math.ceil((to.getTime() - from.getTime()) / MS_PER_DAY);
+  return Math.max(1, days * OCCURRENCES_PER_DAY);
 }
 
 /**
@@ -168,6 +195,8 @@ function relateExceptions(components: ICAL.Component[]) {
  * @param from Start of the window being read.
  * @param to End of the window being read.
  * @param found List the occurrences are appended to.
+ * @param maxOccurrences Most this one rule may contribute; see
+ * `OCCURRENCES_PER_DAY`.
  */
 function collectOccurrences(
   event: ICAL.Event,
@@ -175,6 +204,7 @@ function collectOccurrences(
   from: Date,
   to: Date,
   found: CalEvent[],
+  maxOccurrences: number,
 ) {
   const expansion = event.iterator();
   let kept = 0;
@@ -195,7 +225,7 @@ function collectOccurrences(
     if (overlaps(single, from, to)) {
       found.push(single);
       kept += 1;
-      if (kept >= MAX_OCCURRENCES || found.length >= MAX_EVENTS) break;
+      if (kept >= maxOccurrences || found.length >= MAX_EVENTS) break;
     }
   }
 }

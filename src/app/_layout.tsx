@@ -74,7 +74,7 @@ function BackgroundSync() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontsFailed] = useFonts({
     RobotoSlab_300Light,
     RobotoSlab_400Regular,
     RobotoSlab_500Medium,
@@ -84,7 +84,15 @@ export default function RootLayout() {
   });
 
   const storeHydrated = useStoreHydrated();
-  const ready = fontsLoaded && storeHydrated;
+
+  /**
+   * A font that fails to load counts as loaded. `useFonts` leaves its flag false
+   * for ever in that case, and since nothing is drawn until it turns true, the
+   * app would sit on the splash screen with no way out and nothing said. Coming
+   * up in the system font is worse than the design intends and better than not
+   * coming up.
+   */
+  const ready = (fontsLoaded || !!fontsFailed) && storeHydrated;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();

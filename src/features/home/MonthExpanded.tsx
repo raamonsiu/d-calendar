@@ -8,6 +8,10 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import {
+  WINDOW_MONTHS_AFTER,
+  WINDOW_MONTHS_BEFORE,
+} from '@/lib/calendarWindow';
 import { MONTHS, addMonths, dayKey, isToday, monthRows } from '@/lib/date';
 import { gridCellSize } from '@/lib/layout';
 import { AppText } from '@/theme/Text';
@@ -16,10 +20,6 @@ import { alpha, color, radius, tint } from '@/theme/tokens';
 import { WeekdayRow } from '@/ui/WeekdayRow';
 import { EventDots } from './EventDots';
 import { useShownIndex } from './useShownIndex';
-
-/** Months that can be scrolled through backwards and forwards. */
-const MONTHS_BEFORE = 12;
-const MONTHS_AFTER = 24;
 
 const COLUMNS = 7;
 const CELL_GAP = 4;
@@ -63,10 +63,15 @@ export function MonthExpanded({
   const { weekStart } = usePrefs();
   const [width, setWidth] = useState(0);
 
+  /**
+   * The months the list holds, which are the ones that were read: this is the
+   * view that reaches furthest, so it is the one the window was measured
+   * against, and it takes its ends straight from it.
+   */
   const months = useMemo(() => {
-    const first = addMonths(new Date(), -MONTHS_BEFORE);
+    const first = addMonths(new Date(), -WINDOW_MONTHS_BEFORE);
     return Array.from(
-      { length: MONTHS_BEFORE + MONTHS_AFTER + 1 },
+      { length: WINDOW_MONTHS_BEFORE + WINDOW_MONTHS_AFTER + 1 },
       (_, offset) => {
         const date = addMonths(first, offset);
         return {

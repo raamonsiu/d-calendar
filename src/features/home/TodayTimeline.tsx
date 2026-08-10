@@ -8,6 +8,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import { windowReach } from '@/lib/calendarWindow';
 import {
   MS_PER_DAY,
   addDays,
@@ -30,10 +31,6 @@ import {
   hourToLeft,
 } from './hourRail';
 import { useShownIndex } from './useShownIndex';
-
-/** Days the strip can be scrolled through backwards and forwards. */
-const DAYS_BEFORE = 365;
-const DAYS_AFTER = 730;
 
 /** Height of the hour row and of an event card. */
 const RULER_HEIGHT = 16;
@@ -87,11 +84,22 @@ export function TodayTimeline({
    */
   const [size, setSize] = useState({ width: 0, height: 0 });
 
-  const days = useMemo(() => {
-    const first = addDays(startOfDay(new Date()), -DAYS_BEFORE);
-    return Array.from({ length: DAYS_BEFORE + DAYS_AFTER + 1 }, (_, offset) =>
-      addDays(first, offset),
-    );
+  /**
+   * The days the strip holds, which are the ones that were read: how far it
+   * scrolls is the window and not a number of its own, so it never carries the
+   * user past the last day anybody asked the calendars about.
+   */
+  const { days, daysBefore } = useMemo(() => {
+    const today = startOfDay(new Date());
+    const { before, after } = windowReach(today, today.getTime());
+    const first = addDays(today, -before);
+
+    return {
+      daysBefore: before,
+      days: Array.from({ length: before + after + 1 }, (_, offset) =>
+        addDays(first, offset),
+      ),
+    };
   }, []);
 
   /**
@@ -100,7 +108,7 @@ export function TodayTimeline({
    * heard about.
    */
   const [opening] = useState(() => {
-    const index = indexOfDay(days, initialDay, DAYS_BEFORE, MS_PER_DAY);
+    const index = indexOfDay(days, initialDay, daysBefore, MS_PER_DAY);
     const hour = isToday(days[index]) ? decimalHours(new Date()) : OPEN_HOUR;
     return {
       index,

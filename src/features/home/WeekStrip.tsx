@@ -8,6 +8,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import { windowReach } from '@/lib/calendarWindow';
 import {
   MS_PER_DAY,
   addDays,
@@ -32,10 +33,6 @@ const CELL_GAP = 6;
 
 /** Outer radius of the cell group. */
 const OUTER_RADIUS = 17;
-
-/** Weeks that can be paged through backwards and forwards. */
-const WEEKS_BEFORE = 52;
-const WEEKS_AFTER = 104;
 
 const DAYS_PER_WEEK = 7;
 
@@ -86,12 +83,23 @@ export function WeekStrip({
    */
   const [size, setSize] = useState({ width: 0, height: 0 });
 
+  /**
+   * The weeks the strip pages through, which are the ones that were read. The
+   * count is rounded up, so the weeks at either end are complete even when the
+   * window cuts them in half: a week drawn with three of its days missing would
+   * be stranger than one whose last days are outside what was asked for.
+   */
   const weeks = useMemo(() => {
+    const today = new Date();
+    const { before, after } = windowReach(today, today.getTime());
+    const weeksBefore = Math.ceil(before / DAYS_PER_WEEK);
+    const weeksAfter = Math.ceil(after / DAYS_PER_WEEK);
     const first = addDays(
-      weekDays(new Date(), weekStart)[0],
-      -WEEKS_BEFORE * DAYS_PER_WEEK,
+      weekDays(today, weekStart)[0],
+      -weeksBefore * DAYS_PER_WEEK,
     );
-    return Array.from({ length: WEEKS_BEFORE + WEEKS_AFTER + 1 }, (_, offset) =>
+
+    return Array.from({ length: weeksBefore + weeksAfter + 1 }, (_, offset) =>
       weekDays(addDays(first, offset * DAYS_PER_WEEK), weekStart),
     );
   }, [weekStart]);
