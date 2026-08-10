@@ -41,8 +41,13 @@ the phone is what gets written to a calendar of the device, and from there the
 account syncs it. Adding an account leads out to the system settings, which is
 where accounts are actually added.
 
-Two things are still mock: "Añadir invitado" adds the guest to local state
-without inviting anybody, and exporting generates no file.
+Guests are real in the one place they can be: an event created in a calendar of
+the device that accepts attendees — a Google or an Outlook one, on Android — is
+written with them, and the account that syncs the calendar is what mails the
+invitation. In a calendar of the app the guest is still just a note, and the form
+says so under the list.
+
+One thing is still mock: exporting generates no file.
 
 The next iteration replaces that layer with the real connection; the UI should
 not change.

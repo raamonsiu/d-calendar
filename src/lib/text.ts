@@ -22,3 +22,22 @@ export const avatarInitial = (value: string) =>
  */
 export const countLabel = (count: number, singular: string, plural: string) =>
   `${count} ${count === 1 ? singular : plural}`;
+
+/**
+ * Shape an address has to have before it is offered as a guest.
+ *
+ * It is deliberately loose: whether the address exists is the mail server's
+ * business, and the only thing worth catching here is a name typed where an
+ * address was asked for, which would invite nobody.
+ */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Whether the text can be used as an email address.
+ *
+ * Precondition: `value` may come in empty or half typed, because it comes from
+ * a field the user is still writing in.
+ *
+ * @param value Text typed in the field.
+ */
+export const looksLikeEmail = (value: string) => EMAIL_SHAPE.test(value.trim());

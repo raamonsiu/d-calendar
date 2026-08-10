@@ -13,8 +13,10 @@
  * It reads, it writes back changes to the events it read, and it creates new
  * ones: a calendar the system lets the app write to is offered in the form like
  * any other, and what the user creates there reaches their account and every
- * other device syncing it. The system is the one that decides, calendar by
- * calendar and event by event, what may be touched.
+ * other device syncing it. Guests go with it where the calendar takes them, and
+ * then it is the account, not the app, that mails the invitation. The system is
+ * the one that decides, calendar by calendar and event by event, what may be
+ * touched.
  */
 import * as ExpoCalendar from 'expo-calendar';
 import { Platform } from 'react-native';
@@ -388,9 +390,36 @@ function toGuest(attendee: ExpoCalendar.ExpoCalendarAttendee): Guest {
   return {
     id: toDeviceId(attendee.id ?? name),
     name,
+    email: attendee.email ?? '',
     initial: avatarInitial(name),
     state: toGuestState(attendee.status),
   };
+}
+
+/**
+ * The kind of attendee a calendar takes, which is also the answer to whether it
+ * takes any at all.
+ *
+ * Android publishes it per calendar, and it is what tells a Google or Outlook
+ * calendar — where writing an attendee makes the account send the invitation —
+ * from one that only lives on the phone, where the guest would be a row nobody
+ * ever hears about.
+ *
+ * Postcondition: returns null when the calendar takes no guests, which is also
+ * the answer on iOS: EventKit hands out no way to add one, so the app does not
+ * offer it there.
+ *
+ * @param calendar Calendar as the device stores it.
+ */
+function guestType(calendar: ExpoCalendar.ExpoCalendar) {
+  const allowed = calendar.allowedAttendeeTypes ?? [];
+
+  if (allowed.includes(ExpoCalendar.AttendeeType.REQUIRED)) {
+    return ExpoCalendar.AttendeeType.REQUIRED;
+  }
+  return (
+    allowed.find((type) => type !== ExpoCalendar.AttendeeType.NONE) ?? null
+  );
 }
 
 /**
@@ -476,6 +505,11 @@ function toAppCalendar(
      * the calendars someone shared without giving away control.
      */
     readOnly: !calendar.allowsModifications,
+    /**
+     * Whether a guest written here really gets invited; see `guestType`. The
+     * form reads it to decide whether to offer the guest list at all.
+     */
+    canInvite: guestType(calendar) !== null,
     ...(placement === 'shared' && calendar.ownerAccount
       ? { sharedBy: calendar.ownerAccount }
       : {}),
@@ -749,6 +783,20 @@ export type DeviceEventDraft = DeviceEventChanges & {
   repeat: RepeatRule;
   weekdays: number[];
   reminders: RelativeReminder[];
+  guests: Guest[];
+};
+
+/**
+ * How a create went.
+ *
+ * The two are separate because the event can be created and the guests still
+ * not reach anybody, and a screen that only knew "it worked" would report a
+ * meeting nobody was told about.
+ */
+export type DeviceCreateResult = {
+  created: boolean;
+  /** True when at least one guest was refused by the system. */
+  guestsFailed: boolean;
 };
 
 /**
@@ -781,14 +829,15 @@ async function destinationCalendar(calendarId: string) {
  * here reaches the account the calendar belongs to and, through it, every other
  * device and every other app the user opens that account in.
  *
- * The guests are not written, and neither is the app's own list of reminders
- * kept apart: the alarms travel with the event, so it is the calendar it now
- * lives in that announces it.
+ * The app's own list of reminders is not kept apart: the alarms travel with the
+ * event, so it is the calendar it now lives in that announces it. The guests
+ * travel with it too, and that is what sends the invitations out; `inviteGuests`
+ * says how.
  *
  * Precondition: `calendarId` names a calendar that is not `readOnly`, which is
- * what the form offers. Postcondition: returns false when the system does not
- * know that calendar or refuses the write, and nothing is created. The new
- * event only shows up in the app after the next read.
+ * what the form offers. Postcondition: `created` is false when the system does
+ * not know that calendar or refuses the write, and then nothing at all was
+ * created. The new event only shows up in the app after the next read.
  *
  * @param calendarId Id of the destination calendar in the app's model.
  * @param draft Event the form built.
@@ -796,12 +845,12 @@ async function destinationCalendar(calendarId: string) {
 export async function createDeviceEvent(
   calendarId: string,
   draft: DeviceEventDraft,
-) {
+): Promise<DeviceCreateResult> {
   const calendar = await destinationCalendar(calendarId);
-  if (!calendar) return false;
+  if (!calendar) return { created: false, guestsFailed: false };
 
   try {
-    await calendar.createEvent({
+    const event = await calendar.createEvent({
       title: draft.title,
       notes: draft.description,
       location: draft.location,
@@ -812,11 +861,64 @@ export async function createDeviceEvent(
       recurrenceRule: toRecurrenceRule(draft.repeat, draft.weekdays),
       alarms: draft.reminders.map(toAlarm),
     });
-    return true;
+
+    const guestsFailed = await inviteGuests(event, calendar, draft.guests);
+    return { created: true, guestsFailed };
   } catch (error) {
     console.warn('No se pudo crear el evento en el calendario', error);
-    return false;
+    return { created: false, guestsFailed: false };
   }
+}
+
+/**
+ * Adds the guests to an event that has just been created.
+ *
+ * Nothing is sent from here: the guest is written into the calendar, and it is
+ * the account syncing it that turns that into an invitation and mails it. Which
+ * is why it only works where the account takes attendees at all, and why the
+ * form does not offer guests anywhere else.
+ *
+ * They are written one at a time and on purpose: each one is a separate write,
+ * and one address the system refuses should not take the rest of the list with
+ * it. The event is already created by this point, so a failure here is reported
+ * rather than undone.
+ *
+ * Postcondition: returns true when at least one guest could not be added, which
+ * includes a calendar that takes none while the list is not empty — the event
+ * happens either way, and the caller is the one that has to say so. A guest with
+ * no address is not counted: there was nowhere to send anything.
+ *
+ * @param event Event just created, as the device stores it.
+ * @param calendar Calendar it was created in.
+ * @param guests Guests the form built.
+ */
+async function inviteGuests(
+  event: ExpoCalendar.ExpoCalendarEvent,
+  calendar: ExpoCalendar.ExpoCalendar,
+  guests: Guest[],
+) {
+  const invitable = guests.filter((guest) => guest.email);
+  const type = guestType(calendar);
+  if (!type) return invitable.length > 0;
+
+  let failed = false;
+
+  for (const guest of invitable) {
+    try {
+      await event.createAttendee({
+        email: guest.email,
+        name: guest.name,
+        type,
+        role: ExpoCalendar.AttendeeRole.ATTENDEE,
+        status: ExpoCalendar.AttendeeStatus.INVITED,
+      });
+    } catch (error) {
+      failed = true;
+      console.warn(`No se pudo invitar a ${guest.email}`, error);
+    }
+  }
+
+  return failed;
 }
 
 /**

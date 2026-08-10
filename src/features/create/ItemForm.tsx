@@ -9,8 +9,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CalendarPickerSheet } from '@/features/calendars/CalendarPickerSheet';
 import { formatTime } from '@/lib/date';
 import { isWeeklyFrequency } from '@/lib/habits';
+import { looksLikeEmail } from '@/lib/text';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import {
@@ -21,10 +23,9 @@ import {
   space,
   tint,
 } from '@/theme/tokens';
-import { CalendarDot } from '@/ui/CalendarDot';
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
-import { Cta, Divider, OptionRow } from '@/ui/controls';
+import { Cta, Divider } from '@/ui/controls';
 import { TrashIcon, XIcon } from '@/ui/icons';
 import { useDateTimePicker } from '@/ui/pickers';
 import type { ItemKind } from '@/types';
@@ -56,13 +57,6 @@ const CLOSE_SIZE = 30;
 
 /** Delay before scrolling down: gives the new row time to mount. */
 const REVEAL_DELAY_MS = 60;
-
-/**
- * Room the destination calendar list gets before it starts scrolling. A phone
- * with several accounts holds dozens of calendars, and a sheet as tall as the
- * screen stops looking like a sheet.
- */
-const CALENDAR_LIST_MAX_HEIGHT = 320;
 
 /**
  * Form for an event, a task or a habit.
@@ -97,7 +91,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
   const scrollRef = useRef<ScrollView>(null);
   const [guestSheetOpen, setGuestSheetOpen] = useState(false);
   const [calendarSheetOpen, setCalendarSheetOpen] = useState(false);
-  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   /**
@@ -112,8 +106,8 @@ export function ItemForm({ editing }: { editing?: Editing }) {
   };
 
   const confirmGuest = () => {
-    form.event.addGuest(guestName.trim());
-    setGuestName('');
+    form.event.addGuest(guestEmail.trim());
+    setGuestEmail('');
     setGuestSheetOpen(false);
   };
 
@@ -246,40 +240,26 @@ export function ItemForm({ editing }: { editing?: Editing }) {
         <Field
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="nombre o correo"
-          value={guestName}
-          onChangeText={setGuestName}
+          placeholder="correo del invitado"
+          value={guestEmail}
+          onChangeText={setGuestEmail}
         />
         <Cta
           primary
-          disabled={!guestName.trim()}
+          disabled={!looksLikeEmail(guestEmail)}
           label="INVITAR"
           onPress={confirmGuest}
         />
       </Sheet>
 
-      <Sheet
+      <CalendarPickerSheet
         open={calendarSheetOpen}
+        title="Calendario del evento"
+        options={form.calendarOptions}
+        selectedId={form.event.calendarId}
+        onSelect={form.event.setCalendarId}
         onClose={() => setCalendarSheetOpen(false)}
-        title="Calendario del evento">
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={styles.calendarList}>
-          {form.calendarOptions.map((calendar) => (
-            <OptionRow
-              key={calendar.id}
-              label={calendar.name}
-              hint={calendar.hint}
-              leading={<CalendarDot color={calendar.dotColor} />}
-              selected={form.event.calendarId === calendar.id}
-              onPress={() => {
-                form.event.setCalendarId(calendar.id);
-                setCalendarSheetOpen(false);
-              }}
-            />
-          ))}
-        </ScrollView>
-      </Sheet>
+      />
 
       <Sheet
         open={confirmDelete}
@@ -436,7 +416,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 4,
   },
-  calendarList: { maxHeight: CALENDAR_LIST_MAX_HEIGHT },
   confirmText: {
     fontSize: 12,
     lineHeight: 18,

@@ -49,9 +49,10 @@ type EventBlocksProps = {
  *
  * Three things follow the destination calendar. The repeat rules offered are the
  * ones that calendar can hold, so choosing one of the device may leave fewer
- * chips; where the guest list cannot be touched, the button to add one is
- * replaced by the line saying why; and the visibility row disappears on an event
- * of the device, which is the one place a save cannot carry it.
+ * chips; the INVITAR box always closes with a line saying where the guests end
+ * up, and drops the button to add one where they cannot be touched; and the
+ * visibility row disappears on an event of the device, which is the one place a
+ * save cannot carry it.
  */
 export function EventBlocks({
   form,
@@ -205,15 +206,15 @@ export function EventBlocks({
           </View>
         ) : null}
 
-        {event.guestsNote ? (
-          <AppText style={styles.guestNote}>{event.guestsNote}</AppText>
-        ) : (
+        {event.guestsReadOnly ? null : (
           <DashedButton
             label="AÑADIR INVITADO"
             icon={<UserPlusIcon size={13} color={color.textMuted} />}
             onPress={onAddGuest}
           />
         )}
+
+        <AppText style={styles.guestNote}>{event.guestsNote}</AppText>
       </FormBlock>
     </>
   );

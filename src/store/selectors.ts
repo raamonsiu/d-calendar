@@ -8,13 +8,87 @@ import {
   isSameDay,
   startOfDay,
 } from '@/lib/date';
-import type { CalEvent, Calendar, Task } from '@/types';
+import type { Account, CalEvent, Calendar, Task } from '@/types';
 
 /**
  * Queries over the state. They are pure functions and live outside the store so
  * each screen can memoise them with `useMemo`: the store keeps the data, the
  * selectors decide what is shown.
  */
+
+/** A calendar as the destination pickers draw it. */
+export type CalendarOption = {
+  id: string;
+  name: string;
+  dotColor: string | null;
+  /** Second line: the account it hangs from, or who shared it. */
+  hint: string;
+};
+
+/**
+ * Calendars an item can be saved to: neither a subscription nor the tasks one,
+ * nor one of the device the system keeps under lock.
+ *
+ * Postcondition: keeps the original order and does not modify the input list.
+ *
+ * @param calendars Every calendar in the store.
+ */
+export function writableCalendars(calendars: Calendar[]) {
+  return calendars.filter(
+    (calendar) => !calendar.readOnly && calendar.kind !== 'TAREAS',
+  );
+}
+
+/**
+ * Second line of a calendar in a destination list.
+ *
+ * Postcondition: never empty, so every row in the list has the same two lines.
+ *
+ * @param calendar Calendar being offered.
+ * @param accounts Every account in the store, the device's among them.
+ */
+function calendarHint(calendar: Calendar, accounts: Account[]) {
+  if (calendar.sharedBy) return `Compartido por ${calendar.sharedBy}`;
+
+  const account = accounts.find(
+    (candidate) => candidate.id === calendar.accountId,
+  );
+  return account ? account.email : 'En esta app';
+}
+
+/**
+ * What a destination picker offers: the calendars that can be written to, plus
+ * the one in use when that is not one of them, so an item living in somebody
+ * else's calendar still shows where it is instead of nowhere.
+ *
+ * Each option carries the line that tells it apart, because with several
+ * accounts on the phone the names repeat and "Trabajo" on its own does not say
+ * where the item would land.
+ *
+ * Postcondition: the calendar in use is always in the list, and first when it
+ * is not one of the writable ones.
+ *
+ * @param calendars Every calendar in the store.
+ * @param accounts Every account in the store.
+ * @param currentId Id of the calendar in use.
+ */
+export function calendarOptions(
+  calendars: Calendar[],
+  accounts: Account[],
+  currentId: string,
+): CalendarOption[] {
+  const writable = writableCalendars(calendars);
+  const current = calendars.find((calendar) => calendar.id === currentId);
+  const offered =
+    !current || writable.includes(current) ? writable : [current, ...writable];
+
+  return offered.map((calendar) => ({
+    id: calendar.id,
+    name: calendar.name,
+    dotColor: calendar.dotColor,
+    hint: calendarHint(calendar, accounts),
+  }));
+}
 
 /** Ids of the calendars checked in the side menu. */
 const visibleCalendarIds = (calendars: Calendar[]) =>

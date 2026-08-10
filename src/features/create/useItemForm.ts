@@ -13,15 +13,15 @@ import {
   deleteDeviceEvent,
   readDeviceGuests,
   updateDeviceEvent,
+  type DeviceCreateResult,
 } from '@/services/deviceCalendars';
+import { calendarOptions, writableCalendars } from '@/store/selectors';
 import { createId, useAppStore } from '@/store/useAppStore';
 import { usePrefs } from '@/theme/prefs';
 import { useToast } from '@/ui/Toast';
 import type {
-  Account,
   Availability,
   CalEvent,
-  Calendar,
   Guest,
   Habit,
   HabitFrequency,
@@ -101,21 +101,69 @@ function nextSlot() {
 }
 
 /**
- * Second line of a calendar in the destination list: the account it belongs to,
- * who shared it, or that it is one of the app's own.
+ * What the guest list of an event can do, and the line explaining it.
  *
- * Postcondition: never empty, so every row in the list has the same two lines.
+ * There are four answers and each one is a different promise, so they are
+ * decided here rather than woven through the interface. An event that came from
+ * the device or from a subscription shows the guests it already has and sends
+ * them nowhere else. A calendar of the device that takes attendees really does
+ * invite: the account syncing it mails them. One that does not take them is not
+ * offered a guest list at all, because writing one would leave the guest on the
+ * phone. And a calendar of the app keeps the guest as a note, which is the one
+ * case worth saying out loud.
  *
- * @param calendar Calendar being offered.
- * @param accounts Accounts in the store, the device's among them.
+ * Postcondition: `note` is never null, so the block always says what will
+ * happen.
+ *
+ * @param where Whether the event being edited came from outside the app,
+ * whether the destination is a calendar of the device, and whether that calendar
+ * takes guests; see `Calendar.canInvite`.
  */
-function calendarHint(calendar: Calendar, accounts: Account[]) {
-  if (calendar.sharedBy) return `Compartido por ${calendar.sharedBy}`;
+function guestRule(where: {
+  foreign: boolean;
+  onDevice: boolean;
+  canInvite: boolean;
+}) {
+  const { foreign, onDevice, canInvite } = where;
 
-  const account = accounts.find(
-    (candidate) => candidate.id === calendar.accountId,
-  );
-  return account ? account.email : 'En esta app';
+  if (foreign) {
+    return {
+      readOnly: true,
+      note: 'Los invitados vienen del calendario y se cambian allí.',
+    };
+  }
+  if (!onDevice) {
+    return {
+      readOnly: false,
+      note: 'En un calendario de la app el invitado queda apuntado, pero no se le envía nada.',
+    };
+  }
+  if (!canInvite) {
+    return {
+      readOnly: true,
+      note: 'Este calendario no admite invitados desde la app.',
+    };
+  }
+  return {
+    readOnly: false,
+    note: 'La invitación la envía la cuenta de este calendario.',
+  };
+}
+
+/**
+ * What the toast says after creating an event in a calendar of the device.
+ *
+ * A create that went through with a guest left out gets said out loud: the
+ * event exists, so reporting a plain failure would be wrong, and reporting a
+ * plain success would have the user believing somebody was invited who was not.
+ *
+ * @param result How the create went.
+ * @param moved Whether the event was moved out of a calendar of the app.
+ */
+function createdMessage(result: DeviceCreateResult, moved: boolean) {
+  if (!result.created) return 'No se pudo crear el evento';
+  if (result.guestsFailed) return 'Evento creado, pero faltan invitados';
+  return moved ? 'Evento movido' : 'Evento creado';
 }
 
 /**
@@ -240,17 +288,7 @@ export function useItemForm(editing?: Editing) {
     ],
   );
 
-  /**
-   * Calendars that can be written to: neither subscriptions nor the tasks one,
-   * nor the ones of the device the system keeps under lock.
-   */
-  const writableCalendars = useMemo(
-    () =>
-      calendars.filter(
-        (calendar) => !calendar.readOnly && calendar.kind !== 'TAREAS',
-      ),
-    [calendars],
-  );
+  const writable = useMemo(() => writableCalendars(calendars), [calendars]);
 
   /**
    * Calendar the item is saved to.
@@ -262,41 +300,22 @@ export function useItemForm(editing?: Editing) {
    * checked in the side menu.
    */
   const targetCalendarId =
-    editing || writableCalendars.some((calendar) => calendar.id === calendarId)
+    editing || writable.some((calendar) => calendar.id === calendarId)
       ? calendarId
-      : (writableCalendars[0]?.id ?? calendarId);
+      : (writable[0]?.id ?? calendarId);
 
-  /**
-   * What the destination list offers: the calendars that can be written to,
-   * plus the one the item already lives in when that is not one of them, so an
-   * event of somebody else's calendar still shows where it is instead of
-   * nowhere.
-   *
-   * Each one carries the line that tells it apart, because with several accounts
-   * on the phone the names repeat and "Trabajo" alone does not say where an
-   * event would land.
-   */
-  const calendarOptions = useMemo(() => {
-    const current = calendars.find(
-      (calendar) => calendar.id === targetCalendarId,
-    );
-    const offered =
-      !current || writableCalendars.includes(current)
-        ? writableCalendars
-        : [current, ...writableCalendars];
+  const destinations = useMemo(
+    () => calendarOptions(calendars, accounts, targetCalendarId),
+    [accounts, calendars, targetCalendarId],
+  );
 
-    return offered.map((calendar) => ({
-      id: calendar.id,
-      name: calendar.name,
-      dotColor: calendar.dotColor,
-      hint: calendarHint(calendar, accounts),
-    }));
-  }, [accounts, calendars, writableCalendars, targetCalendarId]);
-
-  const selectedCalendar = calendarOptions.find(
+  const selectedCalendar = destinations.find(
     (option) => option.id === targetCalendarId,
   );
 
+  const targetCalendar = calendars.find(
+    (calendar) => calendar.id === targetCalendarId,
+  );
   const isDeviceTarget = isDeviceId(targetCalendarId);
 
   /**
@@ -313,19 +332,11 @@ export function useItemForm(editing?: Editing) {
     }
   };
 
-  /**
-   * Why the guest list cannot be touched, or null when it can.
-   *
-   * The app writes no attendees to the device: what it could write there stays
-   * on the phone and invites nobody, so it would look like the guest was told
-   * when nothing was sent.
-   */
-  const guestsNote =
-    isDeviceEvent || isSubscribedEvent
-      ? 'Los invitados vienen del calendario y se cambian allí.'
-      : isDeviceTarget
-        ? 'La app no puede invitar a nadie en un calendario del dispositivo.'
-        : null;
+  const guestRules = guestRule({
+    foreign: isDeviceEvent || isSubscribedEvent,
+    onDevice: isDeviceTarget,
+    canInvite: !!targetCalendar?.canInvite,
+  });
 
   /** The next five months plus "Sin mes". */
   const monthOptions = useMemo(() => {
@@ -412,7 +423,8 @@ export function useItemForm(editing?: Editing) {
    *
    * This is the one thing the app makes that leaves the phone: it lands in the
    * account the calendar belongs to and turns up in every other device and app
-   * signed into it.
+   * signed into it. The guests leave with it, and the account is the one that
+   * mails them the invitation.
    *
    * Moving an event of the app to a calendar of the device is a create plus a
    * delete, because the two live in different places and there is nothing to
@@ -429,21 +441,15 @@ export function useItemForm(editing?: Editing) {
   ) => {
     close();
 
-    createDeviceEvent(payload.calendarId, payload).then((created) => {
+    createDeviceEvent(payload.calendarId, payload).then((result) => {
       const store = useAppStore.getState();
 
-      if (created) {
+      if (result.created) {
         if (movedFrom) store.removeItem('event', movedFrom);
         store.refresh();
       }
 
-      toast.show(
-        !created
-          ? 'No se pudo crear el evento'
-          : movedFrom
-            ? 'Evento movido'
-            : 'Evento creado',
-      );
+      toast.show(createdMessage(result, movedFrom !== null));
     });
   };
 
@@ -551,8 +557,8 @@ export function useItemForm(editing?: Editing) {
     save,
     remove,
     close,
-    calendarOptions,
-    /** The chosen one, for the button that opens the list. */
+    /** What the destination picker offers, and the chosen one for its button. */
+    calendarOptions: destinations,
     selectedCalendar,
 
     event: {
@@ -586,19 +592,24 @@ export function useItemForm(editing?: Editing) {
       visibilityShown: !isDeviceEvent && !isSubscribedEvent,
       guests,
       /**
-       * The guest list is shown but not touched whenever the event lives, or is
-       * about to live, in a calendar of the device: letting it be edited would
-       * throw the change away without saying so. `guestsNote` says why.
+       * Whether the list can be added to, and the line under it saying what
+       * happens with what is in it. Both come from `guestRule`.
        */
-      guestsReadOnly: guestsNote !== null,
-      guestsNote,
-      addGuest: (name: string) =>
+      guestsReadOnly: guestRules.readOnly,
+      guestsNote: guestRules.note,
+      addGuest: (email: string) =>
         setGuests((current) => [
           ...current,
           {
             id: createId('g'),
-            name,
-            initial: avatarInitial(name),
+            /**
+             * The address doubles as the name: an invitation is sent to an
+             * address, and whoever receives it is not in the phone's contacts
+             * for the app to look a name up in.
+             */
+            name: email,
+            email,
+            initial: avatarInitial(email),
             state: 'PENDIENTE',
           },
         ]),

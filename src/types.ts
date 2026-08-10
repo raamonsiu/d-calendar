@@ -43,8 +43,16 @@ export type Calendar = {
    */
   sharedBy?: string;
   /**
+   * Whether an event created here can carry guests that really get invited.
+   *
+   * Only a calendar of the device can, and only when the account syncing it
+   * takes attendees: writing one into a calendar that does not would leave the
+   * guest sitting on the phone, told nothing.
+   */
+  canInvite?: boolean;
+  /**
    * Where a subscribed calendar is downloaded from. Only subscriptions carry
-   * one, and for now it is only kept: nothing downloads it yet.
+   * one, and it is what gets downloaded again on every refresh.
    */
   url?: string;
 };
@@ -67,6 +75,11 @@ export type GuestState = 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO';
 export type Guest = {
   id: string;
   name: string;
+  /**
+   * Address the invitation is sent to. Empty on a guest of a calendar that
+   * invites nobody, which is the only case where a guest is just a name.
+   */
+  email: string;
   initial: string;
   state: GuestState;
 };

@@ -25,9 +25,11 @@ import {
   AddSourceSheet,
   type SourceMode,
 } from '@/features/calendars/AddSourceSheet';
+import { CalendarPickerSheet } from '@/features/calendars/CalendarPickerSheet';
 import { DeviceCalendarsGroup } from '@/features/settings/DeviceCalendarsGroup';
 import { groupRadius } from '@/lib/groupRadius';
 import { countLabel } from '@/lib/text';
+import { calendarOptions } from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
@@ -41,6 +43,7 @@ import { useToast } from '@/ui/Toast';
 import { GroupRow, OptionRow } from '@/ui/controls';
 import {
   ArrowUpRightIcon,
+  CaretDownIcon,
   DotsThreeVerticalIcon,
   GearSixIcon,
   LinkIcon,
@@ -87,15 +90,13 @@ export default function CalendarsScreen() {
   const [sourceMode, setSourceMode] = useState<SourceMode | null>(null);
 
   /**
-   * What can be a destination: the app's own calendars and the ones of the
-   * device the system lets it write to, never a subscription or the tasks one.
+   * What can be a destination, in the same list the Crear form draws: the app's
+   * own calendars and the ones of the device the system lets it write to, never
+   * a subscription or the tasks one.
    */
-  const writableCalendars = useMemo(
-    () =>
-      calendars.filter(
-        (calendar) => !calendar.readOnly && calendar.kind !== 'TAREAS',
-      ),
-    [calendars],
+  const destinations = useMemo(
+    () => calendarOptions(calendars, accounts, prefs.defaultCalendarId),
+    [accounts, calendars, prefs.defaultCalendarId],
   );
 
   /**
@@ -141,24 +142,14 @@ export default function CalendarsScreen() {
       title="Calendarios"
       overlays={
         <>
-          <Sheet
+          <CalendarPickerSheet
             open={defaultSheetOpen}
+            title="Calendario por defecto"
+            options={destinations}
+            selectedId={prefs.defaultCalendarId}
+            onSelect={(id) => prefs.setPreference('defaultCalendarId', id)}
             onClose={() => setDefaultSheetOpen(false)}
-            title="Calendario por defecto">
-            <View style={styles.options}>
-              {writableCalendars.map((calendar) => (
-                <OptionRow
-                  key={calendar.id}
-                  label={calendar.name}
-                  selected={prefs.defaultCalendarId === calendar.id}
-                  onPress={() => {
-                    prefs.setPreference('defaultCalendarId', calendar.id);
-                    setDefaultSheetOpen(false);
-                  }}
-                />
-              ))}
-            </View>
-          </Sheet>
+          />
 
           <Sheet
             open={!!accountSheetId}
@@ -219,9 +210,10 @@ export default function CalendarsScreen() {
           index={0}
           count={1}
           label={defaultCalendar?.name ?? 'Sin calendario'}
-          value="CAMBIAR"
           onPress={() => setDefaultSheetOpen(true)}
           icon={<CalendarDot color={defaultCalendar?.dotColor ?? null} />}
+          caret={false}
+          right={<CaretDownIcon size={11} color={color.caret} />}
         />
       </Group>
 
