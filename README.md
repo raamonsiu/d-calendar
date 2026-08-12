@@ -31,6 +31,8 @@ laid out for 412×892, so Android is the reference.
 | `/help` | Help and feedback |
 | `/help/[slug]` | Help article |
 | `/about` | About the app and the developer |
+| `/legal/[slug]` | Privacy policy and terms of use |
+| `/legal/licenses` | Open source licences |
 
 ## Data status
 

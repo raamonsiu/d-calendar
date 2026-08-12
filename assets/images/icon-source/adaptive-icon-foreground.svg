@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="D-Calendar foreground">
+  <g transform="translate(512 512) scale(0.75) translate(-512 -512)">
+    <rect x="225" y="266" width="574" height="532" rx="143" fill="none" stroke="#f4f1f7" stroke-width="72"></rect>
+    <rect x="225" y="410" width="574" height="72" fill="#f4f1f7"></rect>
+    <rect x="348" y="174" width="61" height="164" rx="31" fill="#f4f1f7"></rect>
+    <rect x="614" y="174" width="61" height="164" rx="31" fill="#f4f1f7"></rect>
+    <circle cx="512" cy="625" r="82" fill="#c4a8e0"></circle>
+  </g>
+</svg>

@@ -3,16 +3,23 @@
  *
  * How you get here: from the Home side menu.
  *
- * Where it leads: nowhere inside the app; the changelog opens in a bottom
- * sheet. The developer links open in the system browser through `expo-linking`.
+ * Where it leads: to `/legal/privacidad`, `/legal/terminos` and
+ * `/legal/licenses`; the changelog opens in a bottom sheet instead, since it
+ * is short enough not to need a screen of its own. The developer links open
+ * in the system browser through `expo-linking`.
  *
- * Mock: the privacy, licences, rate and share rows show a toast saying they
- * will arrive once the app is published.
+ * Mock: rating and sharing show a toast saying they will arrive once the app
+ * is published — there is nowhere to rate or a link to share before that.
+ * The hero's icon is `assets/images/icon.png`, the same file `app.json`
+ * points the launcher to, so the two stay in sync whenever that file changes.
  */
+import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { LICENSES } from '@/data/licenses';
 import { APP_BUILD, APP_VERSION, RELEASES } from '@/data/releases';
 import { groupRadius } from '@/lib/groupRadius';
 import { AppText } from '@/theme/Text';
@@ -43,22 +50,19 @@ import {
 const DEV_LINKS: { label: string; handle: string; url: string; Logo: Icon }[] = [
   {
     label: 'GitHub',
-    handle: 'github.com/d1ito',
-    url: 'https://github.com/d1ito',
+    handle: 'github.com/raamonsiu',
+    url: 'https://github.com/raamonsiu',
     Logo: GithubLogoIcon,
   },
   {
     label: 'LinkedIn',
-    handle: 'in/d1ito',
-    url: 'https://www.linkedin.com/in/d1ito',
+    handle: 'in/ramon-lopez-cros',
+    url: 'https://www.linkedin.com/in/ramon-lopez-cros',
     Logo: LinkedinLogoIcon,
   },
 ];
 
 const COFFEE_URL = 'https://buymeacoffee.com/d1ito';
-
-/** How many open source dependencies the app declares. */
-const LICENSE_COUNT = '14';
 
 /**
  * Maximum height of the changelog sheet, so it never covers the whole screen.
@@ -93,18 +97,18 @@ export default function AboutScreen() {
     {
       label: 'Política de privacidad',
       Logo: ShieldCheckIcon,
-      onPress: pending('Pendiente de publicar'),
+      onPress: () => router.push('/legal/privacidad'),
     },
     {
       label: 'Términos de uso',
       Logo: ScrollIcon,
-      onPress: pending('Pendiente de publicar'),
+      onPress: () => router.push('/legal/terminos'),
     },
     {
       label: 'Licencias de código abierto',
-      meta: LICENSE_COUNT,
+      meta: String(LICENSES.length),
       Logo: CodeIcon,
-      onPress: pending('Pendiente de publicar'),
+      onPress: () => router.push('/legal/licenses'),
     },
     {
       label: 'Valorar en Google Play',
@@ -155,11 +159,11 @@ export default function AboutScreen() {
         </Sheet>
       }>
       <View style={styles.hero}>
-        <View style={styles.logo}>
-          <AppText mono style={styles.logoText}>
-            D—C
-          </AppText>
-        </View>
+        <Image
+          source={require('@/assets/images/icon.png')}
+          style={styles.logo}
+          contentFit="cover"
+        />
         <View style={styles.heroBody}>
           <AppText weight={500} style={styles.appName}>
             D-Calendar
@@ -286,10 +290,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.sunken,
     borderWidth: 1,
     borderColor: color.border,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  logoText: { fontSize: 19, letterSpacing: -1 },
   heroBody: { flex: 1, gap: 5 },
   appName: { fontSize: 20, letterSpacing: -0.4 },
   tagline: { fontSize: 11.5, lineHeight: 16, color: color.textMuted },

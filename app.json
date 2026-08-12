@@ -2,20 +2,19 @@
   "expo": {
     "name": "D-Calendar",
     "slug": "NCALENDAR",
-    "version": "1.4.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dcalendar",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0a0a0b",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0a0a0b",
+        "backgroundColor": "#4E1F6E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -33,15 +32,16 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0a0a0b",
+          "backgroundColor": "#4E1F6E",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 200
         }
       ],
       [
         "expo-notifications",
         {
-          "color": "#e5252f"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#4E1F6E"
         }
       ],
       [

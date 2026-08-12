@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="96" height="96" role="img" aria-label="D-Calendar notification">
+  <rect x="225" y="266" width="574" height="532" rx="143" fill="none" stroke="#ffffff" stroke-width="72"></rect>
+  <rect x="225" y="410" width="574" height="72" fill="#ffffff"></rect>
+  <rect x="348" y="174" width="61" height="164" rx="31" fill="#ffffff"></rect>
+  <rect x="614" y="174" width="61" height="164" rx="31" fill="#ffffff"></rect>
+  <circle cx="512" cy="625" r="82" fill="#ffffff"></circle>
+</svg>
