@@ -108,6 +108,16 @@ export type CalEvent = {
   weekdays: number[];
   guests: Guest[];
   reminders: RelativeReminder[];
+  /**
+   * One occurrence of a repeating event of the device.
+   *
+   * It is not `repeat`, and cannot be: the system hands over a repetition
+   * already expanded into one event per day, and the real rule is often one the
+   * app's four values cannot say. So `repeat` stays 'No' — this is a day in a
+   * calendar — and this flag carries the only thing that matters afterwards,
+   * which is that saving or deleting it has to ask what it applies to.
+   */
+  repeats?: boolean;
 };
 
 export type Task = {

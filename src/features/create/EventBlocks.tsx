@@ -47,6 +47,10 @@ type EventBlocksProps = {
  * weekday row only shows up with the "Días de la semana" repeat rule, and the
  * guest list only when there is at least one guest.
  *
+ * On one occurrence of a repetition of the device the box closes with a line
+ * saying so, and FIN dims the same way: the length of a repetition is not the
+ * app's to change, and it follows INICIO instead of being chosen.
+ *
  * Three things follow the destination calendar. The repeat rules offered are the
  * ones that calendar can hold, so choosing one of the device may leave fewer
  * chips; the INVITAR box always closes with a line saying where the guests end
@@ -63,8 +67,18 @@ export function EventBlocks({
   const { event } = form;
 
   const bounds = [
-    { label: 'INICIO', value: event.startsAt, setValue: event.setStartsAt },
-    { label: 'FIN', value: event.endsAt, setValue: event.setEndsAt },
+    {
+      label: 'INICIO',
+      value: event.startsAt,
+      setValue: event.setStartsAt,
+      locked: false,
+    },
+    {
+      label: 'FIN',
+      value: event.endsAt,
+      setValue: event.setEndsAt,
+      locked: event.endLocked,
+    },
   ];
 
   return (
@@ -80,24 +94,26 @@ export function EventBlocks({
           />
         }>
         <View style={styles.rows}>
-          {bounds.map(({ label, value, setValue }) => (
+          {bounds.map(({ label, value, setValue, locked }) => (
             <FieldRow key={label} label={label}>
               <ControlButton
                 grow
+                muted={locked}
                 label={formatLongDate(value)}
-                onPress={() =>
+                onPress={() => {
+                  if (locked) return;
                   picker.open('date', value, (picked) =>
                     setValue(withTime(picked, value)),
-                  )
-                }
+                  );
+                }}
               />
               <ControlButton
                 center
                 width={TIME_WIDTH}
-                muted={event.allDay}
+                muted={event.allDay || locked}
                 label={event.allDay ? '—' : formatTime(value)}
                 onPress={() => {
-                  if (event.allDay) return;
+                  if (event.allDay || locked) return;
                   picker.open('time', value, (picked) =>
                     setValue(withTime(value, picked)),
                   );
@@ -107,26 +123,32 @@ export function EventBlocks({
           ))}
         </View>
 
-        <View style={styles.rows}>
-          <Label>Repetir</Label>
-          <ChipWrap>
-            {event.repeatOptions.map((option) => (
-              <Chip
-                key={option}
-                height={29}
-                label={option}
-                selected={event.repeat === option}
-                onPress={() => event.setRepeat(option)}
+        {event.seriesNote ? (
+          <AppText style={styles.seriesNote}>{event.seriesNote}</AppText>
+        ) : null}
+
+        {event.repeatShown ? (
+          <View style={styles.rows}>
+            <Label>Repetir</Label>
+            <ChipWrap>
+              {event.repeatOptions.map((option) => (
+                <Chip
+                  key={option}
+                  height={29}
+                  label={option}
+                  selected={event.repeat === option}
+                  onPress={() => event.setRepeat(option)}
+                />
+              ))}
+            </ChipWrap>
+            {event.repeat === 'Días de la semana' ? (
+              <WeekdayChips
+                selected={event.weekdays}
+                onToggle={event.toggleWeekday}
               />
-            ))}
-          </ChipWrap>
-          {event.repeat === 'Días de la semana' ? (
-            <WeekdayChips
-              selected={event.weekdays}
-              onToggle={event.toggleWeekday}
-            />
-          ) : null}
-        </View>
+            ) : null}
+          </View>
+        ) : null}
       </FormBlock>
 
       <FormBlock title="UBICACIÓN">
@@ -229,6 +251,7 @@ const styles = StyleSheet.create({
   guestName: { flex: 1, fontSize: 12.5, color: color.textSoft },
   guestState: { fontSize: 9, letterSpacing: 1.1, color: color.labelDim },
   guestNote: { fontSize: 11, lineHeight: 16, color: color.textMuted },
+  seriesNote: { fontSize: 11, lineHeight: 16, color: color.textMuted },
   removeGuest: {
     width: 26,
     height: 30,

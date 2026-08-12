@@ -25,6 +25,7 @@ import {
   accountOf,
   calendarDedupeKey,
   calendarPreference,
+  isAnotherPerson,
   placeCalendar,
   providerOf,
   type CalendarOrigin,
@@ -198,10 +199,11 @@ function toAppEvent(event: ExpoCalendar.ExpoCalendarEvent): CalEvent {
     /**
      * The system was asked for a date range and answered with the occurrences
      * already separated, so each one is an event that happens once. Whether it
-     * belongs to a series is `recurrenceRule`, which the app reads to refuse to
-     * edit it rather than to draw it.
+     * belongs to a series is `repeats` below, which decides what a save or a
+     * delete has to ask, not how the event is drawn.
      */
     repeat: 'No',
+    repeats: !!event.recurrenceRule,
     weekdays: [],
     /**
      * Guests are not here: the system only hands them over one event at a time,
@@ -635,16 +637,25 @@ export async function readDeviceCalendarData(
   editableEvents.clear();
 
   const events: CalEvent[] = [];
+  const lockedBy = new Map<string, number>();
+
   for (const { calendar, events: deviceEvents } of eventsByCalendar) {
     for (const deviceEvent of deviceEvents) {
       const event = toAppEvent(deviceEvent);
       readEvents.set(event.id, deviceEvent);
+
       if (isEditable(deviceEvent, calendar, ownAccounts)) {
         editableEvents.add(event.id);
+      } else {
+        const reason = deviceEvent.organizerEmail || `calendario ${calendar.title}`;
+        lockedBy.set(reason, (lockedBy.get(reason) ?? 0) + 1);
       }
+
       events.push(event);
     }
   }
+
+  logLockedEvents(lockedBy);
 
   logPlacements(
     deviceCalendars,
@@ -717,6 +728,25 @@ function logPlacements(
 }
 
 /**
+ * Writes out who is holding events read only, while developing only.
+ *
+ * An event that cannot be edited when it ought to be is nearly impossible to
+ * work out from the interface: the form says the same thing whatever the reason.
+ * This is the reason, grouped, one line per organiser. An address of the user's
+ * own turning up here is the bug; a colleague's is the feature.
+ *
+ * @param lockedBy How many events each organiser, or each calendar with no
+ * organiser, left read only.
+ */
+function logLockedEvents(lockedBy: ReadonlyMap<string, number>) {
+  if (!__DEV__ || lockedBy.size === 0) return;
+
+  for (const [reason, count] of lockedBy) {
+    console.log(`[solo lectura] ${count} eventos | ${reason}`);
+  }
+}
+
+/**
  * Whether an event of the device can be changed from the app.
  *
  * Decided while reading, which is the only moment the accounts of the device
@@ -732,17 +762,19 @@ export const canEditDeviceEvent = (id: string) => editableEvents.has(id);
 /**
  * Whether the user may change an event of the device.
  *
- * Three things have to hold, and the first is the one that matters: **the event
+ * Two things have to hold, and the first is the one that matters: **the event
  * has to be theirs**. Being in a calendar of theirs is not the same thing — a
  * colleague's invitation lands in their own calendar and is still the
- * colleague's event — so what decides it is who organises it. An event with no
- * organiser is nobody else's, and counts as theirs.
+ * colleague's event — so what decides it is who organises it, and the question
+ * is `isAnotherPerson`, not whether the address is one of the accounts. An
+ * organiser that is missing, or that is a provider's identifier rather than
+ * somebody, is nobody else: every event of a secondary Google calendar is
+ * organised by the calendar's own `@group.calendar.google.com` address, and
+ * reading that as a person locks the user out of their own events.
  *
- * Then the system has to allow writing to the calendar at all, and the event
- * must not belong to a series: a repetition arrives already expanded into one
- * occurrence per day, and saving one of them would leave it unclear, to the
- * user and to the system, whether the change is for that day or for all of
- * them.
+ * Then the system has to allow writing to the calendar at all. Belonging to a
+ * series no longer stops it: what a save or a delete reaches is asked before it
+ * happens, and `SeriesScope` is the answer.
  *
  * @param event Event as the device stores it.
  * @param calendar Calendar it belongs to.
@@ -753,10 +785,9 @@ function isEditable(
   calendar: ExpoCalendar.ExpoCalendar,
   ownAddresses: ReadonlySet<string>,
 ) {
-  const organiser = (event.organizerEmail ?? '').trim().toLowerCase();
-  const isOwn = !organiser || ownAddresses.has(organiser);
+  const someoneElse = isAnotherPerson(event.organizerEmail ?? '', ownAddresses);
 
-  return isOwn && calendar.allowsModifications && !event.recurrenceRule;
+  return !someoneElse && calendar.allowsModifications;
 }
 
 /** The part of an event the app knows how to write back to the device. */
@@ -921,6 +952,78 @@ async function inviteGuests(
   return failed;
 }
 
+/** Which occurrences of a repeating event a change or a deletion reaches. */
+export type SeriesScope = 'occurrence' | 'series';
+
+/**
+ * Scopes a change to a repeating event can be saved with, which is not the same
+ * on both systems.
+ *
+ * iOS hands the question to EventKit, which knows how to write one occurrence
+ * apart from its series. Android does not: `update` there writes the row the
+ * repetition is defined in, whatever options it is given, and the library
+ * offers no way to record a modified occurrence — only a cancelled one, which
+ * is why deleting can do what saving cannot. So on Android a change to a
+ * repeating event reaches all of it, and rather than draw a choice that is not
+ * one, the form offers the single scope this list holds and says what it means.
+ *
+ * The form reads this the same way it reads `DEVICE_REPEAT_RULES`: what cannot
+ * be written is never asked for.
+ */
+export const DEVICE_EDIT_SCOPES: SeriesScope[] =
+  Platform.OS === 'android' ? ['series'] : ['occurrence', 'series'];
+
+/** Scopes a repeating event can be deleted with. Both work everywhere. */
+export const DEVICE_DELETE_SCOPES: SeriesScope[] = ['occurrence', 'series'];
+
+/**
+ * Whether a repeating event of the device holds its length while it is edited.
+ *
+ * It does on Android, and `updateSeries` says why: the provider keeps the
+ * length of a repetition as a duration, the library only knows how to write
+ * ends, and a row carrying both is one the provider rejects. Moving the whole
+ * series earlier or later is fine, so what the form locks is the end and not
+ * the start. iOS has no such trouble.
+ */
+export const DEVICE_SERIES_KEEPS_LENGTH = Platform.OS === 'android';
+
+/**
+ * When the occurrence being worked on starts, read back out of its id.
+ *
+ * Every occurrence of a series shares one identifier, so `toAppEvent` puts the
+ * start on the end of the app's id to tell them apart. This is that, undone: it
+ * is what says *which* Tuesday is being deleted.
+ *
+ * Postcondition: returns null when the id carries no start, which is every id
+ * this app did not build.
+ *
+ * @param id Id of the event in the app's model.
+ */
+function occurrenceStart(id: string) {
+  const tail = id.slice(id.lastIndexOf(':') + 1);
+  if (!tail || tail.length === id.length) return null;
+
+  const start = Number(tail);
+  return Number.isFinite(start) ? start : null;
+}
+
+/**
+ * An instant in the shape the recurrence options want it, which is not the same
+ * shape on both systems.
+ *
+ * Android stores the field as a string and reads it with `toLong`, so it has to
+ * be the milliseconds written out. iOS parses it with a formatter expecting ISO
+ * 8601 in UTC, which is what `toISOString` produces. Handing either one the
+ * other's format fails, and it fails at the point of writing.
+ *
+ * @param instant When the occurrence starts, in ms.
+ */
+function instanceStartDate(instant: number) {
+  return Platform.OS === 'android'
+    ? String(instant)
+    : new Date(instant).toISOString();
+}
+
 /**
  * Writes the changes of an event back to the calendar it came from.
  *
@@ -928,37 +1031,127 @@ async function inviteGuests(
  * and the model does not — the guests, the repetition — is left exactly as it
  * was instead of being wiped by omission.
  *
- * Precondition: `canEditDeviceEvent` said yes. Postcondition: returns false
+ * Precondition: `canEditDeviceEvent` said yes, and `scope` is one of
+ * `DEVICE_EDIT_SCOPES` when the event repeats. Postcondition: returns false
  * when the event is no longer in the last read or the system refuses the
  * change, and nothing is written.
  *
  * @param id Id of the event in the app's model.
  * @param changes New values for the fields the app owns.
+ * @param scope What the change reaches when the event is part of a series.
  */
 export async function updateDeviceEvent(
   id: string,
   changes: DeviceEventChanges,
+  scope: SeriesScope = 'series',
 ) {
   const event = readEvents.get(id);
   if (!event) return false;
 
   try {
-    await event.update({
-      title: changes.title,
-      notes: changes.description,
-      location: changes.location,
-      allDay: changes.allDay,
-      ...deviceBounds(changes),
-      availability: toDeviceAvailability(changes.availability),
-    });
+    if (event.recurrenceRule) await updateSeries(event, id, changes, scope);
+    else {
+      await event.update({
+        title: changes.title,
+        notes: changes.description,
+        location: changes.location,
+        allDay: changes.allDay,
+        ...deviceBounds(changes),
+        availability: toDeviceAvailability(changes.availability),
+      });
+    }
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('No se pudo guardar el cambio en el calendario', error);
     return false;
   }
 }
 
 /**
+ * Writes a change to an event that repeats.
+ *
+ * On iOS the occurrence is asked for by its start and the span comes with it,
+ * so the system decides what a save touches and the whole change travels.
+ *
+ * On Android there is one row, the one holding the repetition, and writing it
+ * changes every occurrence. Two things follow. The times are not written as
+ * they came: what the form holds is when *this* Tuesday should start, and
+ * putting that on the series would drag it to this Tuesday, so what is written
+ * is the same shift applied to where the series begins. And the end is not
+ * written at all: a repeating event of the provider keeps its length as a
+ * duration rather than as an end, the library only writes ends, and a row with
+ * both is one the provider refuses. Hence the form holding the length still
+ * while a series is being edited — the box says so.
+ *
+ * @param event Occurrence as the device stores it.
+ * @param id Id of the event in the app's model.
+ * @param changes New values for the fields the app owns.
+ * @param scope What the change reaches.
+ */
+async function updateSeries(
+  event: ExpoCalendar.ExpoCalendarEvent,
+  id: string,
+  changes: DeviceEventChanges,
+  scope: SeriesScope,
+) {
+  const texts = {
+    title: changes.title,
+    notes: changes.description,
+    location: changes.location,
+    availability: toDeviceAvailability(changes.availability),
+  };
+
+  if (Platform.OS !== 'android') {
+    const start = occurrenceStart(id) ?? changes.startsAt;
+    const occurrence = event.getOccurrenceSync({
+      instanceStartDate: instanceStartDate(start),
+      futureEvents: scope === 'series',
+    });
+
+    await occurrence.update({
+      ...texts,
+      allDay: changes.allDay,
+      ...deviceBounds(changes),
+    });
+    return;
+  }
+
+  await event.update({ ...texts, ...(await seriesStart(event, id, changes)) });
+}
+
+/**
+ * Where a series has to start once one of its occurrences has been moved.
+ *
+ * Postcondition: returns nothing at all when the occurrence did not move, so an
+ * edit that only touched the title writes no dates and cannot disturb the
+ * repetition.
+ *
+ * @param event Occurrence as the device stores it.
+ * @param id Id of the event in the app's model.
+ * @param changes New values for the fields the app owns.
+ */
+async function seriesStart(
+  event: ExpoCalendar.ExpoCalendarEvent,
+  id: string,
+  changes: DeviceEventChanges,
+) {
+  const start = occurrenceStart(id);
+  if (start === null || changes.startsAt === start || !event.id) return {};
+
+  const series = await ExpoCalendar.ExpoCalendarEvent.get(event.id);
+  const shift = changes.startsAt - start;
+
+  return {
+    startDate: new Date(new Date(series.startDate).getTime() + shift),
+  };
+}
+
+/**
  * Deletes an event from the calendar it came from.
+ *
+ * One occurrence of a series is not removed but cancelled: the system records
+ * an exception on that day, which is what leaves the rest of the repetition
+ * standing. Everything else is a plain delete.
  *
  * Precondition: `canEditDeviceEvent` said yes. Postcondition: returns false
  * when the system refuses, and nothing is deleted. There is no undo: unlike the
@@ -966,16 +1159,32 @@ export async function updateDeviceEvent(
  * syncing that account.
  *
  * @param id Id of the event in the app's model.
+ * @param scope What the deletion reaches when the event is part of a series.
  */
-export async function deleteDeviceEvent(id: string) {
+export async function deleteDeviceEvent(
+  id: string,
+  scope: SeriesScope = 'series',
+) {
   const event = readEvents.get(id);
   if (!event) return false;
 
+  const start = occurrenceStart(id);
+  const single =
+    scope === 'occurrence' && !!event.recurrenceRule && start !== null;
+
   try {
-    await event.delete();
+    const target = single
+      ? event.getOccurrenceSync({
+          instanceStartDate: instanceStartDate(start),
+          futureEvents: false,
+        })
+      : event;
+
+    await target.delete();
     readEvents.delete(id);
     return true;
-  } catch {
+  } catch (error) {
+    console.warn('No se pudo eliminar el evento del calendario', error);
     return false;
   }
 }

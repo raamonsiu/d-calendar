@@ -156,6 +156,32 @@ export function eventCountsByDay(events: CalEvent[]) {
   return counts;
 }
 
+/**
+ * Separates the events of a day into the ones that take the whole day and the
+ * ones that happen at a time.
+ *
+ * An all-day event has no place on an hour grid. Laid out there it runs from
+ * midnight to midnight and covers the day whole, hiding everything that really
+ * does happen at an hour — which is the opposite of what it means, since an
+ * event with no hour is precisely the one that does not occupy any.
+ *
+ * Postcondition: the two lists together hold every event given, in the order
+ * they came in.
+ *
+ * @param events Events of one day.
+ */
+export function splitAllDay(events: CalEvent[]) {
+  const allDay: CalEvent[] = [];
+  const timed: CalEvent[] = [];
+
+  for (const event of events) {
+    if (event.allDay) allDay.push(event);
+    else timed.push(event);
+  }
+
+  return { allDay, timed };
+}
+
 /** An event already placed on the hour rail, which runs left to right. */
 export type LaidOutEvent = {
   event: CalEvent;

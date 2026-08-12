@@ -18,11 +18,12 @@ import {
   startOfDay,
 } from '@/lib/date';
 import { indexOfDay } from '@/lib/layout';
-import { layoutDay } from '@/store/selectors';
+import { layoutDay, splitAllDay } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
+import { AllDayChip, CHIP_GAP } from './AllDayChip';
 import {
   DAY_WIDTH,
   HOUR_WIDTH,
@@ -31,6 +32,16 @@ import {
   hourToLeft,
 } from './hourRail';
 import { useShownIndex } from './useShownIndex';
+
+/**
+ * Chips the all-day band draws before collapsing the rest into a count. Three
+ * is a day with a holiday, a birthday and a trip; past that the band would be
+ * eating the hours it sits on top of.
+ */
+const MAX_ALL_DAY_ROWS = 3;
+
+/** Room between the all-day band and the hour ruler under it. */
+const BAND_GAP = 6;
 
 /** Height of the hour row and of an event card. */
 const RULER_HEIGHT = 16;
@@ -116,9 +127,21 @@ export function TodayTimeline({
     };
   });
 
-  const reportIndex = useShownIndex(opening.index, (index) =>
-    onShowDay(days[index]),
-  );
+  /**
+   * The day the band above the strip is naming. It is kept here as well as
+   * reported upwards because that band is not inside the list: it stays put
+   * while the hours scroll under it, which is the whole point of it.
+   */
+  const [shownIndex, setShownIndex] = useState(opening.index);
+
+  const reportIndex = useShownIndex(opening.index, (index) => {
+    setShownIndex(index);
+    onShowDay(days[index]);
+  });
+
+  const shownAllDay = splitAllDay(
+    eventsByDay.get(dayKey(days[shownIndex])) ?? [],
+  ).allDay;
 
   /**
    * The day being shown is read a third of the way into the strip rather than at
@@ -137,16 +160,35 @@ export function TodayTimeline({
   };
 
   return (
-    <View
-      style={styles.root}
-      onLayout={(event) =>
-        setSize({
-          width: event.nativeEvent.layout.width,
-          height: event.nativeEvent.layout.height,
-        })
-      }>
-      {size.height > 0 ? (
-        <FlatList
+    <View style={styles.root}>
+      {shownAllDay.length > 0 ? (
+        <View style={styles.band}>
+          {shownAllDay.slice(0, MAX_ALL_DAY_ROWS).map((event, index) => {
+            const last = index === MAX_ALL_DAY_ROWS - 1;
+            const hidden = shownAllDay.length - MAX_ALL_DAY_ROWS;
+
+            return (
+              <AllDayChip
+                key={event.id}
+                event={event}
+                extra={last && hidden > 0 ? hidden + 1 : undefined}
+                onPress={onPressEvent}
+              />
+            );
+          })}
+        </View>
+      ) : null}
+
+      <View
+        style={styles.strip}
+        onLayout={(event) =>
+          setSize({
+            width: event.nativeEvent.layout.width,
+            height: event.nativeEvent.layout.height,
+          })
+        }>
+        {size.height > 0 ? (
+          <FlatList
           horizontal
           data={days}
           keyExtractor={dayKey}
@@ -169,10 +211,8 @@ export function TodayTimeline({
           onScroll={onScroll}
           scrollEventThrottle={32}
           renderItem={({ item: day }) => {
-            const laidOut = layoutDay(
-              eventsByDay.get(dayKey(day)) ?? [],
-              HOUR_WIDTH,
-            );
+            const { timed } = splitAllDay(eventsByDay.get(dayKey(day)) ?? []);
+            const laidOut = layoutDay(timed, HOUR_WIDTH);
             const nowLeft = isToday(day)
               ? hourToLeft(decimalHours(new Date()))
               : null;
@@ -237,14 +277,22 @@ export function TodayTimeline({
               </View>
             );
           }}
-        />
-      ) : null}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  /**
+   * The band sits outside the list on purpose: an event with no hour has no
+   * place on the rail, and one drawn inside a tile would scroll away with the
+   * hours. This one stays, and names the day the strip is showing.
+   */
+  band: { gap: CHIP_GAP, marginBottom: BAND_GAP },
+  strip: { flex: 1 },
   tile: { width: DAY_WIDTH },
   canvas: {
     position: 'absolute',

@@ -144,6 +144,34 @@ const isPersonAddress = (address: string) =>
   address.includes('@') && !containsAny(address, INFRASTRUCTURE_DOMAINS);
 
 /**
+ * Whether an address belongs to somebody who is not the user.
+ *
+ * It is the question behind two different decisions — whether a calendar was
+ * shared with them and whether an event is theirs to edit — and it is not the
+ * same as "an address that is not mine". Two of the three ways an address can
+ * fail to be one of theirs mean nothing at all: it may be missing, and it may be
+ * one of the identifiers a provider writes in place of a person, which is what
+ * Google does with every secondary calendar somebody creates. Read as a person,
+ * that identifier turns a calendar of their own into a stranger's, and every
+ * event they put in it into an event they may not touch.
+ *
+ * Postcondition: false for an empty address, so "nobody said" counts as theirs,
+ * which is what an event nobody organises is.
+ *
+ * @param address Address to judge: an owner, an organiser.
+ * @param ownAccounts Accounts the device syncs, which are all the user's.
+ */
+export function isAnotherPerson(
+  address: string,
+  ownAccounts: ReadonlySet<string> = new Set(),
+) {
+  const normalised = normalise(address);
+  return (
+    !!normalised && isPersonAddress(normalised) && !ownAccounts.has(normalised)
+  );
+}
+
+/**
  * Where a calendar of the device belongs.
  *
  * The rule is not "a different owner means shared", because there are three
@@ -182,10 +210,8 @@ export function placeCalendar(
   }
 
   if (!ownerAccount || ownerAccount === accountName) return 'personal';
-  if (!isPersonAddress(ownerAccount)) return 'personal';
-  if (ownAccounts.has(ownerAccount)) return 'personal';
 
-  return 'shared';
+  return isAnotherPerson(ownerAccount, ownAccounts) ? 'shared' : 'personal';
 }
 
 /**

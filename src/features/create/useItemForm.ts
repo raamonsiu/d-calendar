@@ -7,13 +7,17 @@ import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
 import { isDeviceId, isForeignId, isSubscriptionId } from '@/lib/sourceIds';
 import { avatarInitial } from '@/lib/text';
 import {
+  DEVICE_DELETE_SCOPES,
+  DEVICE_EDIT_SCOPES,
   DEVICE_REPEAT_RULES,
+  DEVICE_SERIES_KEEPS_LENGTH,
   canEditDeviceEvent,
   createDeviceEvent,
   deleteDeviceEvent,
   readDeviceGuests,
   updateDeviceEvent,
   type DeviceCreateResult,
+  type SeriesScope,
 } from '@/services/deviceCalendars';
 import { calendarOptions, writableCalendars } from '@/store/selectors';
 import { createId, useAppStore } from '@/store/useAppStore';
@@ -63,6 +67,23 @@ const REPEAT_RULES: RepeatRule[] = [
 
 /** Approximate month label used when the task has no month at all. */
 const NO_MONTH = 'Sin mes';
+
+/**
+ * What the CUÁNDO box says on one occurrence of a repetition of the device.
+ *
+ * Two independent facts, and neither is universal, so the line is built out of
+ * them rather than written out: whether the save can be aimed at a single day,
+ * and whether the length can be changed at all. Both come from `services`,
+ * which is where knowing what each system allows belongs.
+ */
+const SERIES_NOTE = [
+  DEVICE_EDIT_SCOPES.length === 1
+    ? 'Este evento se repite y el cambio se aplica a todas las repeticiones.'
+    : 'Este evento se repite: al guardar eliges a qué repeticiones afecta.',
+  DEVICE_SERIES_KEEPS_LENGTH ? 'La duración se mantiene.' : null,
+]
+  .filter(Boolean)
+  .join(' ');
 
 /** Step the start time of a new event is rounded up to. */
 const SLOT_MINUTES = 15;
@@ -220,6 +241,36 @@ export function useItemForm(editing?: Editing) {
   const isDeviceEvent = !!editedEvent && isDeviceId(editedEvent.id);
   const isSubscribedEvent = !!editedEvent && isSubscriptionId(editedEvent.id);
   const deviceEventId = isDeviceEvent ? editedEvent.id : null;
+
+  /**
+   * The event being edited is one occurrence of a repetition of the device, so
+   * every save and every delete has to say what it applies to first.
+   */
+  const inSeries = isDeviceEvent && !!editedEvent.repeats;
+  const endLocked = inSeries && DEVICE_SERIES_KEEPS_LENGTH;
+
+  /**
+   * Moves the start of the event, dragging the end along when the length is not
+   * the user's to change.
+   *
+   * Postcondition: with the end locked the event keeps lasting exactly as long
+   * as it did, which is the only shape a repetition of Android can be saved in.
+   *
+   * @param next New start.
+   */
+  const moveStart = (next: Date) => {
+    if (endLocked) {
+      const shift = next.getTime() - startsAt.getTime();
+      setEndsAt(new Date(endsAt.getTime() + shift));
+    }
+    setStartsAt(next);
+  };
+
+  /**
+   * Scope chosen in the sheet, and which action is waiting for it. Null means no
+   * sheet is open, which is also the state of every event that does not repeat.
+   */
+  const [scopeAsked, setScopeAsked] = useState<'save' | 'remove' | null>(null);
 
   /**
    * An event of the device that the user did not create is shown but not
@@ -407,11 +458,16 @@ export function useItemForm(editing?: Editing) {
    *
    * @param id Id of the event being edited.
    * @param payload What the form built.
+   * @param scope What the save reaches when the event is part of a series.
    */
-  const saveToDevice = (id: string, payload: Omit<CalEvent, 'id'>) => {
+  const saveToDevice = (
+    id: string,
+    payload: Omit<CalEvent, 'id'>,
+    scope: SeriesScope,
+  ) => {
     close();
 
-    updateDeviceEvent(id, payload).then((saved) => {
+    updateDeviceEvent(id, payload, scope).then((saved) => {
       if (saved) useAppStore.getState().refresh();
       toast.show(saved ? 'Cambios guardados' : 'No se pudo guardar el cambio');
     });
@@ -465,8 +521,11 @@ export function useItemForm(editing?: Editing) {
    * Precondition: does nothing when the title is empty, the same criterion that
    * disables the CTA. Postcondition: in edit mode it updates the item, in
    * create mode it adds a new one.
+   *
+   * @param scope What the save reaches when the event is one occurrence of a
+   * repetition; the sheet is what asks for it.
    */
-  const save = () => {
+  const commitSave = (scope: SeriesScope) => {
     if (!canSave) return;
     const store = useAppStore.getState();
 
@@ -484,7 +543,7 @@ export function useItemForm(editing?: Editing) {
           toast.show('Avisos guardados');
           return;
         }
-        saveToDevice(editing.item.id, payload);
+        saveToDevice(editing.item.id, payload, scope);
         return;
       }
 
@@ -517,8 +576,11 @@ export function useItemForm(editing?: Editing) {
    * Precondition: only meaningful in edit mode. Postcondition: always closes
    * the screen, and the undo toast survives that navigation because the toast
    * is mounted above the navigator.
+   *
+   * @param scope What the deletion reaches when the event is one occurrence of
+   * a repetition.
    */
-  const remove = () => {
+  const commitRemove = (scope: SeriesScope) => {
     if (!editing) return;
     const store = useAppStore.getState();
 
@@ -529,7 +591,7 @@ export function useItemForm(editing?: Editing) {
      */
     if (isDeviceId(editing.item.id)) {
       close();
-      deleteDeviceEvent(editing.item.id).then((deleted) => {
+      deleteDeviceEvent(editing.item.id, scope).then((deleted) => {
         if (deleted) store.refresh();
         toast.show(deleted ? 'Evento eliminado' : 'No se pudo eliminar');
       });
@@ -541,6 +603,39 @@ export function useItemForm(editing?: Editing) {
     if (removed) {
       toast.showUndo('Elemento eliminado', () => store.restoreItem(removed));
     }
+  };
+
+  /**
+   * What Guardar and Eliminar do, which on a repetition is ask first.
+   *
+   * An event that happens once goes straight through, and so does one of
+   * somebody else's, where the only thing being saved is the reminders and
+   * there is nothing to ask about. Anything else opens the sheet, and the
+   * answer arrives back through `chooseScope`.
+   */
+  const asksScope = inSeries && !readOnly;
+
+  const save = () => {
+    if (!canSave) return;
+    if (asksScope) setScopeAsked('save');
+    else commitSave('series');
+  };
+
+  const remove = () => {
+    if (asksScope) setScopeAsked('remove');
+    else commitRemove('series');
+  };
+
+  /**
+   * Closes the scope sheet and runs whichever action opened it.
+   *
+   * @param scope What the user chose the action should reach.
+   */
+  const chooseScope = (scope: SeriesScope) => {
+    const asked = scopeAsked;
+    setScopeAsked(null);
+    if (asked === 'save') commitSave(scope);
+    if (asked === 'remove') commitRemove(scope);
   };
 
   return {
@@ -561,19 +656,49 @@ export function useItemForm(editing?: Editing) {
     calendarOptions: destinations,
     selectedCalendar,
 
+    /**
+     * The sheet asking what a save or a delete reaches. It is open only while an
+     * action is waiting on the answer, and the scopes offered are the ones that
+     * action can actually honour, which is not the same list for the two of
+     * them.
+     */
+    series: {
+      /** Whether this event will ask before saving or deleting at all. */
+      asks: asksScope,
+      asked: scopeAsked,
+      scopes: scopeAsked === 'remove' ? DEVICE_DELETE_SCOPES : DEVICE_EDIT_SCOPES,
+      choose: chooseScope,
+      dismiss: () => setScopeAsked(null),
+    },
+
     event: {
       location,
       setLocation,
       startsAt,
-      setStartsAt,
+      setStartsAt: moveStart,
       endsAt,
       setEndsAt,
+      /**
+       * A repetition of the device keeps its length; `DEVICE_SERIES_KEEPS_LENGTH`
+       * says why. The end is shown, and follows the start, but is not chosen.
+       */
+      endLocked,
+      /** The whole box, when the event is one occurrence of a repetition. */
+      seriesNote: inSeries ? SERIES_NOTE : null,
       allDay,
       setAllDay,
       repeat,
       setRepeat,
       /** Rules the destination calendar can hold; see `DEVICE_REPEAT_RULES`. */
       repeatOptions: isDeviceTarget ? DEVICE_REPEAT_RULES : REPEAT_RULES,
+      /**
+       * The chips are hidden on an event that already repeats. The app cannot
+       * read the real rule — a class on Tuesdays and Thursdays is none of its
+       * four values — so they would show 'No' on something that plainly is not,
+       * and a save would throw the answer away. The line under the box says it
+       * repeats; changing how is done in the calendar it came from.
+       */
+      repeatShown: !inSeries,
       weekdays: eventWeekdays,
       toggleWeekday: (day: number) =>
         setEventWeekdays((current) => toggleInList(current, day)),

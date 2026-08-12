@@ -25,7 +25,7 @@ import {
 } from '@/theme/tokens';
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
-import { Cta, Divider } from '@/ui/controls';
+import { Cta, Divider, OptionRow } from '@/ui/controls';
 import { TrashIcon, XIcon } from '@/ui/icons';
 import { useDateTimePicker } from '@/ui/pickers';
 import type { ItemKind } from '@/types';
@@ -57,6 +57,32 @@ const CLOSE_SIZE = 30;
 
 /** Delay before scrolling down: gives the new row time to mount. */
 const REVEAL_DELAY_MS = 60;
+
+/**
+ * What each scope is called, and what it does, per action.
+ *
+ * Saving and deleting are told apart because the same word would be a different
+ * promise: "todas" on a save rewrites the whole repetition, and on a delete it
+ * takes it away. The second line is the one that makes the choice safe to make
+ * quickly.
+ */
+const SCOPE_COPY: Record<
+  'save' | 'remove',
+  { title: string; occurrence: string; series: string; hint: string }
+> = {
+  save: {
+    title: 'Guardar el cambio',
+    occurrence: 'Solo en este día',
+    series: 'En todas las repeticiones',
+    hint: 'Este evento se repite.',
+  },
+  remove: {
+    title: 'Eliminar',
+    occurrence: 'Solo este día',
+    series: 'Todas las repeticiones',
+    hint: 'Este evento se repite. No se puede deshacer.',
+  },
+};
 
 /**
  * Form for an event, a task or a habit.
@@ -208,7 +234,14 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           {form.isEditing && !form.readOnly ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => setConfirmDelete(true)}
+              /**
+               * A repetition goes straight to the scope sheet: that sheet is
+               * already the confirmation, and it says the one thing this one
+               * would get wrong, which is that there is no undo.
+               */
+              onPress={() =>
+                form.series.asks ? form.remove() : setConfirmDelete(true)
+              }
               style={({ pressed }) => [
                 styles.deleteRow,
                 pressed && { backgroundColor: alpha(accent, tint.danger) },
@@ -271,8 +304,42 @@ export function ItemForm({ editing }: { editing?: Editing }) {
         <Cta primary label="ELIMINAR" onPress={form.remove} />
       </Sheet>
 
+      <ScopeSheet series={form.series} />
+
       {picker.element}
     </KeyboardAvoidingView>
+  );
+}
+
+/**
+ * Asks what a save or a delete on one occurrence of a repetition reaches.
+ *
+ * The scopes arrive already filtered to the ones that action can honour. With
+ * only one of them left the sheet stops being a choice and becomes a warning of
+ * what is about to happen, which is the case of a save on Android — and that is
+ * still worth showing, because rewriting a whole repetition is not what someone
+ * pressing GUARDAR CAMBIOS on a Tuesday necessarily has in mind.
+ */
+function ScopeSheet({ series }: { series: ItemFormState['series'] }) {
+  const copy = SCOPE_COPY[series.asked ?? 'save'];
+
+  return (
+    <Sheet
+      open={series.asked !== null}
+      onClose={series.dismiss}
+      title={copy.title}>
+      <AppText style={styles.confirmText}>{copy.hint}</AppText>
+      <View style={styles.options}>
+        {series.scopes.map((scope) => (
+          <OptionRow
+            key={scope}
+            label={scope === 'occurrence' ? copy.occurrence : copy.series}
+            selected={false}
+            onPress={() => series.choose(scope)}
+          />
+        ))}
+      </View>
+    </Sheet>
   );
 }
 
@@ -422,4 +489,5 @@ const styles = StyleSheet.create({
     color: color.textNote,
     paddingHorizontal: 4,
   },
+  options: { gap: 2 },
 });
