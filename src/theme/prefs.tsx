@@ -23,15 +23,29 @@ export type Preferences = {
   defaultDuration: number;
   defaultCalendarId: string;
   /**
-   * Whether reminders reach the system. Turning it off empties the queue; it
-   * says nothing about the system permission, which is asked for separately.
+   * Whether reminders reach the system at all. Turning it off empties the
+   * queue; it says nothing about the system permission, which is asked for
+   * separately. The four settings below only matter while this is on.
    */
   notifications: boolean;
+  /** Whether an event of the app's own calendars can remind. */
+  notifyEvents: boolean;
+  /** Whether a task can remind. */
+  notifyTasks: boolean;
+  /** Whether a habit can remind. */
+  notifyHabits: boolean;
+  /**
+   * Whether an event from a calendar of the device or a subscription can
+   * remind at all. Off, `deviceReminders` below never matters: nothing from
+   * outside the app reminds, chosen calendar by calendar or not.
+   */
+  notifyForeignEvents: boolean;
   /**
    * Whether the alarms an event of the device brings with it are scheduled too.
    * Off by default: the calendar those events came from already announces them,
    * so turning it on means being told twice. It says nothing about a reminder
-   * the user sets by hand on one of those events, which is always scheduled.
+   * the user sets by hand on one of those events, which is always scheduled
+   * while `notifyForeignEvents` is on.
    */
   deviceReminders: boolean;
   reduceMotion: boolean;
@@ -53,6 +67,10 @@ const DEFAULT_PREFERENCES: Preferences = {
   defaultDuration: 30,
   defaultCalendarId: 'cal-personal',
   notifications: true,
+  notifyEvents: true,
+  notifyTasks: true,
+  notifyHabits: true,
+  notifyForeignEvents: true,
   deviceReminders: false,
   reduceMotion: false,
   mono: false,

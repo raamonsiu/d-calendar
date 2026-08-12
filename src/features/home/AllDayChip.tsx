@@ -28,7 +28,7 @@ export const CHIP_GAP = 3;
  * The caller needs this before drawing, because what the chips take is taken
  * from the grid underneath and the grid has to be told how much is left. Each
  * row counts its own gap, which is the one separating it from whatever sits
- * above it — the heading for the first, the previous chip for the rest.
+ * above it: the heading for the first, the previous chip for the rest.
  *
  * Postcondition: 0 for a day with nothing, so a day with no all-day events adds
  * no room at all rather than an empty strip.

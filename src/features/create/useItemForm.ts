@@ -95,6 +95,49 @@ const DEFAULT_DUE_HOUR = 18;
 /** Minimum event duration, so the end never lands before the start. */
 const MIN_EVENT_MS = 60000;
 
+/**
+ * Where the end of an event should land after the start moves to `nextStart`,
+ * so a picker can never leave the two inverted.
+ *
+ * Only intervenes when leaving the end alone would put it at or before the new
+ * start: moving the start earlier or later while it still comes before the end
+ * is how the event is shrunk or stretched from that side, and dragging the end
+ * along regardless would make that impossible. Past that point there is no
+ * duration left to preserve by leaving it alone, so the same one it had before
+ * the move travels with the start instead.
+ *
+ * Postcondition: the result is always after `nextStart`, by at least
+ * `MIN_EVENT_MS`.
+ *
+ * @param startsAt Start before the move.
+ * @param endsAt End before the move.
+ * @param nextStart Start being moved to.
+ */
+export function shiftedEnd(
+  startsAt: number,
+  endsAt: number,
+  nextStart: number,
+) {
+  if (nextStart < endsAt) return endsAt;
+  const duration = Math.max(endsAt - startsAt, MIN_EVENT_MS);
+  return nextStart + duration;
+}
+
+/**
+ * Where the end of an event should land after picking `nextEnd`, so a picker
+ * can never leave it at or before the start.
+ *
+ * Postcondition: the result is always at least `MIN_EVENT_MS` after `startsAt`;
+ * a `nextEnd` that already clears that floor comes back unchanged.
+ *
+ * @param startsAt Start of the event, unaffected by this move.
+ * @param nextEnd End being moved to.
+ */
+export function clampedEnd(startsAt: number, nextEnd: number) {
+  const earliest = startsAt + MIN_EVENT_MS;
+  return nextEnd < earliest ? earliest : nextEnd;
+}
+
 /** Default repetitions and counter bounds of an "X por" habit. */
 const DEFAULT_HABIT_COUNT = 3;
 const MIN_HABIT_COUNT = 2;
@@ -128,7 +171,7 @@ function nextSlot() {
  * There are four answers and each one is a different promise, so they are
  * decided here rather than woven through the interface. A subscription, or a
  * device event that is not the user's to touch at all, shows the guests it
- * already has and sends them nowhere else — `notOwn` is what a save could not
+ * already has and sends them nowhere else: `notOwn` is what a save could not
  * reach anyway, not "came from the device", so it does not catch a device event
  * of the user's own along with them, which is the mistake this used to make: an
  * event created here with guests could not have a single one added back once
@@ -207,7 +250,7 @@ function savedMessage(result: DeviceUpdateResult) {
  * True when two lists hold the same values, order and duplicates aside.
  *
  * What Guardar can change is mostly a handful of scalars and a few lists whose
- * order carries no meaning of its own — the weekdays ticked, the guests
+ * order carries no meaning of its own: the weekdays ticked, the guests
  * invited, the reminders set. Comparing those as ordered arrays would call an
  * edit that only reordered them a change, when nothing was actually saved
  * differently.
@@ -253,8 +296,8 @@ export type EventSnapshot = {
  * Whether an event differs from the state Guardar opened with.
  *
  * Every field Guardar can touch is compared, and nothing else needs to be:
- * a field the interface currently hides — the repeat chips on a repetition, the
- * visibility on a device event — cannot be reached by the user in the first
+ * a field the interface currently hides - the repeat chips on a repetition, the
+ * visibility on a device event - cannot be reached by the user in the first
  * place, so `before` and `now` already agree on it and it never causes a false
  * positive.
  *
@@ -387,7 +430,7 @@ export function useItemForm(editing?: Editing) {
   /**
    * Frozen the moment the screen opens, so Guardar has something fixed to
    * compare the current state against; see `isDirty` below. A prop that only
-   * looks stable is not enough here — `editing.item` is the store's own object,
+   * looks stable is not enough here: `editing.item` is the store's own object,
    * and a background sync refreshing it mid-edit would otherwise drag the
    * baseline along with it. `initialGuests` is kept apart from `initialEvent`
    * because it is the one part of the baseline that cannot be known yet at this
@@ -412,11 +455,8 @@ export function useItemForm(editing?: Editing) {
   const endLocked = inSeries && DEVICE_SERIES_KEEPS_LENGTH;
 
   /**
-   * Moves the start of the event, dragging the end along when the length is not
-   * the user's to change.
-   *
-   * Postcondition: with the end locked the event keeps lasting exactly as long
-   * as it did, which is the only shape a repetition of Android can be saved in.
+   * Moves the start of the event, applying `shiftedEnd` or the locked-length
+   * shift depending on `endLocked`.
    *
    * @param next New start.
    */
@@ -424,8 +464,23 @@ export function useItemForm(editing?: Editing) {
     if (endLocked) {
       const shift = next.getTime() - startsAt.getTime();
       setEndsAt(new Date(endsAt.getTime() + shift));
+    } else {
+      setEndsAt(
+        new Date(
+          shiftedEnd(startsAt.getTime(), endsAt.getTime(), next.getTime()),
+        ),
+      );
     }
     setStartsAt(next);
+  };
+
+  /**
+   * Moves the end of the event, applying `clampedEnd`.
+   *
+   * @param next New end.
+   */
+  const moveEnd = (next: Date) => {
+    setEndsAt(new Date(clampedEnd(startsAt.getTime(), next.getTime())));
   };
 
   /**
@@ -557,7 +612,7 @@ export function useItemForm(editing?: Editing) {
      * Not `isForeignId`: that would be true for every device event, including
      * an editable one of the user's own, and block guests on exactly the events
      * that should offer them. What a save cannot reach is a subscription, or a
-     * device event `readOnly` above already ruled out — someone else's, or a
+     * device event `readOnly` above already ruled out: someone else's, or a
      * calendar the system will not let the app write to.
      */
     notOwn: isSubscribedEvent || (isDeviceEvent && readOnly),
@@ -623,8 +678,8 @@ export function useItemForm(editing?: Editing) {
 
   /**
    * Whether the item being edited differs from the one the screen opened with.
-   * Creating something new is never "no changes" — there is nothing yet to
-   * compare against — so this only applies in edit mode, and it is what stops
+   * Creating something new is never "no changes": there is nothing yet to
+   * compare against, so this only applies in edit mode, and it is what stops
    * Guardar from writing back an event nobody touched.
    */
   const isDirty =
@@ -871,7 +926,7 @@ export function useItemForm(editing?: Editing) {
       startsAt,
       setStartsAt: moveStart,
       endsAt,
-      setEndsAt,
+      setEndsAt: moveEnd,
       /**
        * A repetition of the device keeps its length; `DEVICE_SERIES_KEEPS_LENGTH`
        * says why. The end is shown, and follows the start, but is not chosen.
@@ -887,8 +942,8 @@ export function useItemForm(editing?: Editing) {
       repeatOptions: isDeviceTarget ? DEVICE_REPEAT_RULES : REPEAT_RULES,
       /**
        * The chips are hidden on an event that already repeats. The app cannot
-       * read the real rule — a class on Tuesdays and Thursdays is none of its
-       * four values — so they would show 'No' on something that plainly is not,
+       * read the real rule: a class on Tuesdays and Thursdays is none of its
+       * four values, so they would show 'No' on something that plainly is not,
        * and a save would throw the answer away. The line under the box says it
        * repeats; changing how is done in the calendar it came from.
        */

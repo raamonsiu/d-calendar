@@ -13,8 +13,8 @@ import { Linking, Platform } from 'react-native';
  * Android screens that lead to the accounts of the phone, best first.
  *
  * The first lands straight on the list of account types to add, which is the
- * one step being asked for. It is not on every phone — manufacturers rearrange
- * their settings — so the second is the accounts already added, which carries
+ * one step being asked for. It is not on every phone - manufacturers rearrange
+ * their settings - so the second is the accounts already added, which carries
  * its own button to add another.
  */
 const ANDROID_ACCOUNT_SCREENS = [

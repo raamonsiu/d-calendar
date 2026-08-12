@@ -36,7 +36,14 @@ const REBUILD_DEBOUNCE_MS = 400;
  * outside React.
  */
 export function useNotificationSync() {
-  const { notifications, deviceReminders } = usePrefs();
+  const {
+    notifications,
+    notifyEvents,
+    notifyTasks,
+    notifyHabits,
+    notifyForeignEvents,
+    deviceReminders,
+  } = usePrefs();
   const rebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignature = useRef<string | null>(null);
 
@@ -66,23 +73,25 @@ export function useNotificationSync() {
        * plan when the user asks for them, because the calendar they came from
        * already announces them. A reminder they set themselves is a different
        * matter: they asked for that one on this phone, so it is scheduled
-       * whatever the switch says.
+       * whatever that switch says, as long as foreign events remind at all.
        *
        * A subscribed calendar rarely carries alarms at all, and the ones it does
        * belong to whoever published it, so the same rule reads well for both.
        */
-      const brought = [...state.deviceEvents, ...state.subscriptionEvents];
+      const brought = notifyForeignEvents
+        ? [...state.deviceEvents, ...state.subscriptionEvents]
+        : [];
       const chosen = deviceReminders
         ? brought
         : brought.filter((event) => state.eventReminders[event.id]);
 
-      const events = [...state.events, ...chosen];
+      const events = [...(notifyEvents ? state.events : []), ...chosen];
 
       const plan = planNotifications(
         {
           events: visibleEvents(events, state.calendars),
-          tasks: state.tasks,
-          habits: state.habits,
+          tasks: notifyTasks ? state.tasks : [],
+          habits: notifyHabits ? state.habits : [],
         },
         Date.now(),
       );
@@ -119,7 +128,14 @@ export function useNotificationSync() {
       unsubscribeStore();
       appStateSubscription.remove();
     };
-  }, [notifications, deviceReminders]);
+  }, [
+    notifications,
+    notifyEvents,
+    notifyTasks,
+    notifyHabits,
+    notifyForeignEvents,
+    deviceReminders,
+  ]);
 
   useEffect(
     () =>

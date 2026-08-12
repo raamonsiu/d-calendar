@@ -23,6 +23,7 @@ export { DotsThreeVerticalIcon } from 'phosphor-react-native/src/icons/DotsThree
 export { DownloadSimpleIcon } from 'phosphor-react-native/src/icons/DownloadSimple';
 export { DropHalfIcon } from 'phosphor-react-native/src/icons/DropHalf';
 export { EnvelopeSimpleIcon } from 'phosphor-react-native/src/icons/EnvelopeSimple';
+export { FireIcon } from 'phosphor-react-native/src/icons/Fire';
 export { GearSixIcon } from 'phosphor-react-native/src/icons/GearSix';
 export { GithubLogoIcon } from 'phosphor-react-native/src/icons/GithubLogo';
 export { HeartStraightIcon } from 'phosphor-react-native/src/icons/HeartStraight';

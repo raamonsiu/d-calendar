@@ -4,7 +4,7 @@
  *
  * Versioned 0.1 to 1.0 rather than continuing whatever came before: the app
  * has no public release yet, so 1.0 is the one this history is building
- * towards — the version meant to actually reach a store.
+ * towards: the version meant to actually reach a store.
  */
 
 export type Release = { version: string; date: string; notes: string[] };

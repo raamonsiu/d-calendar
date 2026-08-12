@@ -4,7 +4,7 @@
  * Read straight from each package's own `package.json` in `node_modules`, not
  * guessed: `license`, `repository`. Grouped where several packages come from
  * the same repository and carry the same licence, which is the whole Expo SDK
- * and the two font families — otherwise this would be thirty near-identical
+ * and the two font families: otherwise this would be thirty near-identical
  * rows instead of fourteen readable ones.
  *
  * There is no build step keeping this in sync with `package.json`: a

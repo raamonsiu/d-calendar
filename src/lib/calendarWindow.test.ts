@@ -2,7 +2,7 @@ import { calendarWindow, windowReach } from './calendarWindow';
 
 const MS_PER_DAY = 86400000;
 
-/** 11 ago 2026, 15:42 — un dia y hora cualquiera dentro del mes. */
+/** 11 ago 2026, 15:42: un dia y hora cualquiera dentro del mes. */
 const MID_AUGUST_2026 = new Date(2026, 7, 11, 15, 42).getTime();
 
 describe('calendarWindow', () => {

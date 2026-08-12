@@ -15,8 +15,8 @@ const MAX_HEIGHT = 320;
 /**
  * Sheet that picks a calendar.
  *
- * It is shared by the two places that choose one — the destination of an event
- * in Crear and the default calendar in Ajustes — so both read the same: colour
+ * It is shared by the two places that choose one: the destination of an event
+ * in Crear and the default calendar in Ajustes, so both read the same: colour
  * dot, name, and the line saying which account it hangs from. The options come
  * built from `calendarOptions`, which is where that line is decided.
  */

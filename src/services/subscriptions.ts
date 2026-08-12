@@ -38,9 +38,9 @@ const CALENDAR_SCHEME_REAL = 'https://';
  * Downloads a subscribed calendar and reads its events.
  *
  * Precondition: `calendar.url` is set, which is what makes a calendar a
- * subscription. Postcondition: returns null when anything goes wrong — no
+ * subscription. Postcondition: returns null when anything goes wrong - no
  * network, a server that answers with an error, a file too big, text that is not
- * a calendar — and the caller keeps whatever it already had, which is what makes
+ * a calendar - and the caller keeps whatever it already had, which is what makes
  * the app work on a train.
  *
  * @param calendar Subscribed calendar, with its address.

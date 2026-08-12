@@ -20,8 +20,8 @@ import type { Availability, CalEvent, Visibility } from '@/types';
  * their exceptions. Each of those is a day of work and a month of edge cases.
  *
  * What is deliberately not read: the alarms (`VALARM`), which belong to whoever
- * published the calendar and not to this phone — the user can set their own on
- * any event and those are kept by the app — and the attendees, which say nothing
+ * published the calendar and not to this phone - the user can set their own on
+ * any event and those are kept by the app - and the attendees, which say nothing
  * useful on a calendar nobody here was invited to.
  */
 

@@ -146,8 +146,8 @@ const isPersonAddress = (address: string) =>
 /**
  * Whether an address belongs to somebody who is not the user.
  *
- * It is the question behind two different decisions — whether a calendar was
- * shared with them and whether an event is theirs to edit — and it is not the
+ * It is the question behind two different decisions - whether a calendar was
+ * shared with them and whether an event is theirs to edit - and it is not the
  * same as "an address that is not mine". Two of the three ways an address can
  * fail to be one of theirs mean nothing at all: it may be missing, and it may be
  * one of the identifiers a provider writes in place of a person, which is what

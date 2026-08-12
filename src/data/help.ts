@@ -77,7 +77,7 @@ export const TOPICS: Topic[] = [
         'El botón Guardar cambios aparece solo cuando algo es distinto de como estaba: si abres una ficha y no tocas nada, no hay nada que guardar y el botón no sale.',
       ),
       note(
-        'En un evento que no es tuyo — la invitación de otra persona, o un calendario al que solo estás suscrito — la ficha se ve pero no se puede tocar. Solo los avisos, que son de la app y no del evento, siguen siendo tuyos.',
+        'En un evento que no es tuyo - la invitación de otra persona, o un calendario al que solo estás suscrito - la ficha se ve pero no se puede tocar. Solo los avisos, que son de la app y no del evento, siguen siendo tuyos.',
       ),
     ],
   },
@@ -99,7 +99,7 @@ export const TOPICS: Topic[] = [
         'En iPhone puedes elegir entre ese día o toda la serie, igual que al eliminar. En un calendario de una cuenta de Android el cambio siempre se aplica a toda la serie: el sistema no permite guardar una excepción para un solo día, y la app te lo dice antes de guardar.',
       ),
       note(
-        'Cambiar la hora de una repetición mueve toda la serie ese mismo desplazamiento, no solo el día que tocaste — mover el lunes una hora adelanta la serie entera una hora, no la convierte en el lunes de otra semana.',
+        'Cambiar la hora de una repetición mueve toda la serie ese mismo desplazamiento, no solo el día que tocaste: mover el lunes una hora adelanta la serie entera una hora, no la convierte en el lunes de otra semana.',
       ),
     ],
   },

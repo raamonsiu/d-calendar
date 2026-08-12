@@ -9,7 +9,7 @@
  * in the system browser through `expo-linking`.
  *
  * Mock: rating and sharing show a toast saying they will arrive once the app
- * is published — there is nowhere to rate or a link to share before that.
+ * is published: there is nowhere to rate or a link to share before that.
  * The hero's icon is `assets/images/icon.png`, the same file `app.json`
  * points the launcher to, so the two stay in sync whenever that file changes.
  */

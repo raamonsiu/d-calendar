@@ -105,8 +105,8 @@ const SCOPE_COPY: Record<
  * be changed on an event the app may not touch.
  *
  * Editing an item shows no button at all, and holds no space for one either,
- * until something about it actually differs from what the screen opened with
- * — `useItemForm` decides that, not this file. Opening an item is purely
+ * until something about it actually differs from what the screen opened with:
+ * `useItemForm` decides that, not this file. Opening an item is purely
  * looking at it, the ScrollView above takes the room a button would have used,
  * and a button only turns up, taking that room back, once there is something
  * to save. Creating one is the older rule: the button is there from the start,
@@ -346,7 +346,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
  *
  * The scopes arrive already filtered to the ones that action can honour. With
  * only one of them left the sheet stops being a choice and becomes a warning of
- * what is about to happen, which is the case of a save on Android — and that is
+ * what is about to happen, which is the case of a save on Android, and that is
  * still worth showing, because rewriting a whole repetition is not what someone
  * pressing GUARDAR CAMBIOS on a Tuesday necessarily has in mind.
  */

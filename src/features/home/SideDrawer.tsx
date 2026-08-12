@@ -119,9 +119,9 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
 
   /**
    * Turns while `refreshing` is true, and eases back to rest rather than
-   * snapping when it stops, so the icon does not jump mid-turn. `readDeviceCalendarData`
-   * and the subscription downloads are already asynchronous — this is only the
-   * part that shows it.
+   * snapping when it stops, so the icon does not jump mid-turn.
+   * `readDeviceCalendarData` and the subscription downloads are already
+   * asynchronous: this is only the part that shows it.
    */
   const { motionOff } = usePrefs();
   const spin = useSharedValue(0);

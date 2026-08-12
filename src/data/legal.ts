@@ -2,7 +2,7 @@
  * Content of the privacy policy and the terms of use.
  *
  * Same shape as `src/data/help.ts` on purpose: it is the same kind of
- * document — headings, paragraphs, notes — read by the same article screen,
+ * document - headings, paragraphs, notes - read by the same article screen,
  * `src/app/legal/[slug].tsx`. `src/app/legal/licenses.tsx` is the one legal
  * screen that does not fit this shape, because a licence list is rows of
  * data, not prose.
@@ -41,17 +41,17 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       ),
       heading('Los calendarios del teléfono son del teléfono, no de la app'),
       paragraph(
-        'Cuando conectas una cuenta de Google, Outlook o iCloud, no lo haces dentro de D-Calendar: lo haces en los ajustes del sistema, como con cualquier otra app de calendario. D-Calendar únicamente lee y escribe en los calendarios que esa cuenta ya sincroniza en tu teléfono, a través de la API de calendario del propio sistema operativo — nunca ve tu contraseña ni inicia sesión en tu nombre.',
+        'Cuando conectas una cuenta de Google, Outlook o iCloud, no lo haces dentro de D-Calendar: lo haces en los ajustes del sistema, como con cualquier otra app de calendario. D-Calendar únicamente lee y escribe en los calendarios que esa cuenta ya sincroniza en tu teléfono, a través de la API de calendario del propio sistema operativo: nunca ve tu contraseña ni inicia sesión en tu nombre.',
       ),
       note(
-        'Lo que pase después con esos datos — cómo Google o Microsoft los tratan, cuánto los conservan, con quién los comparten — lo rige la política de privacidad de esa cuenta, no esta. Ya aceptaste esas condiciones el día que añadiste la cuenta al teléfono.',
+        'Lo que pase después con esos datos - cómo Google o Microsoft los tratan, cuánto los conservan, con quién los comparten - lo rige la política de privacidad de esa cuenta, no esta. Ya aceptaste esas condiciones el día que añadiste la cuenta al teléfono.',
       ),
       paragraph(
         'Un calendario al que te suscribes por una dirección .ics se descarga tal cual desde esa dirección, sin pasar por ningún servidor de D-Calendar. Es lectura pura: un archivo de texto que el teléfono pide directamente.',
       ),
       heading('Los avisos suenan en tu teléfono, no llegan por internet'),
       paragraph(
-        'Los recordatorios son notificaciones locales: los programa el propio sistema operativo y saltan sin que ningún servidor esté al tanto. Un evento con invitados es la única excepción parcial, y ni siquiera pasa por D-Calendar: si el calendario donde lo creas admite invitados, es la cuenta que lo sincroniza — Google o la que sea — la que manda la invitación, exactamente igual que si la mandaras desde esa cuenta en el ordenador.',
+        'Los recordatorios son notificaciones locales: los programa el propio sistema operativo y saltan sin que ningún servidor esté al tanto. Un evento con invitados es la única excepción parcial, y ni siquiera pasa por D-Calendar: si el calendario donde lo creas admite invitados, es la cuenta que lo sincroniza - Google o la que sea - la que manda la invitación, exactamente igual que si la mandaras desde esa cuenta en el ordenador.',
       ),
       heading('Lo que no hay'),
       paragraph(
@@ -59,7 +59,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       ),
       heading('Si nos escribes'),
       paragraph(
-        'Ayuda y comentarios te deja mandar un mensaje. Lo que escribas ahí, y la dirección desde la que lo mandes si dejas una, se usa solo para leerlo y responderte — nunca para nada más.',
+        'Ayuda y comentarios te deja mandar un mensaje. Lo que escribas ahí, y la dirección desde la que lo mandes si dejas una, se usa solo para leerlo y responderte: nunca para nada más.',
       ),
       heading('Permisos que pide la app'),
       paragraph(

@@ -1,11 +1,13 @@
 import { guest } from '@/testing/fixtures';
 import type { RelativeReminder, TimeReminder } from '@/types';
 import {
+  clampedEnd,
   eventChanged,
   guestRule,
   habitChanged,
   relativeReminderKey,
   sameMultiset,
+  shiftedEnd,
   taskChanged,
   timeReminderKey,
   type EventSnapshot,
@@ -60,6 +62,63 @@ describe('guestRule', () => {
   test('un calendario de la app permite invitados como nota, editables', () => {
     const rule = guestRule({ notOwn: false, onDevice: false, canInvite: false });
     expect(rule.readOnly).toBe(false);
+  });
+});
+
+describe('shiftedEnd', () => {
+  /** The minimum event length `useItemForm.ts` enforces, in ms. */
+  const MIN_EVENT_MS = 60000;
+
+  test('moviendo el inicio antes, mientras sigue antes del fin, el fin no se toca', () => {
+    expect(shiftedEnd(1000, 400000, 500)).toBe(400000);
+  });
+
+  test('moviendo el inicio despues, mientras sigue antes del fin, el fin no se toca', () => {
+    expect(shiftedEnd(1000, 400000, 4000)).toBe(400000);
+  });
+
+  test('mover el inicio justo al fin actual empuja el fin la misma duracion que tenia', () => {
+    expect(shiftedEnd(1000, 400000, 400000)).toBe(400000 + 399000);
+  });
+
+  test('mover el inicio mas alla del fin actual conserva la duracion, no la invierte', () => {
+    const startsAt = new Date(2026, 0, 1, 10, 0).getTime();
+    const endsAt = new Date(2026, 0, 1, 11, 0).getTime();
+    const nextStart = new Date(2026, 0, 3, 9, 0).getTime();
+
+    expect(shiftedEnd(startsAt, endsAt, nextStart)).toBe(
+      nextStart + (endsAt - startsAt),
+    );
+  });
+
+  test('una duracion original menor al minimo no se propaga por debajo del minimo', () => {
+    expect(shiftedEnd(1000, 1010, 5000)).toBe(5000 + MIN_EVENT_MS);
+  });
+});
+
+describe('clampedEnd', () => {
+  const MIN_EVENT_MS = 60000;
+
+  test('un fin ya valido y suficientemente lejos no cambia', () => {
+    expect(clampedEnd(1000, 1000 + MIN_EVENT_MS + 5000)).toBe(
+      1000 + MIN_EVENT_MS + 5000,
+    );
+  });
+
+  test('un fin anterior al inicio se sube al minimo tras el inicio', () => {
+    expect(clampedEnd(5000, 1000)).toBe(5000 + MIN_EVENT_MS);
+  });
+
+  test('un fin igual al inicio tambien se sube al minimo', () => {
+    expect(clampedEnd(5000, 5000)).toBe(5000 + MIN_EVENT_MS);
+  });
+
+  test('un fin justo un milisegundo por debajo del minimo se sube exactamente al minimo', () => {
+    expect(clampedEnd(1000, 1000 + MIN_EVENT_MS - 1)).toBe(1000 + MIN_EVENT_MS);
+  });
+
+  test('un fin justo en el minimo no cambia', () => {
+    expect(clampedEnd(1000, 1000 + MIN_EVENT_MS)).toBe(1000 + MIN_EVENT_MS);
   });
 });
 

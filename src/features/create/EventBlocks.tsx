@@ -111,7 +111,7 @@ export function EventBlocks({
                 center
                 width={TIME_WIDTH}
                 muted={event.allDay || locked}
-                label={event.allDay ? '—' : formatTime(value)}
+                label={event.allDay ? '-' : formatTime(value)}
                 onPress={() => {
                   if (event.allDay || locked) return;
                   picker.open('time', value, (picked) =>

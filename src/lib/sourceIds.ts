@@ -27,8 +27,8 @@ export const isDeviceId = (id: string) => id.startsWith(DEVICE_ID_PREFIX);
 /**
  * Whether something came from a subscribed calendar.
  *
- * Note that a subscribed *calendar* is the app's own — the user added it here,
- * and its id comes from `createId` — while its *events* are downloaded and carry
+ * Note that a subscribed *calendar* is the app's own - the user added it here,
+ * and its id comes from `createId` - while its *events* are downloaded and carry
  * this prefix. Only the events are ever asked.
  *
  * @param id Id of an event.

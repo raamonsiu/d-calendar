@@ -6,6 +6,11 @@
  * Where it leads: to `/help/[slug]` when a resource is tapped. The feedback
  * form opens in a bottom sheet over this same screen.
  *
+ * "Enviar comentario" is `SecondaryScreen`'s `footer`, fixed below the scroll
+ * rather than inside it: it is the one thing on this screen that should never
+ * take scrolling past a long resource list to reach. "Recursos populares" is
+ * the only thing that scrolls.
+ *
  * Mock: sending feedback calls no service; the sheet just moves to its "sent"
  * state and the fields are cleared on close.
  */
@@ -140,6 +145,29 @@ export default function HelpScreen() {
             </View>
           )}
         </Sheet>
+      }
+      footer={
+        <View style={styles.footer}>
+          <Group title="Enviar comentarios">
+            <View style={styles.feedbackCard}>
+              <AppText style={styles.feedbackText}>
+                ¿Algo no funciona o echas algo en falta? Cuéntanoslo y lo
+                leemos todo.
+              </AppText>
+              <Cta
+                primary
+                height={CTA_HEIGHT}
+                label="ENVIAR COMENTARIO"
+                icon={<PaperPlaneTiltIcon size={14} color={accent} />}
+                onPress={() => setStep('form')}
+              />
+              <View style={styles.mailRow}>
+                <EnvelopeSimpleIcon size={12} color={color.faint} />
+                <AppText style={styles.mail}>{SUPPORT_EMAIL}</AppText>
+              </View>
+            </View>
+          </Group>
+        </View>
       }>
       <Group title="Recursos populares">
         {TOPICS.map((topic, index) => (
@@ -161,31 +189,12 @@ export default function HelpScreen() {
           </Pressable>
         ))}
       </Group>
-
-      <Group title="Enviar comentarios">
-        <View style={styles.feedbackCard}>
-          <AppText style={styles.feedbackText}>
-            ¿Algo no funciona o echas algo en falta? Cuéntanoslo y lo leemos
-            todo.
-          </AppText>
-          <Cta
-            primary
-            height={CTA_HEIGHT}
-            label="ENVIAR COMENTARIO"
-            icon={<PaperPlaneTiltIcon size={14} color={accent} />}
-            onPress={() => setStep('form')}
-          />
-          <View style={styles.mailRow}>
-            <EnvelopeSimpleIcon size={12} color={color.faint} />
-            <AppText style={styles.mail}>{SUPPORT_EMAIL}</AppText>
-          </View>
-        </View>
-      </Group>
     </SecondaryScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  footer: { paddingTop: 16 },
   topic: {
     flexDirection: 'row',
     alignItems: 'center',

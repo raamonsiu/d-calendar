@@ -66,7 +66,7 @@ export type DeviceCalendarData = {
 
 /**
  * The events of the last read, kept because everything done with one afterwards
- * — its guests, saving it, deleting it — goes through the object the system
+ * - its guests, saving it, deleting it - goes through the object the system
  * handed over. It is a cache of that read and nothing else: whatever the
  * interface draws goes through the store.
  */
@@ -403,7 +403,7 @@ function toGuest(attendee: ExpoCalendar.ExpoCalendarAttendee): Guest {
  * takes any at all.
  *
  * Android publishes it per calendar, and it is what tells a Google or Outlook
- * calendar — where writing an attendee makes the account send the invitation —
+ * calendar - where writing an attendee makes the account send the invitation -
  * from one that only lives on the phone, where the guest would be a row nobody
  * ever hears about.
  *
@@ -763,9 +763,9 @@ export const canEditDeviceEvent = (id: string) => editableEvents.has(id);
  * Whether the user may change an event of the device.
  *
  * Two things have to hold, and the first is the one that matters: **the event
- * has to be theirs**. Being in a calendar of theirs is not the same thing — a
+ * has to be theirs**. Being in a calendar of theirs is not the same thing - a
  * colleague's invitation lands in their own calendar and is still the
- * colleague's event — so what decides it is who organises it, and the question
+ * colleague's event - so what decides it is who organises it, and the question
  * is `isAnotherPerson`, not whether the address is one of the accounts. An
  * organiser that is missing, or that is a provider's identifier rather than
  * somebody, is nobody else: every event of a secondary Google calendar is
@@ -958,7 +958,7 @@ export function guestDiff(beforeIds: string[], guests: Guest[]) {
  *
  * Postcondition: returns true when at least one guest could not be added or
  * removed, which includes a calendar that takes none while the list is not
- * empty — the event stands either way, and the caller is the one that has to
+ * empty: the event stands either way, and the caller is the one that has to
  * say so. A guest with no address is never invited: there was nowhere to send
  * anything.
  *
@@ -1021,7 +1021,7 @@ export type SeriesScope = 'occurrence' | 'series';
  * iOS hands the question to EventKit, which knows how to write one occurrence
  * apart from its series. Android does not: `update` there writes the row the
  * repetition is defined in, whatever options it is given, and the library
- * offers no way to record a modified occurrence — only a cancelled one, which
+ * offers no way to record a modified occurrence, only a cancelled one, which
  * is why deleting can do what saving cannot. So on Android a change to a
  * repeating event reaches all of it, and rather than draw a choice that is not
  * one, the form offers the single scope this list holds and says what it means.
@@ -1088,13 +1088,13 @@ export function instanceStartDate(instant: number) {
  * included.
  *
  * Only the fields the app can express are touched otherwise, so anything the
- * system holds and the model does not — the recurrence rule itself — is left
+ * system holds and the model does not - the recurrence rule itself - is left
  * exactly as it was instead of being wiped by omission. The recurrence rule
  * applies to the guests too: they are read and written back by
  * `event.calendarId`, which on Android is the master row of the whole series
  * whatever occurrence was opened, so a guest added from one Tuesday is a guest
- * of every Tuesday. There is no other shape to save them in — the provider has
- * no notion of a per-occurrence attendee — and it is the same reason the save
+ * of every Tuesday. There is no other shape to save them in: the provider has
+ * no notion of a per-occurrence attendee, and it is the same reason the save
  * itself reaches the whole series there.
  *
  * Precondition: `canEditDeviceEvent` said yes, and `scope` is one of
@@ -1169,7 +1169,7 @@ function calendarOf(event: ExpoCalendar.ExpoCalendarEvent) {
  * written at all: a repeating event of the provider keeps its length as a
  * duration rather than as an end, the library only writes ends, and a row with
  * both is one the provider refuses. Hence the form holding the length still
- * while a series is being edited — the box says so.
+ * while a series is being edited: the box says so.
  *
  * @param event Occurrence as the device stores it.
  * @param id Id of the event in the app's model.

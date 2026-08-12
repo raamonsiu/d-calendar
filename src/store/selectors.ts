@@ -162,7 +162,7 @@ export function eventCountsByDay(events: CalEvent[]) {
  *
  * An all-day event has no place on an hour grid. Laid out there it runs from
  * midnight to midnight and covers the day whole, hiding everything that really
- * does happen at an hour — which is the opposite of what it means, since an
+ * does happen at an hour: the opposite of what it means, since an
  * event with no hour is precisely the one that does not occupy any.
  *
  * Postcondition: the two lists together hold every event given, in the order

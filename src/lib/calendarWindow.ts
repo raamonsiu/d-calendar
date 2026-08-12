@@ -6,8 +6,8 @@ import { MS_PER_DAY, addMonths, startOfDay } from '@/lib/date';
  * events, and how far the views let the user scroll.
  *
  * Those two are the same number on purpose, and that is the whole point of this
- * module. They used to differ — three months back and a year forward were read,
- * while the month view scrolled a year back and two forward — and the months
+ * module. They used to differ - three months back and a year forward were read,
+ * while the month view scrolled a year back and two forward - and the months
  * outside the read came out empty, which does not look like "not read yet", it
  * looks like "you had nothing on". A calendar that shows an empty November when
  * November is full is worse than one that will not go to November.

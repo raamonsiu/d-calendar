@@ -24,6 +24,13 @@ type SecondaryScreenProps = {
    * can take the full width and cover it completely.
    */
   overlays?: ReactNode;
+  /**
+   * Fixed below the scroll instead of inside it, for the one thing on the
+   * screen that should never need scrolling to reach: Help's "Enviar
+   * comentario" card. The scroll view shrinks to make room for it on its own,
+   * the same way the create form's own bottom button already does.
+   */
+  footer?: ReactNode;
 };
 
 /**
@@ -40,6 +47,7 @@ export function SecondaryScreen({
   contentGap = GROUP_GAP,
   children,
   overlays,
+  footer,
 }: SecondaryScreenProps) {
   const insets = useSafeAreaInsets();
 
@@ -60,6 +68,8 @@ export function SecondaryScreen({
           contentContainerStyle={[styles.content, { gap: contentGap }]}>
           {children}
         </ScrollView>
+
+        {footer}
       </View>
       {overlays}
     </View>
