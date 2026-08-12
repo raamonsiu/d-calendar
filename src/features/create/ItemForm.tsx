@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CalendarPickerSheet } from '@/features/calendars/CalendarPickerSheet';
@@ -18,6 +19,7 @@ import { useAccent, usePrefs } from '@/theme/prefs';
 import {
   alpha,
   color,
+  duration,
   hitSlopFor,
   radius,
   space,
@@ -101,6 +103,14 @@ const SCOPE_COPY: Record<
  * The reminders are left outside that view on purpose, and the button says
  * GUARDAR AVISOS: they belong to the app rather than to the event, so they can
  * be changed on an event the app may not touch.
+ *
+ * Editing an item shows no button at all, and holds no space for one either,
+ * until something about it actually differs from what the screen opened with
+ * — `useItemForm` decides that, not this file. Opening an item is purely
+ * looking at it, the ScrollView above takes the room a button would have used,
+ * and a button only turns up, taking that room back, once there is something
+ * to save. Creating one is the older rule: the button is there from the start,
+ * disabled until the title is filled in.
  *
  * The sheets live here rather than inside the blocks: they have to sit above the
  * form, not inside the list that scrolls.
@@ -254,13 +264,33 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           ) : null}
         </ScrollView>
 
-        {form.readOnly ? (
-          <Cta primary label="GUARDAR AVISOS" onPress={form.save} />
+        {form.isEditing ? (
+          /**
+           * No slot is reserved for this: the ScrollView above has no fixed
+           * height of its own, so it simply shrinks to fit whatever the rest of
+           * the screen leaves it, and removing this element gives the room
+           * straight back to the event.
+           */
+          form.canSave ? (
+            <Animated.View
+              entering={
+                prefs.motionOff ? undefined : FadeIn.duration(duration.state)
+              }
+              exiting={
+                prefs.motionOff ? undefined : FadeOut.duration(duration.press)
+              }>
+              <Cta
+                primary
+                label={form.readOnly ? 'GUARDAR AVISOS' : 'GUARDAR CAMBIOS'}
+                onPress={form.save}
+              />
+            </Animated.View>
+          ) : null
         ) : (
           <Cta
             primary
             disabled={!form.canSave}
-            label={form.isEditing ? 'GUARDAR CAMBIOS' : COPY[form.kind].cta}
+            label={COPY[form.kind].cta}
             onPress={form.save}
           />
         )}

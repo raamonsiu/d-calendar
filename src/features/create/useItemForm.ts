@@ -17,6 +17,7 @@ import {
   readDeviceGuests,
   updateDeviceEvent,
   type DeviceCreateResult,
+  type DeviceUpdateResult,
   type SeriesScope,
 } from '@/services/deviceCalendars';
 import { calendarOptions, writableCalendars } from '@/store/selectors';
@@ -125,29 +126,33 @@ function nextSlot() {
  * What the guest list of an event can do, and the line explaining it.
  *
  * There are four answers and each one is a different promise, so they are
- * decided here rather than woven through the interface. An event that came from
- * the device or from a subscription shows the guests it already has and sends
- * them nowhere else. A calendar of the device that takes attendees really does
- * invite: the account syncing it mails them. One that does not take them is not
- * offered a guest list at all, because writing one would leave the guest on the
- * phone. And a calendar of the app keeps the guest as a note, which is the one
- * case worth saying out loud.
+ * decided here rather than woven through the interface. A subscription, or a
+ * device event that is not the user's to touch at all, shows the guests it
+ * already has and sends them nowhere else — `notOwn` is what a save could not
+ * reach anyway, not "came from the device", so it does not catch a device event
+ * of the user's own along with them, which is the mistake this used to make: an
+ * event created here with guests could not have a single one added back once
+ * saved. A calendar of the device that takes attendees really does invite: the
+ * account syncing it mails them. One that does not take them is not offered a
+ * guest list at all, because writing one would leave the guest on the phone.
+ * And a calendar of the app keeps the guest as a note, which is the one case
+ * worth saying out loud.
  *
  * Postcondition: `note` is never null, so the block always says what will
  * happen.
  *
- * @param where Whether the event being edited came from outside the app,
- * whether the destination is a calendar of the device, and whether that calendar
- * takes guests; see `Calendar.canInvite`.
+ * @param where Whether the event being edited is not the user's to save at
+ * all, whether the destination is a calendar of the device, and whether that
+ * calendar takes guests; see `Calendar.canInvite`.
  */
 function guestRule(where: {
-  foreign: boolean;
+  notOwn: boolean;
   onDevice: boolean;
   canInvite: boolean;
 }) {
-  const { foreign, onDevice, canInvite } = where;
+  const { notOwn, onDevice, canInvite } = where;
 
-  if (foreign) {
+  if (notOwn) {
     return {
       readOnly: true,
       note: 'Los invitados vienen del calendario y se cambian allí.',
@@ -185,6 +190,147 @@ function createdMessage(result: DeviceCreateResult, moved: boolean) {
   if (!result.created) return 'No se pudo crear el evento';
   if (result.guestsFailed) return 'Evento creado, pero faltan invitados';
   return moved ? 'Evento movido' : 'Evento creado';
+}
+
+/**
+ * What the toast says after saving an event of the device, guests included.
+ *
+ * @param result How the save went.
+ */
+function savedMessage(result: DeviceUpdateResult) {
+  if (!result.saved) return 'No se pudo guardar el cambio';
+  if (result.guestsFailed) return 'Cambios guardados, pero faltan invitados';
+  return 'Cambios guardados';
+}
+
+/**
+ * True when two lists hold the same values, order and duplicates aside.
+ *
+ * What Guardar can change is mostly a handful of scalars and a few lists whose
+ * order carries no meaning of its own — the weekdays ticked, the guests
+ * invited, the reminders set. Comparing those as ordered arrays would call an
+ * edit that only reordered them a change, when nothing was actually saved
+ * differently.
+ *
+ * @param a One list.
+ * @param b The other.
+ * @param key Turns a value into the string two equal values share.
+ */
+function sameMultiset<Value>(
+  a: Value[],
+  b: Value[],
+  key: (value: Value) => string,
+): boolean {
+  if (a.length !== b.length) return false;
+
+  const left = a.map(key).sort();
+  const right = b.map(key).sort();
+  return left.every((value, index) => value === right[index]);
+}
+
+const relativeReminderKey = (reminder: RelativeReminder) =>
+  `${reminder.value}:${reminder.unit}`;
+const timeReminderKey = (reminder: TimeReminder) => reminder.time;
+
+/** What Guardar can change on an event, before and after; see `eventChanged`. */
+type EventSnapshot = {
+  title: string;
+  description: string;
+  location: string;
+  startsAt: number;
+  endsAt: number;
+  allDay: boolean;
+  repeat: RepeatRule;
+  weekdays: number[];
+  calendarId: string;
+  availability: Availability;
+  visibility: Visibility;
+  guests: Guest[];
+  reminders: RelativeReminder[];
+};
+
+/**
+ * Whether an event differs from the state Guardar opened with.
+ *
+ * Every field Guardar can touch is compared, and nothing else needs to be:
+ * a field the interface currently hides — the repeat chips on a repetition, the
+ * visibility on a device event — cannot be reached by the user in the first
+ * place, so `before` and `now` already agree on it and it never causes a false
+ * positive.
+ *
+ * @param before Snapshot taken when the screen opened.
+ * @param now Snapshot of the current state.
+ */
+function eventChanged(before: EventSnapshot, now: EventSnapshot) {
+  return (
+    now.title !== before.title ||
+    now.description !== before.description ||
+    now.location !== before.location ||
+    now.startsAt !== before.startsAt ||
+    now.endsAt !== before.endsAt ||
+    now.allDay !== before.allDay ||
+    now.repeat !== before.repeat ||
+    now.calendarId !== before.calendarId ||
+    now.availability !== before.availability ||
+    now.visibility !== before.visibility ||
+    !sameMultiset(now.weekdays, before.weekdays, String) ||
+    !sameMultiset(now.guests, before.guests, (guest) => guest.id) ||
+    !sameMultiset(now.reminders, before.reminders, relativeReminderKey)
+  );
+}
+
+/** What Guardar can change on a task; see `taskChanged`. */
+type TaskSnapshot = {
+  title: string;
+  description: string;
+  dueAt: number | null;
+  hasTime: boolean;
+  vagueMonth: string | null;
+  reminders: RelativeReminder[];
+};
+
+/**
+ * Whether a task differs from the state Guardar opened with.
+ *
+ * @param before Snapshot taken when the screen opened.
+ * @param now Snapshot of the current state.
+ */
+function taskChanged(before: TaskSnapshot, now: TaskSnapshot) {
+  return (
+    now.title !== before.title ||
+    now.description !== before.description ||
+    now.dueAt !== before.dueAt ||
+    now.hasTime !== before.hasTime ||
+    now.vagueMonth !== before.vagueMonth ||
+    !sameMultiset(now.reminders, before.reminders, relativeReminderKey)
+  );
+}
+
+/** What Guardar can change on a habit; see `habitChanged`. */
+type HabitSnapshot = {
+  name: string;
+  description: string;
+  frequency: HabitFrequency;
+  target: number;
+  weekdays: number[];
+  reminders: TimeReminder[];
+};
+
+/**
+ * Whether a habit differs from the state Guardar opened with.
+ *
+ * @param before Snapshot taken when the screen opened.
+ * @param now Snapshot of the current state.
+ */
+function habitChanged(before: HabitSnapshot, now: HabitSnapshot) {
+  return (
+    now.name !== before.name ||
+    now.description !== before.description ||
+    now.frequency !== before.frequency ||
+    now.target !== before.target ||
+    !sameMultiset(now.weekdays, before.weekdays, String) ||
+    !sameMultiset(now.reminders, before.reminders, timeReminderKey)
+  );
 }
 
 /**
@@ -237,6 +383,22 @@ export function useItemForm(editing?: Editing) {
     editedEvent?.visibility ?? 'Predet.',
   );
   const [guests, setGuests] = useState<Guest[]>(editedEvent?.guests ?? []);
+
+  /**
+   * Frozen the moment the screen opens, so Guardar has something fixed to
+   * compare the current state against; see `isDirty` below. A prop that only
+   * looks stable is not enough here — `editing.item` is the store's own object,
+   * and a background sync refreshing it mid-edit would otherwise drag the
+   * baseline along with it. `initialGuests` is kept apart from `initialEvent`
+   * because it is the one part of the baseline that cannot be known yet at this
+   * point: a device event's guests load after the screen has already opened.
+   */
+  const [initialEvent] = useState(editedEvent);
+  const [initialTask] = useState(editedTask);
+  const [initialHabit] = useState(editedHabit);
+  const [initialGuests, setInitialGuests] = useState(
+    editedEvent?.guests ?? [],
+  );
 
   const isDeviceEvent = !!editedEvent && isDeviceId(editedEvent.id);
   const isSubscribedEvent = !!editedEvent && isSubscriptionId(editedEvent.id);
@@ -294,7 +456,14 @@ export function useItemForm(editing?: Editing) {
 
     let active = true;
     readDeviceGuests(deviceEventId).then((loaded) => {
-      if (active) setGuests(loaded);
+      if (!active) return;
+      setGuests(loaded);
+      /**
+       * The baseline moves with it: this load is the guest list settling into
+       * what it already was, not an edit, and without this Guardar would light
+       * up the moment it finished.
+       */
+      setInitialGuests(loaded);
     });
 
     return () => {
@@ -384,7 +553,14 @@ export function useItemForm(editing?: Editing) {
   };
 
   const guestRules = guestRule({
-    foreign: isDeviceEvent || isSubscribedEvent,
+    /**
+     * Not `isForeignId`: that would be true for every device event, including
+     * an editable one of the user's own, and block guests on exactly the events
+     * that should offer them. What a save cannot reach is a subscription, or a
+     * device event `readOnly` above already ruled out — someone else's, or a
+     * calendar the system will not let the app write to.
+     */
+    notOwn: isSubscribedEvent || (isDeviceEvent && readOnly),
     onDevice: isDeviceTarget,
     canInvite: !!targetCalendar?.canInvite,
   });
@@ -398,8 +574,6 @@ export function useItemForm(editing?: Editing) {
     );
     return [...upcoming, NO_MONTH];
   }, []);
-
-  const canSave = title.trim().length > 0;
 
   /** Goes back to the previous screen, or to Home when there is no history. */
   const close = () => {
@@ -448,6 +622,26 @@ export function useItemForm(editing?: Editing) {
   });
 
   /**
+   * Whether the item being edited differs from the one the screen opened with.
+   * Creating something new is never "no changes" — there is nothing yet to
+   * compare against — so this only applies in edit mode, and it is what stops
+   * Guardar from writing back an event nobody touched.
+   */
+  const isDirty =
+    !editing ||
+    (kind === 'event'
+      ? !initialEvent ||
+        eventChanged(
+          { ...initialEvent, guests: initialGuests },
+          buildEvent(),
+        )
+      : kind === 'task'
+        ? !initialTask || taskChanged(initialTask, buildTask())
+        : !initialHabit || habitChanged(initialHabit, buildHabit()));
+
+  const canSave = title.trim().length > 0 && isDirty;
+
+  /**
    * Writes an event of the device back to the calendar it came from, and closes
    * either way.
    *
@@ -467,9 +661,9 @@ export function useItemForm(editing?: Editing) {
   ) => {
     close();
 
-    updateDeviceEvent(id, payload, scope).then((saved) => {
-      if (saved) useAppStore.getState().refresh();
-      toast.show(saved ? 'Cambios guardados' : 'No se pudo guardar el cambio');
+    updateDeviceEvent(id, payload, scope).then((result) => {
+      if (result.saved) useAppStore.getState().refresh();
+      toast.show(savedMessage(result));
     });
   };
 

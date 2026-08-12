@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -9,9 +9,12 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
+  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +25,7 @@ import { formatAgo } from '@/lib/date';
 import { isDeviceId } from '@/lib/sourceIds';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText, Label } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import {
   OVERLAY_OPACITY,
   color,
@@ -62,6 +65,9 @@ const DRAG_ACTIVATION = 10;
 
 /** The calendar dots of the menu are smaller than the ones in the form. */
 const DRAWER_DOT_SIZE = 6;
+
+/** One full turn of the refresh icon while a sync is in flight. */
+const SPIN_MS = 900;
 
 /** Destinations in the menu footer. */
 const MENU_ITEMS = [
@@ -110,6 +116,32 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
    */
   const refreshing = readingDevice || downloading;
   const lastSync = useAppStore((state) => state.lastSync);
+
+  /**
+   * Turns while `refreshing` is true, and eases back to rest rather than
+   * snapping when it stops, so the icon does not jump mid-turn. `readDeviceCalendarData`
+   * and the subscription downloads are already asynchronous — this is only the
+   * part that shows it.
+   */
+  const { motionOff } = usePrefs();
+  const spin = useSharedValue(0);
+
+  useEffect(() => {
+    if (refreshing && !motionOff) {
+      spin.value = 0;
+      spin.value = withRepeat(
+        withTiming(360, { duration: SPIN_MS, easing: Easing.linear }),
+        -1,
+      );
+    } else {
+      cancelAnimation(spin);
+      spin.value = withTiming(0, { duration: 150 });
+    }
+  }, [motionOff, refreshing, spin]);
+
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spin.value}deg` }],
+  }));
 
   const { mounted, progress } = usePanelTransition(open, onClose);
   const dragOffset = useSharedValue(0);
@@ -253,10 +285,12 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 styles.refresh,
                 pressed && { borderColor: accent },
               ]}>
-              <ArrowsClockwiseIcon
-                size={14}
-                color={refreshing ? accent : color.textMuted}
-              />
+              <Animated.View style={spinStyle}>
+                <ArrowsClockwiseIcon
+                  size={14}
+                  color={refreshing ? accent : color.textMuted}
+                />
+              </Animated.View>
               <AppText style={styles.refreshLabel}>
                 Actualizar calendarios
               </AppText>

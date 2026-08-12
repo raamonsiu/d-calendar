@@ -799,6 +799,7 @@ export type DeviceEventChanges = {
   endsAt: number;
   allDay: boolean;
   availability: Availability;
+  guests: Guest[];
 };
 
 /**
@@ -814,19 +815,25 @@ export type DeviceEventDraft = DeviceEventChanges & {
   repeat: RepeatRule;
   weekdays: number[];
   reminders: RelativeReminder[];
-  guests: Guest[];
 };
 
 /**
- * How a create went.
+ * How a create or a save that touches guests went.
  *
- * The two are separate because the event can be created and the guests still
- * not reach anybody, and a screen that only knew "it worked" would report a
- * meeting nobody was told about.
+ * The two are separate because the rest of the event can go through and the
+ * guests still not reach anybody, and a screen that only knew "it worked" would
+ * report a meeting nobody was told about.
  */
 export type DeviceCreateResult = {
   created: boolean;
   /** True when at least one guest was refused by the system. */
+  guestsFailed: boolean;
+};
+
+/** How a save to an existing event of the device went. */
+export type DeviceUpdateResult = {
+  saved: boolean;
+  /** True when at least one guest could not be added or removed. */
   guestsFailed: boolean;
 };
 
@@ -862,8 +869,8 @@ async function destinationCalendar(calendarId: string) {
  *
  * The app's own list of reminders is not kept apart: the alarms travel with the
  * event, so it is the calendar it now lives in that announces it. The guests
- * travel with it too, and that is what sends the invitations out; `inviteGuests`
- * says how.
+ * travel with it too, and that is what sends the invitations out; `updateGuests`
+ * says how, and it is also what a save reaches for when the guest list changed.
  *
  * Precondition: `calendarId` names a calendar that is not `readOnly`, which is
  * what the form offers. Postcondition: `created` is false when the system does
@@ -893,7 +900,7 @@ export async function createDeviceEvent(
       alarms: draft.reminders.map(toAlarm),
     });
 
-    const guestsFailed = await inviteGuests(event, calendar, draft.guests);
+    const guestsFailed = await updateGuests(event, calendar, draft.guests);
     return { created: true, guestsFailed };
   } catch (error) {
     console.warn('No se pudo crear el evento en el calendario', error);
@@ -902,28 +909,37 @@ export async function createDeviceEvent(
 }
 
 /**
- * Adds the guests to an event that has just been created.
+ * Reconciles the guests of an event with what the form built, on a create and
+ * on a save alike.
+ *
+ * A guest already on the device carries the device id `readDeviceGuests` gave
+ * it; anything else is one typed into the form since, new or not. What used to
+ * be there and is no longer in the list is removed; what is new and has an
+ * address is invited; a guest that is in both is left exactly as it is, because
+ * there is no such thing as renaming an attendee, only removing one and adding
+ * another. On a freshly created event there is nothing to remove yet, which is
+ * what turns this into the plain "invite everyone" a create needs.
  *
  * Nothing is sent from here: the guest is written into the calendar, and it is
  * the account syncing it that turns that into an invitation and mails it. Which
  * is why it only works where the account takes attendees at all, and why the
  * form does not offer guests anywhere else.
  *
- * They are written one at a time and on purpose: each one is a separate write,
- * and one address the system refuses should not take the rest of the list with
- * it. The event is already created by this point, so a failure here is reported
- * rather than undone.
+ * Removals and invitations are written one at a time and on purpose: each is a
+ * separate write, and one address the system refuses should not take the rest
+ * of the list with it.
  *
- * Postcondition: returns true when at least one guest could not be added, which
- * includes a calendar that takes none while the list is not empty — the event
- * happens either way, and the caller is the one that has to say so. A guest with
- * no address is not counted: there was nowhere to send anything.
+ * Postcondition: returns true when at least one guest could not be added or
+ * removed, which includes a calendar that takes none while the list is not
+ * empty — the event stands either way, and the caller is the one that has to
+ * say so. A guest with no address is never invited: there was nowhere to send
+ * anything.
  *
- * @param event Event just created, as the device stores it.
- * @param calendar Calendar it was created in.
- * @param guests Guests the form built.
+ * @param event Event as the device stores it, just created or being saved.
+ * @param calendar Calendar it belongs to.
+ * @param guests Guest list the form built.
  */
-async function inviteGuests(
+async function updateGuests(
   event: ExpoCalendar.ExpoCalendarEvent,
   calendar: ExpoCalendar.ExpoCalendar,
   guests: Guest[],
@@ -933,8 +949,23 @@ async function inviteGuests(
   if (!type) return invitable.length > 0;
 
   let failed = false;
+  const before = await event.getAttendees().catch(() => []);
+  const keep = new Set(guests.map((guest) => guest.id));
+
+  for (const attendee of before) {
+    if (keep.has(toGuest(attendee).id)) continue;
+    try {
+      await attendee.delete();
+    } catch (error) {
+      failed = true;
+      console.warn('No se pudo quitar al invitado', error);
+    }
+  }
+
+  const already = new Set(before.map((attendee) => toGuest(attendee).id));
 
   for (const guest of invitable) {
+    if (already.has(guest.id)) continue;
     try {
       await event.createAttendee({
         email: guest.email,
@@ -1025,16 +1056,23 @@ function instanceStartDate(instant: number) {
 }
 
 /**
- * Writes the changes of an event back to the calendar it came from.
+ * Writes the changes of an event back to the calendar it came from, guests
+ * included.
  *
- * Only the fields the app can express are touched, so anything the system holds
- * and the model does not — the guests, the repetition — is left exactly as it
- * was instead of being wiped by omission.
+ * Only the fields the app can express are touched otherwise, so anything the
+ * system holds and the model does not — the recurrence rule itself — is left
+ * exactly as it was instead of being wiped by omission. The recurrence rule
+ * applies to the guests too: they are read and written back by
+ * `event.calendarId`, which on Android is the master row of the whole series
+ * whatever occurrence was opened, so a guest added from one Tuesday is a guest
+ * of every Tuesday. There is no other shape to save them in — the provider has
+ * no notion of a per-occurrence attendee — and it is the same reason the save
+ * itself reaches the whole series there.
  *
  * Precondition: `canEditDeviceEvent` said yes, and `scope` is one of
- * `DEVICE_EDIT_SCOPES` when the event repeats. Postcondition: returns false
+ * `DEVICE_EDIT_SCOPES` when the event repeats. Postcondition: `saved` is false
  * when the event is no longer in the last read or the system refuses the
- * change, and nothing is written.
+ * change, and then nothing at all was written, guests included.
  *
  * @param id Id of the event in the app's model.
  * @param changes New values for the fields the app owns.
@@ -1044,9 +1082,9 @@ export async function updateDeviceEvent(
   id: string,
   changes: DeviceEventChanges,
   scope: SeriesScope = 'series',
-) {
+): Promise<DeviceUpdateResult> {
   const event = readEvents.get(id);
-  if (!event) return false;
+  if (!event) return { saved: false, guestsFailed: false };
 
   try {
     if (event.recurrenceRule) await updateSeries(event, id, changes, scope);
@@ -1060,11 +1098,33 @@ export async function updateDeviceEvent(
         availability: toDeviceAvailability(changes.availability),
       });
     }
-    return true;
+
+    const calendar = calendarOf(event);
+    const guestsFailed = calendar
+      ? await updateGuests(event, calendar, changes.guests)
+      : changes.guests.some((guest) => guest.email);
+
+    return { saved: true, guestsFailed };
   } catch (error) {
     console.warn('No se pudo guardar el cambio en el calendario', error);
-    return false;
+    return { saved: false, guestsFailed: false };
   }
+}
+
+/**
+ * Calendar an event of the last read belongs to, out of the cache the same
+ * read filled.
+ *
+ * Postcondition: returns undefined when that calendar is no longer in the
+ * cache, which only happens if it was removed from the phone between the read
+ * and the save.
+ *
+ * @param event Event as the device stores it.
+ */
+function calendarOf(event: ExpoCalendar.ExpoCalendarEvent) {
+  return event.calendarId
+    ? readCalendars.get(toDeviceId(event.calendarId))
+    : undefined;
 }
 
 /**

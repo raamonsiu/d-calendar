@@ -59,11 +59,25 @@ type SheetProps = {
  * time picker wheels, the changelog list).
  *
  * Without `title` no header is drawn, and then there is no drag gesture either.
+ *
+ * Opening or closing one dismisses whatever keyboard is up. Opening: a sheet
+ * asking to pick a time or a calendar has nothing for it to focus, so a field
+ * left focused behind it would just sit there covering half the sheet until
+ * the user found an empty spot to tap. Closing: a sheet that does have a field
+ * of its own, like the guest one, leaves it focused when it closes on its own
+ * action — pressing INVITAR does not blur the field it sits next to — and the
+ * keyboard would otherwise stay up with nothing left on screen to type into.
+ * Focusing the field while the sheet is open still opens the keyboard the
+ * normal way; this only ever closes it.
  */
 export function Sheet({ open, onClose, title, children }: SheetProps) {
   const resolveDuration = useDuration();
   const insets = useSafeAreaInsets();
   const { mounted, progress } = usePanelTransition(open, onClose);
+
+  useEffect(() => {
+    Keyboard.dismiss();
+  }, [open]);
 
   const sheetHeight = useSharedValue(600);
   const dragOffset = useSharedValue(0);

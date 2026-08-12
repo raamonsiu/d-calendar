@@ -1,4 +1,4 @@
-import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
+import { Keyboard, StyleSheet, TextInput, type TextInputProps } from 'react-native';
 
 import { fontFamily, scaleType } from '@/theme/Text';
 import { usePrefs } from '@/theme/prefs';
@@ -15,6 +15,12 @@ type FieldProps = TextInputProps & {
 /**
  * Text field of the app. Resolves the font family and the global scale just
  * like `<AppText>`, and in the `boxed` variant it adds the full control.
+ *
+ * A single-line field dismisses the keyboard on Enter by default, so the user
+ * is never left having to tap somewhere empty just to put it away; a caller
+ * that wants its own `returnKeyType` or `onSubmitEditing` still gets it, since
+ * that is set after these defaults. `multiline` gets neither: Enter there
+ * writes a line break, not a submit.
  */
 export function Field({
   variant = 'boxed',
@@ -28,6 +34,8 @@ export function Field({
       placeholderTextColor={color.ghost}
       cursorColor={color.text}
       selectionColor={color.border}
+      returnKeyType={rest.multiline ? undefined : 'done'}
+      onSubmitEditing={rest.multiline ? undefined : () => Keyboard.dismiss()}
       {...rest}
       style={[
         styles.base,
