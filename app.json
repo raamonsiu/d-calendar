@@ -19,7 +19,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.d1ito.NCALENDAR"
+      "package": "com.d1ito.NCALENDAR",
+      "permissions": [
+        "USE_EXACT_ALARM"
+      ]
     },
     "web": {
       "output": "static",
