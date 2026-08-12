@@ -11,15 +11,17 @@
  * take scrolling past a long resource list to reach. "Recursos populares" is
  * the only thing that scrolls.
  *
- * Mock: sending feedback calls no service; the sheet just moves to its "sent"
- * state and the fields are cleared on close.
+ * Sending a report calls `sendFeedback`, which relays it through EmailJS:
+ * the app has no server of its own to land it on. A failed send keeps the
+ * form open with a toast instead of clearing it, so nothing typed is lost.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { TOPICS } from '@/data/help';
 import { groupRadius } from '@/lib/groupRadius';
+import { sendFeedback } from '@/services/feedback';
 import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
 import { alpha, color, radius, tint } from '@/theme/tokens';
@@ -28,6 +30,7 @@ import { Field } from '@/ui/Field';
 import { Group } from '@/ui/Group';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
+import { useToast } from '@/ui/Toast';
 import { Cta } from '@/ui/controls';
 import {
   CaretRightIcon,
@@ -50,16 +53,31 @@ type FeedbackStep = 'form' | 'sent' | null;
 
 export default function HelpScreen() {
   const accent = useAccent();
+  const toast = useToast();
 
   const [step, setStep] = useState<FeedbackStep>(null);
   const [kind, setKind] = useState(FEEDBACK_KINDS[0]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
 
   const closeFeedback = () => {
     setStep(null);
     setTitle('');
     setBody('');
+  };
+
+  const submitFeedback = async () => {
+    Keyboard.dismiss();
+    setSending(true);
+    const sent = await sendFeedback({ kind, title, body });
+    setSending(false);
+
+    if (sent) {
+      setStep('sent');
+    } else {
+      toast.show('No se pudo enviar. Inténtalo de nuevo.');
+    }
   };
 
   return (
@@ -117,9 +135,9 @@ export default function HelpScreen() {
               <View style={styles.submit}>
                 <Cta
                   primary
-                  disabled={!title.trim()}
-                  label="ENVIAR"
-                  onPress={() => setStep('sent')}
+                  disabled={!title.trim() || sending}
+                  label={sending ? 'ENVIANDO…' : 'ENVIAR'}
+                  onPress={submitFeedback}
                 />
               </View>
             </View>
@@ -139,8 +157,8 @@ export default function HelpScreen() {
                 Comentario enviado
               </AppText>
               <AppText style={styles.sentText}>
-                Gracias. Si hace falta más contexto te escribimos a
-                dani@digimevo.com.
+                Gracias. Si hace falta más contexto, escribe a{' '}
+                {SUPPORT_EMAIL}.
               </AppText>
             </View>
           )}

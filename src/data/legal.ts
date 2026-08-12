@@ -59,7 +59,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       ),
       heading('Si nos escribes'),
       paragraph(
-        'Ayuda y comentarios te deja mandar un mensaje. Lo que escribas ahí, y la dirección desde la que lo mandes si dejas una, se usa solo para leerlo y responderte: nunca para nada más.',
+        'Ayuda y comentarios te deja mandar un mensaje. Como la app no tiene servidor propio, ese mensaje viaja a través de EmailJS, un intermediario que solo lo convierte en un correo a la bandeja del desarrollador y no lo usa para nada más. Lo que escribas ahí, y la dirección desde la que lo mandes si dejas una, se usa solo para leerlo y responderte.',
       ),
       heading('Permisos que pide la app'),
       paragraph(
