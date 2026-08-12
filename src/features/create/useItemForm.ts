@@ -145,7 +145,7 @@ function nextSlot() {
  * all, whether the destination is a calendar of the device, and whether that
  * calendar takes guests; see `Calendar.canInvite`.
  */
-function guestRule(where: {
+export function guestRule(where: {
   notOwn: boolean;
   onDevice: boolean;
   canInvite: boolean;
@@ -216,7 +216,7 @@ function savedMessage(result: DeviceUpdateResult) {
  * @param b The other.
  * @param key Turns a value into the string two equal values share.
  */
-function sameMultiset<Value>(
+export function sameMultiset<Value>(
   a: Value[],
   b: Value[],
   key: (value: Value) => string,
@@ -228,12 +228,12 @@ function sameMultiset<Value>(
   return left.every((value, index) => value === right[index]);
 }
 
-const relativeReminderKey = (reminder: RelativeReminder) =>
+export const relativeReminderKey = (reminder: RelativeReminder) =>
   `${reminder.value}:${reminder.unit}`;
-const timeReminderKey = (reminder: TimeReminder) => reminder.time;
+export const timeReminderKey = (reminder: TimeReminder) => reminder.time;
 
 /** What Guardar can change on an event, before and after; see `eventChanged`. */
-type EventSnapshot = {
+export type EventSnapshot = {
   title: string;
   description: string;
   location: string;
@@ -261,7 +261,7 @@ type EventSnapshot = {
  * @param before Snapshot taken when the screen opened.
  * @param now Snapshot of the current state.
  */
-function eventChanged(before: EventSnapshot, now: EventSnapshot) {
+export function eventChanged(before: EventSnapshot, now: EventSnapshot) {
   return (
     now.title !== before.title ||
     now.description !== before.description ||
@@ -280,7 +280,7 @@ function eventChanged(before: EventSnapshot, now: EventSnapshot) {
 }
 
 /** What Guardar can change on a task; see `taskChanged`. */
-type TaskSnapshot = {
+export type TaskSnapshot = {
   title: string;
   description: string;
   dueAt: number | null;
@@ -295,7 +295,7 @@ type TaskSnapshot = {
  * @param before Snapshot taken when the screen opened.
  * @param now Snapshot of the current state.
  */
-function taskChanged(before: TaskSnapshot, now: TaskSnapshot) {
+export function taskChanged(before: TaskSnapshot, now: TaskSnapshot) {
   return (
     now.title !== before.title ||
     now.description !== before.description ||
@@ -307,7 +307,7 @@ function taskChanged(before: TaskSnapshot, now: TaskSnapshot) {
 }
 
 /** What Guardar can change on a habit; see `habitChanged`. */
-type HabitSnapshot = {
+export type HabitSnapshot = {
   name: string;
   description: string;
   frequency: HabitFrequency;
@@ -322,7 +322,7 @@ type HabitSnapshot = {
  * @param before Snapshot taken when the screen opened.
  * @param now Snapshot of the current state.
  */
-function habitChanged(before: HabitSnapshot, now: HabitSnapshot) {
+export function habitChanged(before: HabitSnapshot, now: HabitSnapshot) {
   return (
     now.name !== before.name ||
     now.description !== before.description ||

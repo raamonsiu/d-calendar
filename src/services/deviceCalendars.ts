@@ -909,6 +909,33 @@ export async function createDeviceEvent(
 }
 
 /**
+ * Which of the device's current attendees to drop and which of the form's
+ * guests to invite, comparing what is already there against what was built.
+ *
+ * Pulled out of `updateGuests` as the one part of it with no write to make: a
+ * guest present on both sides is in neither list, because there is no such
+ * thing as renaming an attendee in place, only removing one and adding
+ * another.
+ *
+ * Postcondition: a guest with no address is never in `toInvite`, since there
+ * would be nowhere to send anything.
+ *
+ * @param beforeIds Ids `toGuest` gave the attendees the device already has.
+ * @param guests Guest list the form built.
+ */
+export function guestDiff(beforeIds: string[], guests: Guest[]) {
+  const keep = new Set(guests.map((guest) => guest.id));
+  const already = new Set(beforeIds);
+
+  return {
+    removeIds: beforeIds.filter((id) => !keep.has(id)),
+    toInvite: guests.filter(
+      (guest) => !!guest.email && !already.has(guest.id),
+    ),
+  };
+}
+
+/**
  * Reconciles the guests of an event with what the form built, on a create and
  * on a save alike.
  *
@@ -950,10 +977,14 @@ async function updateGuests(
 
   let failed = false;
   const before = await event.getAttendees().catch(() => []);
-  const keep = new Set(guests.map((guest) => guest.id));
+  const { removeIds, toInvite } = guestDiff(
+    before.map((attendee) => toGuest(attendee).id),
+    guests,
+  );
+  const removeSet = new Set(removeIds);
 
   for (const attendee of before) {
-    if (keep.has(toGuest(attendee).id)) continue;
+    if (!removeSet.has(toGuest(attendee).id)) continue;
     try {
       await attendee.delete();
     } catch (error) {
@@ -962,10 +993,7 @@ async function updateGuests(
     }
   }
 
-  const already = new Set(before.map((attendee) => toGuest(attendee).id));
-
-  for (const guest of invitable) {
-    if (already.has(guest.id)) continue;
+  for (const guest of toInvite) {
     try {
       await event.createAttendee({
         email: guest.email,
@@ -1030,7 +1058,7 @@ export const DEVICE_SERIES_KEEPS_LENGTH = Platform.OS === 'android';
  *
  * @param id Id of the event in the app's model.
  */
-function occurrenceStart(id: string) {
+export function occurrenceStart(id: string) {
   const tail = id.slice(id.lastIndexOf(':') + 1);
   if (!tail || tail.length === id.length) return null;
 
@@ -1049,7 +1077,7 @@ function occurrenceStart(id: string) {
  *
  * @param instant When the occurrence starts, in ms.
  */
-function instanceStartDate(instant: number) {
+export function instanceStartDate(instant: number) {
   return Platform.OS === 'android'
     ? String(instant)
     : new Date(instant).toISOString();
@@ -1199,11 +1227,34 @@ async function seriesStart(
   if (start === null || changes.startsAt === start || !event.id) return {};
 
   const series = await ExpoCalendar.ExpoCalendarEvent.get(event.id);
-  const shift = changes.startsAt - start;
 
   return {
-    startDate: new Date(new Date(series.startDate).getTime() + shift),
+    startDate: shiftedStart(
+      new Date(series.startDate).getTime(),
+      start,
+      changes.startsAt,
+    ),
   };
+}
+
+/**
+ * Where the series has to start once one of its occurrences has moved.
+ *
+ * The shift is what travels, not the chosen start itself: writing that
+ * straight to the series would drag the whole series to the day the one
+ * occurrence was on, rather than moving every occurrence by the same amount.
+ *
+ * @param seriesStartMs When the series currently starts.
+ * @param occurrenceStartMs When the occurrence being edited started before
+ * the move.
+ * @param chosenStartMs Where the form moved that occurrence to.
+ */
+export function shiftedStart(
+  seriesStartMs: number,
+  occurrenceStartMs: number,
+  chosenStartMs: number,
+) {
+  return new Date(seriesStartMs + (chosenStartMs - occurrenceStartMs));
 }
 
 /**
