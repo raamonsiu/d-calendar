@@ -22,6 +22,7 @@
  */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -53,7 +54,8 @@ const COLLAPSED_BOX_HEIGHT = 200;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { weekStart } = usePrefs();
+  const { t } = useTranslation();
+  const { weekStart, language } = usePrefs();
   const accent = useAccent();
 
   const [mode, setMode] = useState<CalendarMode>('today');
@@ -111,6 +113,8 @@ export default function HomeScreen() {
     dayEventCount: byDay.get(dayKey(shownDay))?.length ?? 0,
     weekEventCount,
     isCurrentWeek: shownWeek.some((day) => isSameDay(day, today)),
+    language,
+    translate: t,
   });
 
   /**
@@ -152,7 +156,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <IconButton
             size={32}
-            label="Menú"
+            label={t('home.menuButtonLabel')}
             style={styles.menuButton}
             onPress={() => setDrawerOpen(true)}>
             <ListIcon size={20} color={color.textMuted} />
@@ -223,7 +227,7 @@ export default function HomeScreen() {
         )}
 
         <Cta
-          label="CREAR"
+          label={t('home.createButtonLabel')}
           onPress={() => router.push('/create')}
           icon={<PlusIcon size={16} color={accent} />}
         />

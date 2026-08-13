@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FlatList,
   Pressable,
@@ -73,8 +74,9 @@ export function WeekStrip({
   onShowWeek,
   onPressDay,
 }: WeekStripProps) {
-  const { weekStart } = usePrefs();
-  const initials = weekdayInitials(weekStart);
+  const { t } = useTranslation();
+  const { weekStart, language } = usePrefs();
+  const initials = weekdayInitials(weekStart, language);
 
   /**
    * A week is exactly the strip: its width is what the snap is measured from,
@@ -147,7 +149,11 @@ export function WeekStrip({
   return (
     <View style={styles.wrap}>
       <AppText numberOfLines={1} style={styles.weekLabel}>
-        {`SEMANA ${isoWeek(shownWeek[0])} · ${formatShortDate(shownWeek[0])} - ${formatShortDate(shownWeek[DAYS_PER_WEEK - 1])}`}
+        {t('home.weekLabel', {
+          number: isoWeek(shownWeek[0]),
+          start: formatShortDate(shownWeek[0], language),
+          end: formatShortDate(shownWeek[DAYS_PER_WEEK - 1], language),
+        })}
       </AppText>
 
       <View
@@ -217,13 +223,18 @@ function WeekCell({
   eventCount: number;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const accent = useAccent();
   const today = isToday(day);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${initial} ${day.getDate()}, ${eventCount} eventos`}
+      accessibilityLabel={t('home.dayCellLabel', {
+        initial,
+        day: day.getDate(),
+        count: eventCount,
+      })}
       onPress={onPress}
       style={({ pressed }) => [
         styles.cell,

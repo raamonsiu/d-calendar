@@ -1,8 +1,11 @@
 import { router } from 'expo-router';
+import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { NO_MONTH_VALUE } from '@/data/translations/domain';
 import { toggleInList, withoutId } from '@/lib/collections';
-import { MONTHS, withTime } from '@/lib/date';
+import { monthNames, withTime } from '@/lib/date';
 import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
 import { isDeviceId, isForeignId, isSubscriptionId } from '@/lib/sourceIds';
 import { avatarInitial } from '@/lib/text';
@@ -65,26 +68,6 @@ const REPEAT_RULES: RepeatRule[] = [
   'Días de la semana',
   'Cada mes',
 ];
-
-/** Approximate month label used when the task has no month at all. */
-const NO_MONTH = 'Sin mes';
-
-/**
- * What the CUÁNDO box says on one occurrence of a repetition of the device.
- *
- * Two independent facts, and neither is universal, so the line is built out of
- * them rather than written out: whether the save can be aimed at a single day,
- * and whether the length can be changed at all. Both come from `services`,
- * which is where knowing what each system allows belongs.
- */
-const SERIES_NOTE = [
-  DEVICE_EDIT_SCOPES.length === 1
-    ? 'Este evento se repite y el cambio se aplica a todas las repeticiones.'
-    : 'Este evento se repite: al guardar eliges a qué repeticiones afecta.',
-  DEVICE_SERIES_KEEPS_LENGTH ? 'La duración se mantiene.' : null,
-]
-  .filter(Boolean)
-  .join(' ');
 
 /** Step the start time of a new event is rounded up to. */
 const SLOT_MINUTES = 15;
@@ -220,6 +203,23 @@ export function guestRule(where: {
 }
 
 /**
+ * Translation key for each fixed note `guestRule` can produce.
+ *
+ * `guestRule` is a tested pure function whose signature `useItemForm.test.ts`
+ * relies on, so it stays untranslated and keeps returning Spanish - the
+ * translation happens here instead, at the boundary where its result reaches
+ * the interface.
+ */
+const GUEST_NOTE_KEYS: Record<string, string> = {
+  'Los invitados vienen del calendario y se cambian allí.': 'guestNoteForeign',
+  'En un calendario de la app el invitado queda apuntado, pero no se le envía nada.':
+    'guestNoteAppCalendar',
+  'Este calendario no admite invitados desde la app.': 'guestNoteNoInvites',
+  'La invitación la envía la cuenta de este calendario.':
+    'guestNoteDeviceInvites',
+};
+
+/**
  * What the toast says after creating an event in a calendar of the device.
  *
  * A create that went through with a guest left out gets said out loud: the
@@ -228,22 +228,30 @@ export function guestRule(where: {
  *
  * @param result How the create went.
  * @param moved Whether the event was moved out of a calendar of the app.
+ * @param t Translator of the calling component.
  */
-function createdMessage(result: DeviceCreateResult, moved: boolean) {
-  if (!result.created) return 'No se pudo crear el evento';
-  if (result.guestsFailed) return 'Evento creado, pero faltan invitados';
-  return moved ? 'Evento movido' : 'Evento creado';
+function createdMessage(
+  result: DeviceCreateResult,
+  moved: boolean,
+  t: TFunction,
+) {
+  if (!result.created) return t('create.createEventFailedToast');
+  if (result.guestsFailed) return t('create.createEventGuestsFailedToast');
+  return moved
+    ? t('create.eventMovedToast')
+    : t('create.createEventSuccessToast');
 }
 
 /**
  * What the toast says after saving an event of the device, guests included.
  *
  * @param result How the save went.
+ * @param t Translator of the calling component.
  */
-function savedMessage(result: DeviceUpdateResult) {
-  if (!result.saved) return 'No se pudo guardar el cambio';
-  if (result.guestsFailed) return 'Cambios guardados, pero faltan invitados';
-  return 'Cambios guardados';
+function savedMessage(result: DeviceUpdateResult, t: TFunction) {
+  if (!result.saved) return t('create.saveChangeFailedToast');
+  if (result.guestsFailed) return t('create.saveChangesGuestsFailedToast');
+  return t('create.saveChangesToast');
 }
 
 /**
@@ -383,6 +391,7 @@ export function habitChanged(before: HabitSnapshot, now: HabitSnapshot) {
 export type ItemFormState = ReturnType<typeof useItemForm>;
 
 export function useItemForm(editing?: Editing) {
+  const { t } = useTranslation();
   const prefs = usePrefs();
   const toast = useToast();
   const accounts = useAppStore((state) => state.accounts);
@@ -453,6 +462,23 @@ export function useItemForm(editing?: Editing) {
    */
   const inSeries = isDeviceEvent && !!editedEvent.repeats;
   const endLocked = inSeries && DEVICE_SERIES_KEEPS_LENGTH;
+
+  /**
+   * What the CUÁNDO box says on one occurrence of a repetition of the device.
+   *
+   * Two independent facts, and neither is universal, so the line is built out
+   * of them rather than written out: whether the save can be aimed at a
+   * single day, and whether the length can be changed at all. Both come from
+   * `services`, which is where knowing what each system allows belongs.
+   */
+  const seriesNoteText = [
+    DEVICE_EDIT_SCOPES.length === 1
+      ? t('create.seriesNoteAllOccurrences')
+      : t('create.seriesNoteChooseScope'),
+    DEVICE_SERIES_KEEPS_LENGTH ? t('create.seriesNoteDurationKept') : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   /**
    * Moves the start of the event, applying `shiftedEnd` or the locked-length
@@ -580,8 +606,8 @@ export function useItemForm(editing?: Editing) {
       : (writable[0]?.id ?? calendarId);
 
   const destinations = useMemo(
-    () => calendarOptions(calendars, accounts, targetCalendarId),
-    [accounts, calendars, targetCalendarId],
+    () => calendarOptions(calendars, accounts, targetCalendarId, prefs.language),
+    [accounts, calendars, targetCalendarId, prefs.language],
   );
 
   const selectedCalendar = destinations.find(
@@ -620,14 +646,21 @@ export function useItemForm(editing?: Editing) {
     canInvite: !!targetCalendar?.canInvite,
   });
 
-  /** The next five months plus "Sin mes". */
+  /**
+   * The next five months plus "Sin mes", the stored/compared form written to
+   * `task.vagueMonth`. Deliberately always Spanish rather than `prefs.language`:
+   * this is the canonical value the chip writes and compares against, not the
+   * label drawn on it, which `TaskBlock.tsx` translates separately with
+   * `monthLabelFromSpanish`.
+   */
   const monthOptions = useMemo(() => {
+    const spanishMonths = monthNames('es');
     const currentMonth = new Date().getMonth();
     const upcoming = Array.from(
       { length: VAGUE_MONTH_OPTIONS },
-      (_, offset) => MONTHS[(currentMonth + offset) % MONTHS.length],
+      (_, offset) => spanishMonths[(currentMonth + offset) % spanishMonths.length],
     );
-    return [...upcoming, NO_MONTH];
+    return [...upcoming, NO_MONTH_VALUE];
   }, []);
 
   /** Goes back to the previous screen, or to Home when there is no history. */
@@ -660,8 +693,9 @@ export function useItemForm(editing?: Editing) {
       targetCalendarId,
     dueAt: vague ? null : dueAt.getTime(),
     hasTime: vague ? false : hasTime,
-    vagueMonth: vague ? (vagueMonth ?? NO_MONTH) : null,
+    vagueMonth: vague ? (vagueMonth ?? NO_MONTH_VALUE) : null,
     done: editedTask?.done ?? false,
+    doneAt: editedTask?.doneAt ?? null,
     reminders: relativeReminders,
   });
 
@@ -718,7 +752,7 @@ export function useItemForm(editing?: Editing) {
 
     updateDeviceEvent(id, payload, scope).then((result) => {
       if (result.saved) useAppStore.getState().refresh();
-      toast.show(savedMessage(result));
+      toast.show(savedMessage(result, t));
     });
   };
 
@@ -754,7 +788,7 @@ export function useItemForm(editing?: Editing) {
         store.refresh();
       }
 
-      toast.show(createdMessage(result, movedFrom !== null));
+      toast.show(createdMessage(result, movedFrom !== null, t));
     });
   };
 
@@ -789,7 +823,7 @@ export function useItemForm(editing?: Editing) {
         store.setEventReminders(editing.item.id, relativeReminders);
         if (readOnly) {
           close();
-          toast.show('Avisos guardados');
+          toast.show(t('create.saveNotificationsToast'));
           return;
         }
         saveToDevice(editing.item.id, payload, scope);
@@ -803,17 +837,29 @@ export function useItemForm(editing?: Editing) {
 
       if (editing) store.updateEvent(editing.item.id, payload);
       else store.addEvent(payload);
-      toast.show(editing ? 'Cambios guardados' : 'Evento creado');
+      toast.show(
+        editing
+          ? t('create.saveChangesToast')
+          : t('create.createEventSuccessToast'),
+      );
     } else if (kind === 'task') {
       const payload = buildTask();
       if (editing) store.updateTask(editing.item.id, payload);
       else store.addTask(payload);
-      toast.show(editing ? 'Cambios guardados' : 'Tarea creada');
+      toast.show(
+        editing
+          ? t('create.saveChangesToast')
+          : t('create.createTaskSuccessToast'),
+      );
     } else {
       const payload = buildHabit();
       if (editing) store.updateHabit(editing.item.id, payload);
       else store.addHabit(payload);
-      toast.show(editing ? 'Cambios guardados' : 'Hábito creado');
+      toast.show(
+        editing
+          ? t('create.saveChangesToast')
+          : t('create.createHabitSuccessToast'),
+      );
     }
 
     close();
@@ -842,7 +888,11 @@ export function useItemForm(editing?: Editing) {
       close();
       deleteDeviceEvent(editing.item.id, scope).then((deleted) => {
         if (deleted) store.refresh();
-        toast.show(deleted ? 'Evento eliminado' : 'No se pudo eliminar');
+        toast.show(
+          deleted
+            ? t('create.deviceEventDeletedToast')
+            : t('create.deviceEventDeleteFailedToast'),
+        );
       });
       return;
     }
@@ -850,7 +900,9 @@ export function useItemForm(editing?: Editing) {
     const removed = store.removeItem(editing.kind, editing.item.id);
     close();
     if (removed) {
-      toast.showUndo('Elemento eliminado', () => store.restoreItem(removed));
+      toast.showUndo(t('create.itemDeletedToast'), () =>
+        store.restoreItem(removed),
+      );
     }
   };
 
@@ -933,7 +985,7 @@ export function useItemForm(editing?: Editing) {
        */
       endLocked,
       /** The whole box, when the event is one occurrence of a repetition. */
-      seriesNote: inSeries ? SERIES_NOTE : null,
+      seriesNote: inSeries ? seriesNoteText : null,
       allDay,
       setAllDay,
       repeat,
@@ -970,7 +1022,7 @@ export function useItemForm(editing?: Editing) {
        * happens with what is in it. Both come from `guestRule`.
        */
       guestsReadOnly: guestRules.readOnly,
-      guestsNote: guestRules.note,
+      guestsNote: t(`create.${GUEST_NOTE_KEYS[guestRules.note]}`),
       addGuest: (email: string) =>
         setGuests((current) => [
           ...current,

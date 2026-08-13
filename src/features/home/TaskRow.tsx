@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { taskDueLabel } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import { CheckIcon } from '@/ui/icons';
 import type { Task } from '@/types';
@@ -26,8 +27,10 @@ type TaskRowProps = {
  * appears when the task has a date or an approximate month.
  */
 export function TaskRow({ task, onToggle, onOpenSettings }: TaskRowProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
-  const dueLabel = taskDueLabel(task);
+  const { language } = usePrefs();
+  const dueLabel = taskDueLabel(task, language);
 
   return (
     <Pressable
@@ -72,7 +75,7 @@ export function TaskRow({ task, onToggle, onOpenSettings }: TaskRowProps) {
       {dueLabel ? <AppText style={styles.due}>{dueLabel}</AppText> : null}
 
       <ItemSettingsButton
-        label="Ajustes de la tarea"
+        label={t('home.taskSettingsLabel')}
         size={SETTINGS_SIZE}
         onPress={onOpenSettings}
       />

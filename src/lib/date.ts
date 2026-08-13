@@ -1,38 +1,19 @@
 /**
  * Dates of the app. Everything is computed in local time with the native
- * `Date`: there is no i18n dependency because the design is Spanish only.
+ * `Date`. The month/weekday names are the one part that depends on the
+ * language, so every function that names one takes it as a plain parameter
+ * instead of reading a preference itself: this stays a pure module, callable
+ * from a test with no provider running.
  */
-import type { WeekStart } from '@/theme/prefs';
+import { MONTH_LABELS, WEEKDAY_INITIALS, WEEKDAY_LABELS } from '@/data/translations/domain';
+import type { Language, WeekStart } from '@/theme/prefs';
 
-export const MONTHS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
+/** The twelve month names in the active language, `getMonth()` indexed. */
+export const monthNames = (language: Language) => MONTH_LABELS[language];
 
-const MONTHS_LOWER = MONTHS.map((month) => month.toLowerCase());
-
-const WEEKDAYS = [
-  'Domingo',
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-];
-
-/** Initials from the design, indexed by `getDay()` (0 = Sunday). */
-const WEEKDAY_INITIALS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+/** One month name in the active language. */
+export const monthName = (monthIndex: number, language: Language) =>
+  MONTH_LABELS[language][monthIndex];
 
 /** A day in milliseconds, for the offset arithmetic. */
 export const MS_PER_DAY = 86400000;
@@ -60,8 +41,10 @@ export function weekStartIndex(weekStart: WeekStart) {
  * Initial of the weekday a date falls on.
  *
  * @param date Date to take the initial from.
+ * @param language Active language.
  */
-export const weekdayInitial = (date: Date) => WEEKDAY_INITIALS[date.getDay()];
+export const weekdayInitial = (date: Date, language: Language) =>
+  WEEKDAY_INITIALS[language][date.getDay()];
 
 /**
  * The seven initials in the order the grids draw them.
@@ -71,12 +54,14 @@ export const weekdayInitial = (date: Date) => WEEKDAY_INITIALS[date.getDay()];
  * first day of the week according to the preference.
  *
  * @param weekStart Week start preference.
+ * @param language Active language.
  */
-export function weekdayInitials(weekStart: WeekStart) {
+export function weekdayInitials(weekStart: WeekStart, language: Language) {
   const first = weekStartIndex(weekStart);
+  const initials = WEEKDAY_INITIALS[language];
   return Array.from(
     { length: DAYS_PER_WEEK },
-    (_, offset) => WEEKDAY_INITIALS[(first + offset) % DAYS_PER_WEEK],
+    (_, offset) => initials[(first + offset) % DAYS_PER_WEEK],
   );
 }
 
@@ -239,16 +224,16 @@ export const decimalHours = (date: Date) =>
   date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
 
 /** "Miércoles 30 julio" */
-export const formatLongDate = (date: Date) =>
-  `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS_LOWER[date.getMonth()]}`;
+export const formatLongDate = (date: Date, language: Language) =>
+  `${WEEKDAY_LABELS[language][date.getDay()]} ${date.getDate()} ${MONTH_LABELS[language][date.getMonth()].toLowerCase()}`;
 
 /** "Miércoles 30" - the Home title in day mode. */
-export const formatDayTitle = (date: Date) =>
-  `${WEEKDAYS[date.getDay()]} ${date.getDate()}`;
+export const formatDayTitle = (date: Date, language: Language) =>
+  `${WEEKDAY_LABELS[language][date.getDay()]} ${date.getDate()}`;
 
 /** "30 JUL" */
-export const formatShortDate = (date: Date) =>
-  `${date.getDate()} ${MONTHS[date.getMonth()].slice(0, 3).toUpperCase()}`;
+export const formatShortDate = (date: Date, language: Language) =>
+  `${date.getDate()} ${MONTH_LABELS[language][date.getMonth()].slice(0, 3).toUpperCase()}`;
 
 /** Stable key for a day, used to group events by date. */
 export const dayKey = (date: Date) =>
@@ -275,24 +260,61 @@ export function withTime(day: Date, time: Date) {
   );
 }
 
+/** Pieces `formatAgo` composes, one set per language. */
+const AGO_LABELS: Record<
+  Language,
+  {
+    never: string;
+    now: string;
+    minutesAgo: (minutes: number) => string;
+    hoursAgo: (hours: number) => string;
+    daysAgo: (days: number) => string;
+  }
+> = {
+  es: {
+    never: 'NUNCA',
+    now: 'AHORA',
+    minutesAgo: (minutes) => `HACE ${minutes} MIN`,
+    hoursAgo: (hours) => `HACE ${hours} H`,
+    daysAgo: (days) => `HACE ${days} D`,
+  },
+  en: {
+    never: 'NEVER',
+    now: 'NOW',
+    minutesAgo: (minutes) => `${minutes} MIN AGO`,
+    hoursAgo: (hours) => `${hours} H AGO`,
+    daysAgo: (days) => `${days} D AGO`,
+  },
+  ca: {
+    never: 'MAI',
+    now: 'ARA',
+    minutesAgo: (minutes) => `FA ${minutes} MIN`,
+    hoursAgo: (hours) => `FA ${hours} H`,
+    daysAgo: (days) => `FA ${days} D`,
+  },
+};
+
 /**
  * Age in the uppercase format of the side menu: "HACE 4 MIN".
  *
  * Precondition: `timestamp` is an instant in ms, or `null` when it never
- * happened. Postcondition: returns "NUNCA" without a timestamp, "AHORA" below
- * one minute, and from there on the largest unit that reaches 1.
+ * happened. Postcondition: returns the "never" label without a timestamp, the
+ * "now" label below one minute, and from there on the largest unit that
+ * reaches 1.
  *
  * @param timestamp Instant to compare against now, or null.
+ * @param language Active language.
  */
-export function formatAgo(timestamp: number | null) {
-  if (!timestamp) return 'NUNCA';
+export function formatAgo(timestamp: number | null, language: Language) {
+  const labels = AGO_LABELS[language];
+  if (!timestamp) return labels.never;
 
   const minutes = Math.floor((Date.now() - timestamp) / 60000);
-  if (minutes < 1) return 'AHORA';
-  if (minutes < 60) return `HACE ${minutes} MIN`;
+  if (minutes < 1) return labels.now;
+  if (minutes < 60) return labels.minutesAgo(minutes);
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `HACE ${hours} H`;
+  if (hours < 24) return labels.hoursAgo(hours);
 
-  return `HACE ${Math.floor(hours / 24)} D`;
+  return labels.daysAgo(Math.floor(hours / 24));
 }

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { isMultiFrequency, isWeeklyFrequency } from '@/lib/habits';
 import { AppText, Label } from '@/theme/Text';
@@ -18,6 +19,20 @@ const FREQUENCY_OPTIONS: HabitFrequency[] = [
 ];
 
 /**
+ * Translation key of the full-word chip label for each frequency. The
+ * abbreviated card label (`habitFrequencyLabel` in `src/lib/habits.ts`) is a
+ * different string and lives in `domain.ts` instead, because it also needs
+ * the target count; these chips show the plain word, which has no exported
+ * helper of its own.
+ */
+const FREQUENCY_LABEL_KEYS: Record<HabitFrequency, string> = {
+  Diario: 'frequencyDiario',
+  Semanal: 'frequencySemanal',
+  'X por día': 'frequencyXPorDia',
+  'X por semana': 'frequencyXPorSemana',
+};
+
+/**
  * Frequency box of a habit.
  *
  * The "X por" frequencies add the repetition counter and a preview of the
@@ -25,16 +40,17 @@ const FREQUENCY_OPTIONS: HabitFrequency[] = [
  * shows neither.
  */
 export function HabitBlock({ form }: { form: ItemFormState }) {
+  const { t } = useTranslation();
   const accent = useAccent();
   const { habit } = form;
 
   return (
-    <FormBlock first title="TEMPORALIDAD">
+    <FormBlock first title={t('create.frequencyTitle')}>
       <ChipWrap>
         {FREQUENCY_OPTIONS.map((option) => (
           <Chip
             key={option}
-            label={option}
+            label={t(`create.${FREQUENCY_LABEL_KEYS[option]}`)}
             selected={habit.frequency === option}
             onPress={() => habit.setFrequency(option)}
           />
@@ -46,13 +62,13 @@ export function HabitBlock({ form }: { form: ItemFormState }) {
           <View style={styles.counterRow}>
             <AppText style={styles.counterLabel}>
               {habit.frequency === 'X por día'
-                ? 'Veces al día'
-                : 'Veces por semana'}
+                ? t('create.timesPerDayLabel')
+                : t('create.timesPerWeekLabel')}
             </AppText>
             <View style={styles.counter}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Quitar una"
+                accessibilityLabel={t('create.decrementLabel')}
                 onPress={habit.decrement}
                 style={({ pressed }) => [
                   styles.counterButton,
@@ -63,7 +79,7 @@ export function HabitBlock({ form }: { form: ItemFormState }) {
               <AppText style={styles.counterValue}>{habit.count}</AppText>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Añadir una"
+                accessibilityLabel={t('create.incrementLabel')}
                 onPress={habit.increment}
                 style={({ pressed }) => [
                   styles.counterButton,
@@ -85,7 +101,7 @@ export function HabitBlock({ form }: { form: ItemFormState }) {
               />
             ))}
             <AppText style={styles.markerLabel}>
-              MARCADORES EN LA TARJETA
+              {t('create.cardMarkersLabel')}
             </AppText>
           </View>
         </>
@@ -93,7 +109,7 @@ export function HabitBlock({ form }: { form: ItemFormState }) {
 
       {isWeeklyFrequency(habit.frequency) ? (
         <View style={styles.days}>
-          <Label>Días</Label>
+          <Label>{t('create.daysLabel')}</Label>
           <WeekdayChips
             selected={habit.weekdays}
             onToggle={habit.toggleWeekday}

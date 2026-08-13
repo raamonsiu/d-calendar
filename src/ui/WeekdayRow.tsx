@@ -22,11 +22,11 @@ export function WeekdayRow({
   gap: number;
   height?: number;
 }) {
-  const { weekStart } = usePrefs();
+  const { weekStart, language } = usePrefs();
 
   return (
     <View style={[styles.row, { gap, height, marginBottom: gap }]}>
-      {weekdayInitials(weekStart).map((initial, index) => (
+      {weekdayInitials(weekStart, language).map((initial, index) => (
         <AppText
           key={`${index}-${initial}`}
           style={[styles.initial, { width: cellWidth }]}>

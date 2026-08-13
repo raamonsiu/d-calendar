@@ -21,7 +21,7 @@ import {
   addNotificationTapListener,
   cancelPlannedNotifications,
   configureNotifications,
-  ensureNotificationPermission,
+  getNotificationPermission,
   syncNotifications,
 } from './notifications';
 
@@ -43,6 +43,7 @@ export function useNotificationSync() {
     notifyHabits,
     notifyForeignEvents,
     deviceReminders,
+    language,
   } = usePrefs();
   const rebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignature = useRef<string | null>(null);
@@ -55,6 +56,9 @@ export function useNotificationSync() {
     /**
      * Recomputes the plan and hands it over, unless it is the same one the
      * system is already holding.
+     *
+     * Only reads the permission, never prompts for it: that only happens when
+     * the user taps the permission row in onboarding or Settings.
      */
     const rebuild = async () => {
       if (!notifications) {
@@ -63,7 +67,7 @@ export function useNotificationSync() {
         return;
       }
 
-      const granted = await ensureNotificationPermission();
+      const granted = (await getNotificationPermission()) === 'granted';
       if (!active || !granted) return;
 
       const state = useAppStore.getState();
@@ -94,6 +98,7 @@ export function useNotificationSync() {
           habits: notifyHabits ? state.habits : [],
         },
         Date.now(),
+        language,
       );
 
       const signature = planSignature(plan);
@@ -135,6 +140,7 @@ export function useNotificationSync() {
     notifyHabits,
     notifyForeignEvents,
     deviceReminders,
+    language,
   ]);
 
   useEffect(

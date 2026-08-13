@@ -1,3 +1,4 @@
+import { NO_MONTH_VALUE, monthLabelFromSpanish } from '@/data/translations/domain';
 import {
   HOURS_PER_DAY,
   MS_PER_DAY,
@@ -8,7 +9,46 @@ import {
   isSameDay,
   startOfDay,
 } from '@/lib/date';
+import type { Language } from '@/theme/prefs';
 import type { Account, CalEvent, Calendar, Task } from '@/types';
+
+/** Copy this module needs, one set per language. */
+const SELECTOR_LABELS: Record<
+  Language,
+  {
+    sharedBy: (name: string) => string;
+    inThisApp: string;
+    overdue: string;
+    today: string;
+    tomorrow: string;
+    someDay: string;
+  }
+> = {
+  es: {
+    sharedBy: (name) => `Compartido por ${name}`,
+    inThisApp: 'En esta app',
+    overdue: 'VENCE',
+    today: 'HOY',
+    tomorrow: 'MAÑANA',
+    someDay: 'ALGÚN DÍA',
+  },
+  en: {
+    sharedBy: (name) => `Shared by ${name}`,
+    inThisApp: 'In this app',
+    overdue: 'OVERDUE',
+    today: 'TODAY',
+    tomorrow: 'TOMORROW',
+    someDay: 'SOMEDAY',
+  },
+  ca: {
+    sharedBy: (name) => `Compartit per ${name}`,
+    inThisApp: 'En aquesta app',
+    overdue: 'VENÇUT',
+    today: 'AVUI',
+    tomorrow: 'DEMÀ',
+    someDay: 'ALGUN DIA',
+  },
+};
 
 /**
  * Queries over the state. They are pure functions and live outside the store so
@@ -46,14 +86,16 @@ export function writableCalendars(calendars: Calendar[]) {
  *
  * @param calendar Calendar being offered.
  * @param accounts Every account in the store, the device's among them.
+ * @param language Active language.
  */
-function calendarHint(calendar: Calendar, accounts: Account[]) {
-  if (calendar.sharedBy) return `Compartido por ${calendar.sharedBy}`;
+function calendarHint(calendar: Calendar, accounts: Account[], language: Language) {
+  const labels = SELECTOR_LABELS[language];
+  if (calendar.sharedBy) return labels.sharedBy(calendar.sharedBy);
 
   const account = accounts.find(
     (candidate) => candidate.id === calendar.accountId,
   );
-  return account ? account.email : 'En esta app';
+  return account ? account.email : labels.inThisApp;
 }
 
 /**
@@ -71,11 +113,13 @@ function calendarHint(calendar: Calendar, accounts: Account[]) {
  * @param calendars Every calendar in the store.
  * @param accounts Every account in the store.
  * @param currentId Id of the calendar in use.
+ * @param language Active language.
  */
 export function calendarOptions(
   calendars: Calendar[],
   accounts: Account[],
   currentId: string,
+  language: Language,
 ): CalendarOption[] {
   const writable = writableCalendars(calendars);
   const current = calendars.find((calendar) => calendar.id === currentId);
@@ -86,7 +130,7 @@ export function calendarOptions(
     id: calendar.id,
     name: calendar.name,
     dotColor: calendar.dotColor,
-    hint: calendarHint(calendar, accounts),
+    hint: calendarHint(calendar, accounts, language),
   }));
 }
 
@@ -341,12 +385,15 @@ export function layoutDayColumn(
  * an approximate month, which is the case where the row draws nothing.
  *
  * @param task Task whose due date is being described.
+ * @param language Active language.
  */
-export function taskDueLabel(task: Task): string {
+export function taskDueLabel(task: Task, language: Language): string {
+  const labels = SELECTOR_LABELS[language];
+
   if (task.vagueMonth) {
-    return task.vagueMonth === 'Sin mes'
-      ? 'ALGÚN DÍA'
-      : task.vagueMonth.slice(0, 3).toUpperCase();
+    return task.vagueMonth === NO_MONTH_VALUE
+      ? labels.someDay
+      : monthLabelFromSpanish(task.vagueMonth, language).slice(0, 3).toUpperCase();
   }
   if (task.dueAt == null) return '';
 
@@ -356,14 +403,14 @@ export function taskDueLabel(task: Task): string {
 
   const isOverdue =
     !task.done && task.dueAt < now.getTime() && !isSameDay(dueAt, now);
-  if (isOverdue) return 'VENCE';
+  if (isOverdue) return labels.overdue;
 
-  if (isSameDay(dueAt, today)) return task.hasTime ? formatTime(dueAt) : 'HOY';
+  if (isSameDay(dueAt, today)) return task.hasTime ? formatTime(dueAt) : labels.today;
 
   const tomorrow = new Date(today.getTime() + MS_PER_DAY);
-  if (isSameDay(dueAt, tomorrow)) return 'MAÑANA';
+  if (isSameDay(dueAt, tomorrow)) return labels.tomorrow;
 
-  return formatShortDate(dueAt);
+  return formatShortDate(dueAt, language);
 }
 
 /**

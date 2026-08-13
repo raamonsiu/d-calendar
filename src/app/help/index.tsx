@@ -24,26 +24,19 @@ import { groupRadius } from '@/lib/groupRadius';
 import { sendFeedback } from '@/services/feedback';
 import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
-import { alpha, color, radius, tint } from '@/theme/tokens';
+import { color, radius } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
 import { Group } from '@/ui/Group';
+import { IconCircle } from '@/ui/IconCircle';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
 import { useToast } from '@/ui/Toast';
 import { Cta } from '@/ui/controls';
-import {
-  CaretRightIcon,
-  CheckIcon,
-  EnvelopeSimpleIcon,
-  PaperPlaneTiltIcon,
-} from '@/ui/icons';
+import { CaretRightIcon, CheckIcon, PaperPlaneTiltIcon } from '@/ui/icons';
 
 /** Kinds of feedback that can be sent. */
 const FEEDBACK_KINDS = ['Error', 'Idea', 'Otro'];
-
-/** Support address shown under the button. */
-const SUPPORT_EMAIL = 'soporte@d-calendar.app';
 
 /** CTA height on this screen, shorter than a bottom action bar. */
 const CTA_HEIGHT = 48;
@@ -143,22 +136,12 @@ export default function HelpScreen() {
             </View>
           ) : (
             <View style={styles.sent}>
-              <View
-                style={[
-                  styles.sentIcon,
-                  {
-                    borderColor: accent,
-                    backgroundColor: alpha(accent, tint.glyph),
-                  },
-                ]}>
-                <CheckIcon size={19} color={accent} />
-              </View>
+              <IconCircle icon={<CheckIcon size={19} color={accent} />} />
               <AppText weight={400} style={styles.sentTitle}>
                 Comentario enviado
               </AppText>
               <AppText style={styles.sentText}>
-                Gracias. Si hace falta más contexto, escribe a{' '}
-                {SUPPORT_EMAIL}.
+                Gracias. Si hace falta más contexto te escribimos.
               </AppText>
             </View>
           )}
@@ -179,10 +162,6 @@ export default function HelpScreen() {
                 icon={<PaperPlaneTiltIcon size={14} color={accent} />}
                 onPress={() => setStep('form')}
               />
-              <View style={styles.mailRow}>
-                <EnvelopeSimpleIcon size={12} color={color.faint} />
-                <AppText style={styles.mail}>{SUPPORT_EMAIL}</AppText>
-              </View>
             </View>
           </Group>
         </View>
@@ -231,13 +210,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   feedbackText: { fontSize: 12.5, lineHeight: 18, color: color.textNote },
-  mailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 2,
-  },
-  mail: { fontSize: 9.5, letterSpacing: 0.6, color: color.labelDim },
   form: { gap: 5 },
   kindRow: { flexDirection: 'row', gap: 5 },
   inputBox: {
@@ -253,14 +225,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingHorizontal: 10,
     paddingBottom: 20,
-  },
-  sentIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sentTitle: { fontSize: 14 },
   sentText: {

@@ -24,7 +24,7 @@ import {
 } from '@/lib/date';
 import { layoutDayColumn, splitAllDay } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
 import { AllDayChip, CHIP_GAP, allDayHeight } from './AllDayChip';
@@ -251,6 +251,7 @@ function DayHeading({
   onPressEvent: (event: CalEvent) => void;
 }) {
   const accent = useAccent();
+  const { language } = usePrefs();
   const today = isToday(day);
   const hidden = allDay.length - MAX_ALL_DAY_ROWS;
 
@@ -262,7 +263,7 @@ function DayHeading({
             styles.headingInitial,
             { color: today ? accent : color.textDim },
           ]}>
-          {weekdayInitial(day)}
+          {weekdayInitial(day, language)}
         </AppText>
         <AppText
           weight={400}

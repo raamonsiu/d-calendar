@@ -9,12 +9,24 @@ import {
 } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
+import { detectLanguage, type Language } from '@/lib/language';
+import i18n from './i18n';
 import { color } from './tokens';
+
+export type { Language };
 
 /** Key the preferences are stored under on the device. */
 const PREFERENCES_KEY = 'dcalendar-preferences';
 
 export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
+
+/**
+ * The "Violeta" accent's hex before it was moved to match the app icon's own
+ * accent colour (`#c4a8e0`). Anyone who had it selected is migrated to the
+ * new value on the next read, so the swatch keeps showing as selected in
+ * Settings › Apariencia instead of matching nothing.
+ */
+const OLD_VIOLET_ACCENT = '#9184d9';
 
 export type Preferences = {
   accent: string;
@@ -50,6 +62,9 @@ export type Preferences = {
   deviceReminders: boolean;
   reduceMotion: boolean;
   mono: boolean;
+  language: Language;
+  /** Whether the first-launch onboarding has already run. */
+  onboarded: boolean;
 };
 
 type PreferencesContextValue = Preferences & {
@@ -74,6 +89,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   deviceReminders: false,
   reduceMotion: false,
   mono: false,
+  language: detectLanguage(),
+  onboarded: false,
 };
 
 /**
@@ -107,6 +124,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   /**
    * Reads what was stored, falling back to the defaults for anything missing so
    * a preference added later does not arrive as `undefined`.
+   *
+   * Two of those missing preferences get a real value instead of the default,
+   * because the default is wrong for someone who already has a stored blob:
+   * `onboarded` defaults to true, not false, since a blob with no such key can
+   * only belong to an install from before onboarding existed - the wizard is
+   * for someone who has never opened the app, not someone updating it. And an
+   * `accent` left over from before the "Violeta" swatch changed hex is mapped
+   * onto its new value, so it still matches a swatch in Settings › Apariencia.
    */
   useEffect(() => {
     let subscribed = true;
@@ -115,7 +140,16 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       .then((stored) => {
         if (!subscribed) return;
         if (stored) {
-          setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(stored) });
+          const parsed = JSON.parse(stored);
+          setPreferences({
+            ...DEFAULT_PREFERENCES,
+            ...parsed,
+            accent:
+              parsed.accent === OLD_VIOLET_ACCENT
+                ? color.accentDefault
+                : (parsed.accent ?? DEFAULT_PREFERENCES.accent),
+            onboarded: parsed.onboarded ?? true,
+          });
         }
       })
       .catch(() => {})
@@ -153,6 +187,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       subscription.remove();
     };
   }, []);
+
+  /**
+   * Keeps `i18next` in step with the preference: on mount (the default guessed
+   * from the device), and again whenever hydration overrides it or the user
+   * changes it in Settings.
+   */
+  useEffect(() => {
+    i18n.changeLanguage(preferences.language);
+  }, [preferences.language]);
 
   const value = useMemo<PreferencesContextValue>(
     () => ({

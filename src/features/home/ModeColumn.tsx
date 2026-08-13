@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/theme/Text';
@@ -32,13 +33,14 @@ export function ModeColumn({
   onToggleMode,
   onToggleExpand,
 }: ModeColumnProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
 
   return (
     <View style={styles.column}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Vista ${label}. Cambiar a ${other}`}
+        accessibilityLabel={t('home.modeSwitchLabel', { label, other })}
         onPress={onToggleMode}
         style={({ pressed }) => [
           styles.button,
@@ -55,7 +57,7 @@ export function ModeColumn({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          expanded ? 'Colapsar calendario' : 'Expandir calendario'
+          expanded ? t('home.collapseCalendar') : t('home.expandCalendar')
         }
         onPress={onToggleExpand}
         style={({ pressed }) => [

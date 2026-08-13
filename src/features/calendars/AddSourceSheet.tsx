@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -16,15 +17,6 @@ import { Cta } from '@/ui/controls';
 
 /** The two things this sheet can add. */
 export type SourceMode = 'account' | 'subscription';
-
-/**
- * Where the accounts of the phone are, said in the words of each system. On
- * Android the button gets there on its own, so the line only names the place it
- * is about to open.
- */
-const ACCOUNT_PATH = ACCOUNT_SETTINGS_DIRECT
-  ? 'Se abrirán los ajustes de cuentas del teléfono.'
-  : 'En Ajustes del sistema › Calendario › Cuentas.';
 
 type AddSourceSheetProps = {
   open: boolean;
@@ -54,10 +46,20 @@ export function AddSourceSheet({
   const subscribeCalendar = useAppStore((state) => state.subscribeCalendar);
   const refresh = useAppStore((state) => state.refresh);
   const toast = useToast();
+  const { t } = useTranslation();
 
   const [mode, setMode] = useState<SourceMode>(initialMode ?? 'account');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+
+  /**
+   * Where the accounts of the phone are, said in the words of each system. On
+   * Android the button gets there on its own, so the line only names the place
+   * it is about to open.
+   */
+  const accountPath = ACCOUNT_SETTINGS_DIRECT
+    ? t('calendars.settingsWillOpen')
+    : t('calendars.settingsPathHint');
 
   /**
    * Opening from Settings chooses the tab. It is adjusted during render
@@ -85,7 +87,7 @@ export function AddSourceSheet({
   const goToSettings = () => {
     close();
     openAccountSettings().then((opened) => {
-      if (!opened) toast.show('No se pudieron abrir los ajustes');
+      if (!opened) toast.show(t('calendars.settingsOpenFailedToast'));
     });
   };
 
@@ -97,24 +99,24 @@ export function AddSourceSheet({
   const subscribe = () => {
     subscribeCalendar(name.trim(), url.trim());
     refresh();
-    toast.show(`${name.trim()} añadido`);
+    toast.show(t('calendars.addedToast', { name: name.trim() }));
     close();
   };
 
   return (
-    <Sheet open={open} onClose={close} title="Añadir cuenta o calendario">
+    <Sheet open={open} onClose={close} title={t('calendars.addSourceTitle')}>
       <View style={styles.tabs}>
         <Chip
           grow
           height={34}
-          label="CUENTA"
+          label={t('calendars.accountTab')}
           selected={mode === 'account'}
           onPress={() => setMode('account')}
         />
         <Chip
           grow
           height={34}
-          label="SUSCRIPCIÓN"
+          label={t('calendars.subscriptionTab')}
           selected={mode === 'subscription'}
           onPress={() => setMode('subscription')}
         />
@@ -123,37 +125,43 @@ export function AddSourceSheet({
       {mode === 'account' ? (
         <View style={styles.body}>
           <AppText style={styles.explain}>
-            Las cuentas se añaden al teléfono, no a la app: la app lee los
-            calendarios que el sistema ya sincroniza. Al volver aparecerán aquí
-            solos.
+            {t('calendars.accountExplain')}
           </AppText>
-          <AppText style={styles.note}>{ACCOUNT_PATH}</AppText>
+          <AppText style={styles.note}>{accountPath}</AppText>
         </View>
       ) : (
         <View style={styles.body}>
           <Field
-            placeholder="Nombre del calendario"
+            placeholder={t('calendars.namePlaceholder')}
             value={name}
             onChangeText={setName}
           />
           <Field
             autoCapitalize="none"
             keyboardType="url"
-            placeholder="https://…/calendario.ics"
+            placeholder={t('calendars.urlPlaceholder')}
             value={url}
             onChangeText={setUrl}
           />
           <AppText style={styles.note}>
-            Los calendarios por URL son de solo lectura. Se descargan al añadirlos
-            y cada vez que abres la app.
+            {t('calendars.subscriptionNote')}
           </AppText>
         </View>
       )}
 
       {mode === 'account' ? (
-        <Cta primary label="ABRIR AJUSTES" onPress={goToSettings} />
+        <Cta
+          primary
+          label={t('calendars.openSettingsCta')}
+          onPress={goToSettings}
+        />
       ) : (
-        <Cta primary disabled={!isValid} label="AÑADIR" onPress={subscribe} />
+        <Cta
+          primary
+          disabled={!isValid}
+          label={t('calendars.addCta')}
+          onPress={subscribe}
+        />
       )}
     </Sheet>
   );

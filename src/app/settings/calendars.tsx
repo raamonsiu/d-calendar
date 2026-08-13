@@ -19,8 +19,10 @@
  * its calendars from the store, and local items are kept.
  */
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { calendarKindLabel } from '@/data/translations/domain';
 import {
   AddSourceSheet,
   type SourceMode,
@@ -54,17 +56,24 @@ import {
 /**
  * The two ways a calendar gets in, and neither is an account form: one leads
  * out to the system settings, where the phone's accounts are added, and the
- * other opens the subscription tab.
+ * other opens the subscription tab. `labelKey` is resolved with `t()` at
+ * render time, since the translation hook is only available inside the
+ * component.
  */
-const SOURCES: { label: string; mode: SourceMode; Logo: Icon; Mark: Icon }[] = [
+const SOURCES: {
+  labelKey: string;
+  mode: SourceMode;
+  Logo: Icon;
+  Mark: Icon;
+}[] = [
   {
-    label: 'Añadir una cuenta al teléfono',
+    labelKey: 'calendars.addAccountSource',
     mode: 'account',
     Logo: GearSixIcon,
     Mark: ArrowUpRightIcon,
   },
   {
-    label: 'Suscribirse a un calendario por URL',
+    labelKey: 'calendars.subscribeSource',
     mode: 'subscription',
     Logo: LinkIcon,
     Mark: PlusIcon,
@@ -75,6 +84,7 @@ export default function CalendarsScreen() {
   const accent = useAccent();
   const prefs = usePrefs();
   const toast = useToast();
+  const { t } = useTranslation();
 
   const accounts = useAppStore((state) => state.accounts);
   const calendars = useAppStore((state) => state.calendars);
@@ -95,8 +105,14 @@ export default function CalendarsScreen() {
    * a subscription or the tasks one.
    */
   const destinations = useMemo(
-    () => calendarOptions(calendars, accounts, prefs.defaultCalendarId),
-    [accounts, calendars, prefs.defaultCalendarId],
+    () =>
+      calendarOptions(
+        calendars,
+        accounts,
+        prefs.defaultCalendarId,
+        prefs.language,
+      ),
+    [accounts, calendars, prefs.defaultCalendarId, prefs.language],
   );
 
   /**
@@ -124,7 +140,9 @@ export default function CalendarsScreen() {
   const disconnect = () => {
     if (accountInSheet) {
       disconnectAccount(accountInSheet.id);
-      toast.show(`${accountInSheet.email} desconectada`);
+      toast.show(
+        t('calendars.disconnectedToast', { email: accountInSheet.email }),
+      );
     }
     setAccountSheetId(null);
   };
@@ -132,19 +150,23 @@ export default function CalendarsScreen() {
   const unsubscribe = () => {
     if (subscriptionInSheet) {
       removeSubscription(subscriptionInSheet.id);
-      toast.show(`${subscriptionInSheet.name} eliminado`);
+      toast.show(
+        t('calendars.removedSubscriptionToast', {
+          name: subscriptionInSheet.name,
+        }),
+      );
     }
     setSubscriptionSheetId(null);
   };
 
   return (
     <SecondaryScreen
-      title="Calendarios"
+      title={t('calendars.screenTitle')}
       overlays={
         <>
           <CalendarPickerSheet
             open={defaultSheetOpen}
-            title="Calendario por defecto"
+            title={t('calendars.defaultCalendarTitle')}
             options={destinations}
             selectedId={prefs.defaultCalendarId}
             onSelect={(id) => prefs.setPreference('defaultCalendarId', id)}
@@ -157,17 +179,15 @@ export default function CalendarsScreen() {
             title={accountInSheet?.email ?? ''}>
             <View style={styles.options}>
               <OptionRow
-                label="Exportar como .ics"
+                label={t('calendars.exportIcs')}
                 selected={false}
                 onPress={() => {
                   setAccountSheetId(null);
-                  toast.show(
-                    'La exportación llegará con la sincronización real',
-                  );
+                  toast.show(t('calendars.exportComingSoon'));
                 }}
               />
               <OptionRow
-                label="Desconectar la cuenta"
+                label={t('calendars.disconnectAccountOption')}
                 selected={false}
                 onPress={disconnect}
               />
@@ -183,7 +203,7 @@ export default function CalendarsScreen() {
             </AppText>
             <View style={styles.options}>
               <OptionRow
-                label="Actualizar ahora"
+                label={t('calendars.refreshNowOption')}
                 selected={false}
                 onPress={() => {
                   setSubscriptionSheetId(null);
@@ -191,7 +211,7 @@ export default function CalendarsScreen() {
                 }}
               />
               <OptionRow
-                label="Eliminar la suscripción"
+                label={t('calendars.removeSubscriptionOption')}
                 selected={false}
                 onPress={unsubscribe}
               />
@@ -205,11 +225,11 @@ export default function CalendarsScreen() {
           />
         </>
       }>
-      <Group title="Calendario por defecto">
+      <Group title={t('calendars.defaultCalendarTitle')}>
         <GroupRow
           index={0}
           count={1}
-          label={defaultCalendar?.name ?? 'Sin calendario'}
+          label={defaultCalendar?.name ?? t('calendars.noCalendarSelected')}
           onPress={() => setDefaultSheetOpen(true)}
           icon={<CalendarDot color={defaultCalendar?.dotColor ?? null} />}
           caret={false}
@@ -219,7 +239,7 @@ export default function CalendarsScreen() {
 
       <DeviceCalendarsGroup />
 
-      <Group title="Cuentas conectadas">
+      <Group title={t('calendars.connectedAccountsTitle')}>
         {accounts.map((account, index) => {
           const owned = calendars.filter(
             (calendar) => calendar.accountId === account.id,
@@ -229,7 +249,9 @@ export default function CalendarsScreen() {
             <Pressable
               key={account.id}
               accessibilityRole="button"
-              accessibilityLabel={`Opciones de ${account.email}`}
+              accessibilityLabel={t('calendars.optionsFor', {
+                name: account.email,
+              })}
               onPress={() => setAccountSheetId(account.id)}
               style={({ pressed }) => [
                 styles.accountRow,
@@ -245,7 +267,11 @@ export default function CalendarsScreen() {
                 </AppText>
                 <AppText style={styles.accountMeta}>
                   {account.provider} ·{' '}
-                  {countLabel(owned, 'CALENDARIO', 'CALENDARIOS')}
+                  {countLabel(
+                    owned,
+                    t('calendars.calendarSingular'),
+                    t('calendars.calendarPlural'),
+                  )}
                 </AppText>
               </View>
               <DotsThreeVerticalIcon
@@ -259,12 +285,14 @@ export default function CalendarsScreen() {
       </Group>
 
       {subscriptions.length ? (
-        <Group title="Suscripciones">
+        <Group title={t('calendars.subscriptionsTitle')}>
           {subscriptions.map((calendar, index) => (
             <Pressable
               key={calendar.id}
               accessibilityRole="button"
-              accessibilityLabel={`Opciones de ${calendar.name}`}
+              accessibilityLabel={t('calendars.optionsFor', {
+                name: calendar.name,
+              })}
               onPress={() => setSubscriptionSheetId(calendar.id)}
               style={({ pressed }) => [
                 styles.accountRow,
@@ -277,7 +305,9 @@ export default function CalendarsScreen() {
                   {calendar.name}
                 </AppText>
                 <AppText numberOfLines={1} style={styles.accountMeta}>
-                  {calendar.kind} · SOLO LECTURA
+                  {t('calendars.readOnlyMeta', {
+                    kind: calendarKindLabel(calendar.kind, prefs.language),
+                  })}
                 </AppText>
               </View>
               <DotsThreeVerticalIcon
@@ -290,8 +320,8 @@ export default function CalendarsScreen() {
         </Group>
       ) : null}
 
-      <Group title="Añadir" gap={6}>
-        {SOURCES.map(({ label, mode, Logo, Mark }) => (
+      <Group title={t('calendars.addSourcesTitle')} gap={6}>
+        {SOURCES.map(({ labelKey, mode, Logo, Mark }) => (
           <Pressable
             key={mode}
             accessibilityRole="button"
@@ -301,7 +331,7 @@ export default function CalendarsScreen() {
               { borderColor: pressed ? accent : color.borderStrong },
             ]}>
             <Logo size={15} color={color.textMuted} />
-            <AppText style={styles.connectorLabel}>{label}</AppText>
+            <AppText style={styles.connectorLabel}>{t(labelKey)}</AppText>
             <Mark size={12} color={accent} />
           </Pressable>
         ))}

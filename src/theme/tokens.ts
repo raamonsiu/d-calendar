@@ -61,7 +61,13 @@ export const color = {
   caret: '#3f3f47',
   knobOff: '#5c5c65',
 
-  accentDefault: '#e5252f',
+  /**
+   * The app's own purple, from the icon's inner circle (`icon-source/icon.svg`):
+   * the icon's background purple (`#4E1F6E`) reads at ~1.6:1 against this
+   * background as text or an icon, effectively invisible, while this lighter
+   * tone reads at ~9.5:1.
+   */
+  accentDefault: '#c4a8e0',
 } as const;
 
 /**
@@ -76,7 +82,7 @@ export const ACCENTS = [
   { name: 'Ámbar', hex: '#e5a020' },
   { name: 'Verde', hex: '#3fae6b' },
   { name: 'Azul', hex: '#3d7fe0' },
-  { name: 'Violeta', hex: '#9184d9' },
+  { name: 'Violeta', hex: '#c4a8e0' },
   { name: 'Gris', hex: '#b9b9c1' },
 ] as const;
 

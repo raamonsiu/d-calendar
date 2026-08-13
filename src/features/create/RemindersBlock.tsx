@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { nextInCycle, patchById, withoutId } from '@/lib/collections';
 import { formatTime } from '@/lib/date';
@@ -12,8 +13,8 @@ import { BellIcon, PlusIcon, XIcon } from '@/ui/icons';
 import type { RelativeReminder, ReminderUnit, TimeReminder } from '@/types';
 import { ControlButton, FormBlock } from './blocks';
 
-/** Units of a relative reminder, in `ReminderUnit` order. */
-const RELATIVE_UNITS = ['MINUTOS ANTES', 'HORAS ANTES', 'DÍAS ANTES'];
+/** Translation keys of a relative reminder's unit, in `ReminderUnit` order. */
+const RELATIVE_UNIT_KEYS = ['minutesBefore', 'hoursBefore', 'daysBefore'];
 
 /** Values the control cycles through when tapped. */
 const RELATIVE_VALUES = [5, 10, 15, 30, 45];
@@ -55,10 +56,19 @@ type TimeProps = CommonProps & {
  * row, and only the controls in the middle change.
  */
 export function RemindersBlock(props: RelativeProps | TimeProps) {
+  const { t } = useTranslation();
   const summary =
     props.kind === 'time'
-      ? countLabel(props.reminders.length, 'HORA', 'HORAS')
-      : countLabel(props.reminders.length, 'AVISO', 'AVISOS');
+      ? countLabel(
+          props.reminders.length,
+          t('create.hourSingular'),
+          t('create.hourPlural'),
+        )
+      : countLabel(
+          props.reminders.length,
+          t('create.reminderSingular'),
+          t('create.reminderPlural'),
+        );
 
   const addReminder = () => {
     if (props.kind === 'time') {
@@ -81,14 +91,14 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
   return (
     <FormBlock
       last
-      title="NOTIFICACIONES"
+      title={t('create.notificationsTitle')}
       right={<AppText style={styles.summary}>{summary}</AppText>}>
       <View style={styles.list}>
         {props.kind === 'time'
           ? props.reminders.map((reminder) => (
               <ReminderRow
                 key={reminder.id}
-                removeLabel="Quitar hora"
+                removeLabel={t('create.removeHourLabel')}
                 onRemove={() =>
                   props.onChange(withoutId(props.reminders, reminder.id))
                 }>
@@ -115,7 +125,7 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
           : props.reminders.map((reminder) => (
               <ReminderRow
                 key={reminder.id}
-                removeLabel="Quitar aviso"
+                removeLabel={t('create.removeReminderLabel')}
                 onRemove={() =>
                   props.onChange(withoutId(props.reminders, reminder.id))
                 }>
@@ -135,7 +145,7 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
                 <ControlButton
                   grow
                   height={size.controlSmall}
-                  label={RELATIVE_UNITS[reminder.unit]}
+                  label={t(`create.${RELATIVE_UNIT_KEYS[reminder.unit]}`)}
                   onPress={() =>
                     props.onChange(
                       patchById(props.reminders, reminder.id, {
@@ -149,7 +159,11 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
       </View>
 
       <DashedButton
-        label={props.kind === 'time' ? 'AÑADIR HORA' : 'AÑADIR AVISO'}
+        label={
+          props.kind === 'time'
+            ? t('create.addHourLabel')
+            : t('create.addReminderLabel')
+        }
         icon={<PlusIcon size={12} color={color.textMuted} />}
         onPress={addReminder}
       />
@@ -165,7 +179,7 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
  * @param unit Unit currently on screen.
  */
 function nextUnit(unit: ReminderUnit) {
-  return ((unit + 1) % RELATIVE_UNITS.length) as ReminderUnit;
+  return ((unit + 1) % RELATIVE_UNIT_KEYS.length) as ReminderUnit;
 }
 
 /**

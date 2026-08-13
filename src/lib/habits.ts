@@ -1,3 +1,4 @@
+import type { Language } from '@/theme/prefs';
 import type { Habit, HabitFrequency } from '@/types';
 
 /**
@@ -15,24 +16,42 @@ export const isWeeklyFrequency = (frequency: HabitFrequency) =>
 export const isMultiFrequency = (frequency: HabitFrequency) =>
   frequency === 'X por día' || frequency === 'X por semana';
 
+/** Abbreviated frequency label, one set per language. */
+const FREQUENCY_LABELS: Record<
+  Language,
+  Record<HabitFrequency, (target: number) => string>
+> = {
+  es: {
+    Diario: () => 'DIARIO',
+    Semanal: () => 'SEM.',
+    'X por día': (target) => `${target}×/DÍA`,
+    'X por semana': (target) => `${target}×/SEM`,
+  },
+  en: {
+    Diario: () => 'DAILY',
+    Semanal: () => 'WK.',
+    'X por día': (target) => `${target}×/DAY`,
+    'X por semana': (target) => `${target}×/WK`,
+  },
+  ca: {
+    Diario: () => 'DIARI',
+    Semanal: () => 'SET.',
+    'X por día': (target) => `${target}×/DIA`,
+    'X por semana': (target) => `${target}×/SET`,
+  },
+};
+
 /**
  * Frequency label exactly as it appears on the habit card.
  *
  * @param habit Habit to read the frequency and the target from.
+ * @param language Active language.
  */
 export function habitFrequencyLabel(
   habit: Pick<Habit, 'frequency' | 'target'>,
+  language: Language,
 ) {
-  switch (habit.frequency) {
-    case 'Diario':
-      return 'DIARIO';
-    case 'Semanal':
-      return 'SEM.';
-    case 'X por día':
-      return `${habit.target}×/DÍA`;
-    case 'X por semana':
-      return `${habit.target}×/SEM`;
-  }
+  return FREQUENCY_LABELS[language][habit.frequency](habit.target);
 }
 
 /** Unit of the streak: days or weeks. */

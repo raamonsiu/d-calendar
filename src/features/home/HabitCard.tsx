@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -15,7 +16,7 @@ import {
   isHabitDone,
 } from '@/lib/habits';
 import { AppText } from '@/theme/Text';
-import { useAccent, useDuration } from '@/theme/prefs';
+import { useAccent, useDuration, usePrefs } from '@/theme/prefs';
 import { EASE_OUT, alpha, color, duration, radius, tint } from '@/theme/tokens';
 import type { Habit } from '@/types';
 import { ItemSettingsButton } from './ItemSettingsButton';
@@ -66,8 +67,10 @@ export function HabitCard({
   onBump,
   onOpenSettings,
 }: HabitCardProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
   const resolveDuration = useDuration();
+  const { language } = usePrefs();
   const done = isHabitDone(habit);
 
   const scale = useSharedValue(1);
@@ -119,8 +122,12 @@ export function HabitCard({
     <Animated.View style={[{ width }, cardStyle]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${habit.name}, ${habit.progress} de ${habit.target}`}
-        accessibilityHint="Toca para sumar una repetición, mantén pulsado para restarla"
+        accessibilityLabel={t('home.habitProgressLabel', {
+          name: habit.name,
+          progress: habit.progress,
+          target: habit.target,
+        })}
+        accessibilityHint={t('home.habitHint')}
         delayLongPress={LONG_PRESS_MS}
         onPress={bumpUp}
         onLongPress={bumpDown}
@@ -136,7 +143,7 @@ export function HabitCard({
           },
         ]}>
         <ItemSettingsButton
-          label="Ajustes del hábito"
+          label={t('home.habitSettingsLabel')}
           size={SETTINGS_SIZE}
           style={styles.settings}
           onPress={onOpenSettings}
@@ -187,7 +194,7 @@ export function HabitCard({
                     habit.target > 1 ? color.textMuted : color.labelDim,
                 },
               ]}>
-              {habitFrequencyLabel(habit)}
+              {habitFrequencyLabel(habit, language)}
             </AppText>
             {showStreak ? (
               <AppText style={[styles.meta, { color: color.faint }]}>

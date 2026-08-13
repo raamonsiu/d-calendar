@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/theme/Text';
@@ -53,13 +54,16 @@ export function AllDayChip({
   extra?: number;
   onPress: (event: CalEvent) => void;
 }) {
+  const { t } = useTranslation();
   const accent = useAccent();
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        extra ? `${extra} eventos más de todo el día` : `${event.title}, todo el día`
+        extra
+          ? t('home.allDayMore', { count: extra })
+          : t('home.allDayLabel', { title: event.title })
       }
       onPress={() => onPress(event)}
       style={({ pressed }) => [

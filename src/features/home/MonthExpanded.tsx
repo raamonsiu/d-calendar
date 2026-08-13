@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FlatList,
   Pressable,
@@ -12,7 +13,7 @@ import {
   WINDOW_MONTHS_AFTER,
   WINDOW_MONTHS_BEFORE,
 } from '@/lib/calendarWindow';
-import { MONTHS, addMonths, dayKey, isToday, monthRows } from '@/lib/date';
+import { addMonths, dayKey, isToday, monthName, monthRows } from '@/lib/date';
 import { gridCellSize } from '@/lib/layout';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
@@ -59,8 +60,9 @@ export function MonthExpanded({
   onShowMonth,
   onPressDay,
 }: MonthExpandedProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
-  const { weekStart } = usePrefs();
+  const { weekStart, language } = usePrefs();
   const [width, setWidth] = useState(0);
 
   /**
@@ -163,7 +165,7 @@ export function MonthExpanded({
             <View style={styles.month}>
               <View style={styles.monthHead}>
                 <AppText weight={500} style={styles.monthName}>
-                  {MONTHS[month.date.getMonth()]}
+                  {monthName(month.date.getMonth(), language)}
                 </AppText>
                 <AppText style={styles.monthYear}>
                   {month.date.getFullYear()}
@@ -195,7 +197,10 @@ export function MonthExpanded({
                       <Pressable
                         key={columnIndex}
                         accessibilityRole="button"
-                        accessibilityLabel={`${day.getDate()}, ${eventCount} eventos`}
+                        accessibilityLabel={t('home.monthDayLabel', {
+                          day: day.getDate(),
+                          count: eventCount,
+                        })}
                         onPress={() => onPressDay(day)}
                         style={({ pressed }) => [
                           styles.cell,

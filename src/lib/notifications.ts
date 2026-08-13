@@ -22,6 +22,7 @@ import {
   withTime,
 } from '@/lib/date';
 import { isWeeklyFrequency } from '@/lib/habits';
+import type { Language } from '@/theme/prefs';
 import type { CalEvent, Habit, RelativeReminder, Task } from '@/types';
 
 /** How far ahead reminders are scheduled. */
@@ -129,6 +130,93 @@ function atHour(day: Date, hour: number) {
 const COUNTDOWN_LEAD_MS = MS_PER_HOUR;
 
 /**
+ * The phrases `dayTitle`/`dayComplement`/`whenPhrase`/`eventBody`/`taskBody`/
+ * `habitBody` compose, one set per language. Kept next to the functions that
+ * use them rather than in `src/data/translations/`, since they are template
+ * pieces built for this module's specific composition, not flat UI copy.
+ */
+const NOTIFICATION_PHRASES: Record<
+  Language,
+  {
+    todayTitle: string;
+    tomorrowTitle: string;
+    todayComplement: string;
+    tomorrowComplement: string;
+    onDay: (day: string) => string;
+    now: string;
+    inMinutes: (minutes: number) => string;
+    atTime: (time: string) => string;
+    dayAtTime: (day: string, time: string) => string;
+    allDay: (day: string) => string;
+    eventStarts: (when: string) => string;
+    taskDueOn: (when: string) => string;
+    taskDueAt: (when: string) => string;
+    habitDaily: string;
+    habitWeekly: string;
+    habitTimesPerDay: (times: number) => string;
+    habitTimesPerWeek: (times: number) => string;
+  }
+> = {
+  es: {
+    todayTitle: 'Hoy',
+    tomorrowTitle: 'Mañana',
+    todayComplement: 'hoy',
+    tomorrowComplement: 'mañana',
+    onDay: (day) => `el ${day}`,
+    now: 'ahora',
+    inMinutes: (minutes) => `en ${minutes} min`,
+    atTime: (time) => `a las ${time}`,
+    dayAtTime: (day, time) => `${day} a las ${time}`,
+    allDay: (day) => `${day}, todo el día`,
+    eventStarts: (when) => `Empieza ${when}`,
+    taskDueOn: (when) => `Vence ${when}`,
+    taskDueAt: (when) => `Vence ${when}`,
+    habitDaily: 'Hábito diario',
+    habitWeekly: 'Hábito semanal',
+    habitTimesPerDay: (times) => `Hábito · ${times} veces al día`,
+    habitTimesPerWeek: (times) => `Hábito · ${times} veces a la semana`,
+  },
+  en: {
+    todayTitle: 'Today',
+    tomorrowTitle: 'Tomorrow',
+    todayComplement: 'today',
+    tomorrowComplement: 'tomorrow',
+    onDay: (day) => `on ${day}`,
+    now: 'now',
+    inMinutes: (minutes) => `in ${minutes} min`,
+    atTime: (time) => `at ${time}`,
+    dayAtTime: (day, time) => `${day} at ${time}`,
+    allDay: (day) => `${day}, all day`,
+    eventStarts: (when) => `Starts ${when}`,
+    taskDueOn: (when) => `Due ${when}`,
+    taskDueAt: (when) => `Due ${when}`,
+    habitDaily: 'Daily habit',
+    habitWeekly: 'Weekly habit',
+    habitTimesPerDay: (times) => `Habit · ${times} times a day`,
+    habitTimesPerWeek: (times) => `Habit · ${times} times a week`,
+  },
+  ca: {
+    todayTitle: 'Avui',
+    tomorrowTitle: 'Demà',
+    todayComplement: 'avui',
+    tomorrowComplement: 'demà',
+    onDay: (day) => `el ${day}`,
+    now: 'ara',
+    inMinutes: (minutes) => `en ${minutes} min`,
+    atTime: (time) => `a les ${time}`,
+    dayAtTime: (day, time) => `${day} a les ${time}`,
+    allDay: (day) => `${day}, tot el dia`,
+    eventStarts: (when) => `Comença ${when}`,
+    taskDueOn: (when) => `Venç ${when}`,
+    taskDueAt: (when) => `Venç ${when}`,
+    habitDaily: 'Hàbit diari',
+    habitWeekly: 'Hàbit setmanal',
+    habitTimesPerDay: (times) => `Hàbit · ${times} vegades al dia`,
+    habitTimesPerWeek: (times) => `Hàbit · ${times} vegades a la setmana`,
+  },
+};
+
+/**
  * Which day an item falls on, seen from the notification that announces it.
  *
  * The day is named relative to `firesAt` and not to the moment the plan is
@@ -156,12 +244,14 @@ function dayKindOf(instant: number, firesAt: number) {
  *
  * @param instant When the item happens.
  * @param firesAt When the notification arrives.
+ * @param language Active language.
  */
-function dayTitle(instant: number, firesAt: number) {
+function dayTitle(instant: number, firesAt: number, language: Language) {
+  const phrases = NOTIFICATION_PHRASES[language];
   const kind = dayKindOf(instant, firesAt);
-  if (kind === 'today') return 'Hoy';
-  if (kind === 'tomorrow') return 'Mañana';
-  return formatLongDate(new Date(instant));
+  if (kind === 'today') return phrases.todayTitle;
+  if (kind === 'tomorrow') return phrases.tomorrowTitle;
+  return formatLongDate(new Date(instant), language);
 }
 
 /**
@@ -171,12 +261,14 @@ function dayTitle(instant: number, firesAt: number) {
  *
  * @param instant When the item happens.
  * @param firesAt When the notification arrives.
+ * @param language Active language.
  */
-function dayComplement(instant: number, firesAt: number) {
+function dayComplement(instant: number, firesAt: number, language: Language) {
+  const phrases = NOTIFICATION_PHRASES[language];
   const kind = dayKindOf(instant, firesAt);
-  if (kind === 'today') return 'hoy';
-  if (kind === 'tomorrow') return 'mañana';
-  return `el ${formatLongDate(new Date(instant)).toLowerCase()}`;
+  if (kind === 'today') return phrases.todayComplement;
+  if (kind === 'tomorrow') return phrases.tomorrowComplement;
+  return phrases.onDay(formatLongDate(new Date(instant), language).toLowerCase());
 }
 
 /**
@@ -188,23 +280,25 @@ function dayComplement(instant: number, firesAt: number) {
  * says everything.
  *
  * Precondition: `instant` and `firesAt` are instants in ms. Postcondition:
- * returns a countdown for anything under `COUNTDOWN_LEAD_MS`, and 'ahora' when
- * the notification arrives at the very moment, which is what a reminder with no
- * offset does.
+ * returns a countdown for anything under `COUNTDOWN_LEAD_MS`, and the "now"
+ * phrase when the notification arrives at the very moment, which is what a
+ * reminder with no offset does.
  *
  * @param instant When the item happens.
  * @param firesAt When the notification arrives.
+ * @param language Active language.
  */
-function whenPhrase(instant: number, firesAt: number) {
+function whenPhrase(instant: number, firesAt: number, language: Language) {
+  const phrases = NOTIFICATION_PHRASES[language];
   const lead = instant - firesAt;
-  if (lead <= 0) return 'ahora';
+  if (lead <= 0) return phrases.now;
   if (lead < COUNTDOWN_LEAD_MS) {
-    return `en ${Math.round(lead / MS_PER_MINUTE)} min`;
+    return phrases.inMinutes(Math.round(lead / MS_PER_MINUTE));
   }
 
   const time = formatTime(new Date(instant));
-  if (dayKindOf(instant, firesAt) === 'today') return `a las ${time}`;
-  return `${dayComplement(instant, firesAt)} a las ${time}`;
+  if (dayKindOf(instant, firesAt) === 'today') return phrases.atTime(time);
+  return phrases.dayAtTime(dayComplement(instant, firesAt, language), time);
 }
 
 /**
@@ -216,10 +310,17 @@ function whenPhrase(instant: number, firesAt: number) {
  * @param instant When the event starts.
  * @param firesAt When the notification arrives.
  * @param allDay Whether the event takes the whole day.
+ * @param language Active language.
  */
-function eventBody(instant: number, firesAt: number, allDay: boolean) {
-  if (allDay) return `${dayTitle(instant, firesAt)}, todo el día`;
-  return `Empieza ${whenPhrase(instant, firesAt)}`;
+function eventBody(
+  instant: number,
+  firesAt: number,
+  allDay: boolean,
+  language: Language,
+) {
+  const phrases = NOTIFICATION_PHRASES[language];
+  if (allDay) return phrases.allDay(dayTitle(instant, firesAt, language));
+  return phrases.eventStarts(whenPhrase(instant, firesAt, language));
 }
 
 /**
@@ -231,10 +332,17 @@ function eventBody(instant: number, firesAt: number, allDay: boolean) {
  * @param instant When the task is due.
  * @param firesAt When the notification arrives.
  * @param hasTime Whether the due date carries a time.
+ * @param language Active language.
  */
-function taskBody(instant: number, firesAt: number, hasTime: boolean) {
-  if (!hasTime) return `Vence ${dayComplement(instant, firesAt)}`;
-  return `Vence ${whenPhrase(instant, firesAt)}`;
+function taskBody(
+  instant: number,
+  firesAt: number,
+  hasTime: boolean,
+  language: Language,
+) {
+  const phrases = NOTIFICATION_PHRASES[language];
+  if (!hasTime) return phrases.taskDueOn(dayComplement(instant, firesAt, language));
+  return phrases.taskDueAt(whenPhrase(instant, firesAt, language));
 }
 
 /**
@@ -303,8 +411,14 @@ export function eventOccurrences(event: CalEvent, from: number, to: number) {
  * @param event Event to plan.
  * @param now Moment the plan is built; anything earlier is already past.
  * @param horizonEnd Last instant a notification may fire at.
+ * @param language Active language.
  */
-function planEvent(event: CalEvent, now: number, horizonEnd: number) {
+function planEvent(
+  event: CalEvent,
+  now: number,
+  horizonEnd: number,
+  language: Language,
+) {
   if (event.reminders.length === 0) return [];
 
   const leads = event.reminders.map(reminderLeadMs);
@@ -327,7 +441,7 @@ function planEvent(event: CalEvent, now: number, horizonEnd: number) {
       planned.push({
         id: `event:${event.id}:${occurrence}:${reminder.id}`,
         title: event.title,
-        body: eventBody(instant, firesAt, event.allDay),
+        body: eventBody(instant, firesAt, event.allDay, language),
         itemId: event.id,
         trigger: { kind: 'date', at: firesAt },
       });
@@ -346,8 +460,14 @@ function planEvent(event: CalEvent, now: number, horizonEnd: number) {
  * @param task Task to plan.
  * @param now Moment the plan is built.
  * @param horizonEnd Last instant a notification may fire at.
+ * @param language Active language.
  */
-function planTask(task: Task, now: number, horizonEnd: number) {
+function planTask(
+  task: Task,
+  now: number,
+  horizonEnd: number,
+  language: Language,
+) {
   if (task.done || task.dueAt == null || task.reminders.length === 0) return [];
 
   const dueAt = task.hasTime
@@ -362,7 +482,7 @@ function planTask(task: Task, now: number, horizonEnd: number) {
     planned.push({
       id: `task:${task.id}:${reminder.id}`,
       title: task.title,
-      body: taskBody(dueAt, firesAt, task.hasTime),
+      body: taskBody(dueAt, firesAt, task.hasTime, language),
       itemId: task.id,
       trigger: { kind: 'date', at: firesAt },
     });
@@ -375,17 +495,19 @@ function planTask(task: Task, now: number, horizonEnd: number) {
  * it happens: a repeating reminder has no single date to name.
  *
  * @param habit Habit to describe.
+ * @param language Active language.
  */
-function habitBody(habit: Habit) {
+function habitBody(habit: Habit, language: Language) {
+  const phrases = NOTIFICATION_PHRASES[language];
   switch (habit.frequency) {
     case 'Diario':
-      return 'Hábito diario';
+      return phrases.habitDaily;
     case 'Semanal':
-      return 'Hábito semanal';
+      return phrases.habitWeekly;
     case 'X por día':
-      return `Hábito · ${habit.target} veces al día`;
+      return phrases.habitTimesPerDay(habit.target);
     case 'X por semana':
-      return `Hábito · ${habit.target} veces a la semana`;
+      return phrases.habitTimesPerWeek(habit.target);
   }
 }
 
@@ -417,8 +539,9 @@ function parseClock(time: string) {
  * triggers are not rescheduled as time passes.
  *
  * @param habit Habit to plan.
+ * @param language Active language.
  */
-function planHabit(habit: Habit) {
+function planHabit(habit: Habit, language: Language) {
   const planned: PlannedNotification[] = [];
 
   for (const reminder of habit.reminders) {
@@ -427,7 +550,7 @@ function planHabit(habit: Habit) {
 
     const content = {
       title: habit.name,
-      body: habitBody(habit),
+      body: habitBody(habit, language),
       itemId: habit.id,
     };
 
@@ -478,17 +601,21 @@ const firesAt = (plan: PlannedNotification) =>
  *
  * @param input Events, tasks and habits to plan for.
  * @param now Moment the plan is built, in ms.
+ * @param language Active language, since the plan is text the OS will show.
  */
 export function planNotifications(
   input: NotificationPlanInput,
   now: number,
+  language: Language,
 ): PlannedNotification[] {
   const horizonEnd = now + HORIZON_DAYS * MS_PER_DAY;
 
-  const repeating = input.habits.flatMap(planHabit);
+  const repeating = input.habits.flatMap((habit) => planHabit(habit, language));
   const dated = [
-    ...input.events.flatMap((event) => planEvent(event, now, horizonEnd)),
-    ...input.tasks.flatMap((task) => planTask(task, now, horizonEnd)),
+    ...input.events.flatMap((event) =>
+      planEvent(event, now, horizonEnd, language),
+    ),
+    ...input.tasks.flatMap((task) => planTask(task, now, horizonEnd, language)),
   ].sort((first, second) => firesAt(first) - firesAt(second));
 
   const room = Math.max(0, PENDING_LIMIT - repeating.length);

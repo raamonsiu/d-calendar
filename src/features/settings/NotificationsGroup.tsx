@@ -10,6 +10,7 @@
  * the app.
  */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppState, Linking } from 'react-native';
 
 import {
@@ -43,40 +44,45 @@ type CategoryKey =
   | 'notifyHabits'
   | 'notifyForeignEvents';
 
-/** One row per kind of item that can remind, under the master switch. */
+/**
+ * One row per kind of item that can remind, under the master switch.
+ * `labelKey` and `hintKey` are `t()` keys, resolved once the component has a
+ * translator to hand.
+ */
 const CATEGORY_ROWS: {
   key: CategoryKey;
-  label: string;
-  hint: string;
+  labelKey: string;
+  hintKey: string;
   Icon: typeof BellIcon;
 }[] = [
   {
     key: 'notifyEvents',
-    label: 'Eventos',
-    hint: 'De tus calendarios propios',
+    labelKey: 'settings.eventsLabel',
+    hintKey: 'settings.eventsHint',
     Icon: CalendarBlankIcon,
   },
   {
     key: 'notifyTasks',
-    label: 'Tareas',
-    hint: 'Al llegar la fecha límite',
+    labelKey: 'settings.tasksLabel',
+    hintKey: 'settings.tasksHint',
     Icon: ListChecksIcon,
   },
   {
     key: 'notifyHabits',
-    label: 'Hábitos',
-    hint: 'A las horas que marques',
+    labelKey: 'settings.habitsLabel',
+    hintKey: 'settings.habitsHint',
     Icon: FireIcon,
   },
   {
     key: 'notifyForeignEvents',
-    label: 'Eventos de otros calendarios',
-    hint: 'Los del teléfono y los suscritos por URL',
+    labelKey: 'settings.foreignEventsLabel',
+    hintKey: 'settings.foreignEventsHint',
     Icon: CalendarBlankIcon,
   },
 ];
 
 export function NotificationsGroup() {
+  const { t } = useTranslation();
   const prefs = usePrefs();
   const [permission, setPermission] =
     useState<NotificationPermission>('undetermined');
@@ -127,8 +133,8 @@ export function NotificationsGroup() {
   const rows = [
     {
       key: 'notifications',
-      label: 'Recordatorios',
-      hint: 'Avisos de eventos, tareas y hábitos',
+      label: t('settings.remindersLabel'),
+      hint: t('settings.remindersHint'),
       Icon: BellIcon,
       value: prefs.notifications,
       onPress: toggleNotifications,
@@ -137,8 +143,8 @@ export function NotificationsGroup() {
       ? CATEGORY_ROWS.flatMap((row) => [
           {
             key: row.key,
-            label: row.label,
-            hint: row.hint,
+            label: t(row.labelKey),
+            hint: t(row.hintKey),
             Icon: row.Icon,
             value: prefs[row.key],
             onPress: () => prefs.setPreference(row.key, !prefs[row.key]),
@@ -147,8 +153,8 @@ export function NotificationsGroup() {
             ? [
                 {
                   key: 'deviceReminders',
-                  label: 'Avisos de los calendarios',
-                  hint: 'Usar también los que ya traen sus eventos',
+                  label: t('settings.deviceRemindersLabel'),
+                  hint: t('settings.deviceRemindersHint'),
                   Icon: CalendarBlankIcon,
                   value: prefs.deviceReminders,
                   onPress: () =>
@@ -164,7 +170,7 @@ export function NotificationsGroup() {
   ];
 
   return (
-    <Group title="Notificaciones">
+    <Group title={t('settings.notificationsSection')}>
       {rows.map(({ key, label, hint, Icon, value, onPress }, index) => (
         <GroupRow
           key={key}
@@ -187,8 +193,8 @@ export function NotificationsGroup() {
           index={rows.length}
           count={rows.length + 1}
           icon={<GearSixIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Permiso denegado"
-          hint="Actívalo en los ajustes del sistema"
+          label={t('settings.permissionDeniedLabel')}
+          hint={t('settings.permissionDeniedHint')}
           onPress={() => Linking.openSettings()}
         />
       ) : null}

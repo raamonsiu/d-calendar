@@ -1,4 +1,5 @@
-import { MONTHS, formatDayTitle, isoWeek } from '@/lib/date';
+import { formatDayTitle, isoWeek, monthName } from '@/lib/date';
+import type { Language } from '@/theme/prefs';
 
 /**
  * Texts of the Home header.
@@ -10,6 +11,10 @@ import { MONTHS, formatDayTitle, isoWeek } from '@/lib/date';
  * Every one of them is about the day the box has been scrolled to, not about
  * today: the views travel through days now, and a header still naming today
  * while the box shows next Tuesday would be worse than no header at all.
+ *
+ * This module stays plain and reads no hook of its own, so it takes the
+ * `translate` function `useTranslation()` returns as a parameter instead of
+ * calling the hook itself, alongside the `language` its date formatting needs.
  */
 
 /** The two modes of the calendar box. */
@@ -27,12 +32,6 @@ export type HomeHeaderCopy = {
   otherModeLabel: string;
 };
 
-/** Labels of the mode control, by box state. */
-const MODE_LABELS = {
-  collapsed: { today: 'HOY', week: 'SEM' },
-  expanded: { today: 'DÍA', week: 'MES' },
-} as const;
-
 type HomeHeaderParams = {
   mode: CalendarMode;
   expanded: boolean;
@@ -44,6 +43,10 @@ type HomeHeaderParams = {
   weekEventCount: number;
   /** Whether the week holding `shownDay` also holds today. */
   isCurrentWeek: boolean;
+  /** Active language, for the date names. */
+  language: Language;
+  /** `t` from `useTranslation()`, for the copy. */
+  translate: (key: string, options?: Record<string, unknown>) => string;
 };
 
 /**
@@ -53,7 +56,7 @@ type HomeHeaderParams = {
  * the state where the design hides the event counter. `modeLabel` and
  * `otherModeLabel` are never equal.
  *
- * @param params State of the calendar box and the event counts.
+ * @param params State of the calendar box, the event counts and the copy.
  */
 export function homeHeaderCopy(params: HomeHeaderParams): HomeHeaderCopy {
   const {
@@ -63,9 +66,22 @@ export function homeHeaderCopy(params: HomeHeaderParams): HomeHeaderCopy {
     dayEventCount,
     weekEventCount,
     isCurrentWeek,
+    language,
+    translate,
   } = params;
 
-  const labels = expanded ? MODE_LABELS.expanded : MODE_LABELS.collapsed;
+  const modeLabels = {
+    collapsed: {
+      today: translate('home.todayCollapsed'),
+      week: translate('home.weekCollapsed'),
+    },
+    expanded: {
+      today: translate('home.todayExpanded'),
+      week: translate('home.weekExpanded'),
+    },
+  } as const;
+
+  const labels = expanded ? modeLabels.expanded : modeLabels.collapsed;
   const otherMode: CalendarMode = mode === 'today' ? 'week' : 'today';
 
   /**
@@ -75,23 +91,23 @@ export function homeHeaderCopy(params: HomeHeaderParams): HomeHeaderCopy {
   const isMonthView = expanded && mode === 'week';
 
   const title = isMonthView
-    ? MONTHS[shownDay.getMonth()]
+    ? monthName(shownDay.getMonth(), language)
     : mode === 'week'
       ? isCurrentWeek
-        ? 'Esta semana'
-        : `Semana ${isoWeek(shownDay)}`
-      : formatDayTitle(shownDay);
+        ? translate('home.thisWeek')
+        : translate('home.weekNumber', { number: isoWeek(shownDay) })
+      : formatDayTitle(shownDay, language);
 
   const subtitle = isMonthView
     ? String(shownDay.getFullYear())
-    : MONTHS[shownDay.getMonth()].toUpperCase();
+    : monthName(shownDay.getMonth(), language).toUpperCase();
 
   const eventCount = mode === 'today' ? dayEventCount : weekEventCount;
 
   return {
     title,
     subtitle,
-    right: expanded ? '' : `${eventCount} EVENTOS`,
+    right: expanded ? '' : translate('home.eventsCount', { count: eventCount }),
     modeLabel: labels[mode],
     otherModeLabel: labels[otherMode],
   };

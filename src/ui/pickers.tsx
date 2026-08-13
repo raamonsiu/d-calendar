@@ -1,11 +1,12 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
-  MONTHS,
   addMonths,
   isSameDay,
   isToday,
+  monthName,
   monthRows,
   startOfDay,
 } from '@/lib/date';
@@ -138,8 +139,9 @@ type PickerSheetProps = {
  * been measured, because their side is derived from the width.
  */
 function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
-  const { weekStart } = usePrefs();
+  const { weekStart, language } = usePrefs();
   const [width, setWidth] = useState(0);
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [session, setSession] = useState(0);
@@ -159,18 +161,18 @@ function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
   const cellSize = gridCellSize(width, CELL_GAP, COLUMNS);
 
   return (
-    <Sheet open={open} onClose={onClose} title="Elegir día">
+    <Sheet open={open} onClose={onClose} title={t('pickers.chooseDate')}>
       <View style={styles.monthBar}>
         <IconButton
           size={30}
-          label="Mes anterior"
+          label={t('pickers.previousMonth')}
           onPress={() => setVisibleMonth((month) => addMonths(month, -1))}>
           <CaretLeftIcon size={14} color={color.textMuted} />
         </IconButton>
 
         <View style={styles.monthName}>
           <AppText weight={500} style={styles.monthLabel}>
-            {MONTHS[visibleMonth.getMonth()]}
+            {monthName(visibleMonth.getMonth(), language)}
           </AppText>
           <AppText style={styles.yearLabel}>
             {visibleMonth.getFullYear()}
@@ -182,12 +184,14 @@ function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
           hitSlop={hitSlopFor(28)}
           onPress={() => setVisibleMonth(new Date())}
           style={styles.todayButton}>
-          <AppText style={[styles.todayLabel, { color: accent }]}>HOY</AppText>
+          <AppText style={[styles.todayLabel, { color: accent }]}>
+            {t('pickers.today')}
+          </AppText>
         </Pressable>
 
         <IconButton
           size={30}
-          label="Mes siguiente"
+          label={t('pickers.nextMonth')}
           onPress={() => setVisibleMonth((month) => addMonths(month, 1))}>
           <CaretRightIcon size={14} color={color.textMuted} />
         </IconButton>
@@ -217,7 +221,10 @@ function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
                       key={columnIndex}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isSelected }}
-                      accessibilityLabel={`${day.getDate()} de ${MONTHS[day.getMonth()]}`}
+                      accessibilityLabel={t('pickers.dayOfMonth', {
+                        day: day.getDate(),
+                        month: monthName(day.getMonth(), language),
+                      })}
                       onPress={() => onPick(startOfDay(day))}
                       style={({ pressed }) => [
                         styles.cell,
@@ -259,6 +266,7 @@ function DateSheet({ open, request, onClose, onPick }: PickerSheetProps) {
  * values.
  */
 function TimeSheet({ open, request, onClose, onPick }: PickerSheetProps) {
+  const { t } = useTranslation();
   const baseDate = request?.value ?? new Date();
   const [hour, setHour] = useState(baseDate.getHours());
   const [minute, setMinute] = useState(snapToStep(baseDate.getMinutes()));
@@ -284,12 +292,12 @@ function TimeSheet({ open, request, onClose, onPick }: PickerSheetProps) {
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Elegir hora">
+    <Sheet open={open} onClose={onClose} title={t('pickers.chooseTime')}>
       <View style={styles.wheels}>
         <View style={styles.band} pointerEvents="none" />
         <Wheel
           key={`hour-${session}`}
-          label="hora"
+          label={t('pickers.hourWheel')}
           values={hours}
           selected={hour}
           onChange={setHour}
@@ -297,14 +305,14 @@ function TimeSheet({ open, request, onClose, onPick }: PickerSheetProps) {
         <AppText style={styles.colon}>:</AppText>
         <Wheel
           key={`minute-${session}`}
-          label="minutos"
+          label={t('pickers.minuteWheel')}
           values={minutes}
           selected={minute}
           onChange={setMinute}
         />
       </View>
 
-      <Cta primary label="LISTO" onPress={confirm} />
+      <Cta primary label={t('pickers.confirmTime')} onPress={confirm} />
     </Sheet>
   );
 }

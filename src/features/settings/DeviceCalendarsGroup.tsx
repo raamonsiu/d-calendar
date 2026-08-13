@@ -10,6 +10,7 @@
  * why.
  */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppState, Linking } from 'react-native';
 
 import { isDeviceId } from '@/lib/sourceIds';
@@ -32,6 +33,7 @@ const ROW_ICON = 15;
 const HINT_ROW_HEIGHT = 62;
 
 export function DeviceCalendarsGroup() {
+  const { t } = useTranslation();
   const calendars = useAppStore((state) => state.calendars);
   const refresh = useAppStore((state) => state.refresh);
   const ignoredCount = useAppStore((state) => state.ignoredAccounts.length);
@@ -80,14 +82,18 @@ export function DeviceCalendarsGroup() {
     const rowCount = ignoredCount > 0 ? 2 : 1;
 
     return (
-      <Group title="Calendarios del dispositivo">
+      <Group title={t('settings.deviceCalendarsSection')}>
         <GroupRow
           index={0}
           count={rowCount}
           caret={false}
           icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Se están leyendo"
-          value={countLabel(deviceCount, 'CALENDARIO', 'CALENDARIOS')}
+          label={t('settings.readingLabel')}
+          value={countLabel(
+            deviceCount,
+            t('settings.calendarSingular'),
+            t('settings.calendarPlural'),
+          )}
         />
 
         {ignoredCount > 0 ? (
@@ -98,8 +104,12 @@ export function DeviceCalendarsGroup() {
             icon={
               <ArrowsClockwiseIcon size={ROW_ICON} color={color.textMuted} />
             }
-            label={countLabel(ignoredCount, 'CUENTA OCULTA', 'CUENTAS OCULTAS')}
-            hint="Toca para volver a leerlas"
+            label={countLabel(
+              ignoredCount,
+              t('settings.hiddenAccountSingular'),
+              t('settings.hiddenAccountPlural'),
+            )}
+            hint={t('settings.restoreIgnoredHint')}
             onPress={restoreIgnoredAccounts}
           />
         ) : null}
@@ -110,17 +120,21 @@ export function DeviceCalendarsGroup() {
   const denied = permission === 'denied';
 
   return (
-    <Group title="Calendarios del dispositivo">
+    <Group title={t('settings.deviceCalendarsSection')}>
       <GroupRow
         index={0}
         count={1}
         height={HINT_ROW_HEIGHT}
         icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
-        label={denied ? 'Permiso denegado' : 'Permitir la lectura'}
+        label={
+          denied
+            ? t('settings.permissionDeniedLabel')
+            : t('settings.allowReadingLabel')
+        }
         hint={
           denied
-            ? 'Actívalo en los ajustes del sistema'
-            : 'Para ver aquí los eventos de Google, Outlook o iCloud'
+            ? t('settings.permissionDeniedHint')
+            : t('settings.allowReadingHint')
         }
         onPress={denied ? () => Linking.openSettings() : allow}
       />

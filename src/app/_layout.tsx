@@ -5,6 +5,11 @@
  * gesture container, safe area, preferences and toasts. No screen should mount
  * these providers again.
  *
+ * `AppShell` decides what that first screen is: `src/features/onboarding/`
+ * while `prefs.onboarded` is false, the navigator below once it is true. The
+ * wizard is a plain component, not a route, so there is nothing to redirect
+ * away from and no back button leaking out of it.
+ *
  * The route map is flat, with Home as the root:
  *
  * ```
@@ -43,25 +48,28 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { Onboarding } from '@/features/onboarding/Onboarding';
 import { useDeviceCalendarSync } from '@/services/useDeviceCalendarSync';
 import { useNotificationSync } from '@/services/useNotificationSync';
 import { useSubscriptionSync } from '@/services/useSubscriptionSync';
+import { useTaskCleanup } from '@/services/useTaskCleanup';
 import { useStoreHydrated } from '@/store/useAppStore';
-import { PreferencesProvider } from '@/theme/prefs';
+import { PreferencesProvider, usePrefs } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
 import { ToastProvider } from '@/ui/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
 /**
- * Mounts the three background jobs: reading the calendars of the device,
- * downloading the ones subscribed by URL, and scheduling the reminders. It draws
- * nothing, and it has to live inside `PreferencesProvider` because the
- * notifications hook reads the preference, which `RootLayout` itself creates.
+ * Mounts the four background jobs: reading the calendars of the device,
+ * downloading the ones subscribed by URL, scheduling the reminders, and
+ * dropping tasks completed on an earlier day. It draws nothing, and it has to
+ * live inside `PreferencesProvider` because the notifications hook reads the
+ * preference, which `RootLayout` itself creates.
  *
- * It is only mounted once the stored state has been read, because `RootLayout`
- * draws nothing before that: the subscriptions are in there, and a download that
- * ran first would find no calendars to download.
+ * It is only mounted once onboarded, alongside the navigator: no reason to
+ * sync anything before the user has even seen the app or granted a
+ * permission.
  *
  * The order matters: the calendars come in first so the first reminder plan is
  * built with everything already in the store.
@@ -70,7 +78,52 @@ function BackgroundSync() {
   useDeviceCalendarSync();
   useSubscriptionSync();
   useNotificationSync();
+  useTaskCleanup();
   return null;
+}
+
+/**
+ * Everything that needs the preferences already mounted: the first-launch
+ * wizard while `onboarded` is false, the real navigator once it is true.
+ * Split out from `RootLayout` because `usePrefs()` only works below
+ * `PreferencesProvider`, which `RootLayout` is the one mounting.
+ */
+function AppShell() {
+  const prefs = usePrefs();
+
+  if (!prefs.onboarded) {
+    return (
+      <Onboarding onDone={() => prefs.setPreference('onboarded', true)} />
+    );
+  }
+
+  return (
+    <>
+      <BackgroundSync />
+      <StatusBar style="light" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: styles.content,
+          animation: 'slide_from_right',
+        }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen
+          name="create"
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="item/[id]"
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="settings/index" />
+        <Stack.Screen name="settings/calendars" />
+        <Stack.Screen name="help/index" />
+        <Stack.Screen name="help/[slug]" />
+        <Stack.Screen name="about" />
+      </Stack>
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -110,29 +163,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PreferencesProvider>
           <ToastProvider>
-            <BackgroundSync />
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: styles.content,
-                animation: 'slide_from_right',
-              }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen
-                name="create"
-                options={{ animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen
-                name="item/[id]"
-                options={{ animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen name="settings/index" />
-              <Stack.Screen name="settings/calendars" />
-              <Stack.Screen name="help/index" />
-              <Stack.Screen name="help/[slug]" />
-              <Stack.Screen name="about" />
-            </Stack>
+            <AppShell />
           </ToastProvider>
         </PreferencesProvider>
       </SafeAreaProvider>

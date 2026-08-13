@@ -11,13 +11,15 @@
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { weekStartLabel } from '@/data/translations/domain';
 import { NotificationsGroup } from '@/features/settings/NotificationsGroup';
 import { countLabel } from '@/lib/text';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText } from '@/theme/Text';
-import { usePrefs, type WeekStart } from '@/theme/prefs';
+import { usePrefs, type Language, type WeekStart } from '@/theme/prefs';
 import { ACCENTS, color } from '@/theme/tokens';
 import { Group } from '@/ui/Group';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
@@ -31,10 +33,23 @@ import {
   SquaresFourIcon,
   TextAaIcon,
   TimerIcon,
+  TranslateIcon,
   WindIcon,
 } from '@/ui/icons';
 
 const WEEK_START_OPTIONS: WeekStart[] = ['Lunes', 'Sábado', 'Domingo'];
+
+/**
+ * Language choices, each shown by its name in its own language: a Spanish
+ * speaker needs to recognise "English" and "Català" regardless of which
+ * language the rest of the interface is currently in, so these never go
+ * through `t()`.
+ */
+const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
+  { value: 'es', label: 'Castellano' },
+  { value: 'en', label: 'English' },
+  { value: 'ca', label: 'Català' },
+];
 
 /** Durations offered for a new event. */
 const DURATION_OPTIONS = [
@@ -51,10 +66,11 @@ const ROW_ICON = 15;
 /** Height of the rows carrying a switch, which have two lines of text. */
 const SWITCH_ROW_HEIGHT = 62;
 
-/** Which of the three sheets is open. */
-type OpenSheet = 'weekStart' | 'duration' | 'accent' | null;
+/** Which of the four sheets is open. */
+type OpenSheet = 'language' | 'weekStart' | 'duration' | 'accent' | null;
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const prefs = usePrefs();
   const accounts = useAppStore((state) => state.accounts);
   const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
@@ -66,20 +82,43 @@ export default function SettingsScreen() {
     DURATION_OPTIONS.find((option) => option.minutes === prefs.defaultDuration)
       ?.label ?? `${prefs.defaultDuration} min`;
 
+  const languageLabel =
+    LANGUAGE_OPTIONS.find((option) => option.value === prefs.language)
+      ?.label ?? prefs.language;
+
   return (
     <SecondaryScreen
-      title="Ajustes"
+      title={t('settings.title')}
       overlays={
         <>
           <Sheet
+            open={openSheet === 'language'}
+            onClose={closeSheet}
+            title={t('settings.languageLabel')}>
+            <View style={styles.options}>
+              {LANGUAGE_OPTIONS.map((option) => (
+                <OptionRow
+                  key={option.value}
+                  label={option.label}
+                  selected={prefs.language === option.value}
+                  onPress={() => {
+                    prefs.setPreference('language', option.value);
+                    closeSheet();
+                  }}
+                />
+              ))}
+            </View>
+          </Sheet>
+
+          <Sheet
             open={openSheet === 'weekStart'}
             onClose={closeSheet}
-            title="Día de inicio de la semana">
+            title={t('settings.weekStartLabel')}>
             <View style={styles.options}>
               {WEEK_START_OPTIONS.map((option) => (
                 <OptionRow
                   key={option}
-                  label={option}
+                  label={weekStartLabel(option, prefs.language)}
                   selected={prefs.weekStart === option}
                   onPress={() => {
                     prefs.setPreference('weekStart', option);
@@ -93,7 +132,7 @@ export default function SettingsScreen() {
           <Sheet
             open={openSheet === 'duration'}
             onClose={closeSheet}
-            title="Duración por defecto">
+            title={t('settings.defaultDurationLabel')}>
             <View style={styles.options}>
               {DURATION_OPTIONS.map((option) => (
                 <OptionRow
@@ -112,7 +151,7 @@ export default function SettingsScreen() {
           <Sheet
             open={openSheet === 'accent'}
             onClose={closeSheet}
-            title="Color de remarcado">
+            title={t('settings.accentLabel')}>
             <View style={styles.swatches}>
               {ACCENTS.map((option) => {
                 const selected = prefs.accent === option.hex;
@@ -147,31 +186,39 @@ export default function SettingsScreen() {
           </Sheet>
         </>
       }>
-      <Group title="General">
+      <Group title={t('settings.generalSection')}>
         <GroupRow
           index={0}
-          count={2}
-          icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Día de inicio de la semana"
-          value={prefs.weekStart}
-          onPress={() => setOpenSheet('weekStart')}
+          count={3}
+          icon={<TranslateIcon size={ROW_ICON} color={color.textMuted} />}
+          label={t('settings.languageLabel')}
+          value={languageLabel}
+          onPress={() => setOpenSheet('language')}
         />
         <GroupRow
           index={1}
-          count={2}
+          count={3}
+          icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
+          label={t('settings.weekStartLabel')}
+          value={weekStartLabel(prefs.weekStart, prefs.language)}
+          onPress={() => setOpenSheet('weekStart')}
+        />
+        <GroupRow
+          index={2}
+          count={3}
           icon={<TimerIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Duración por defecto"
+          label={t('settings.defaultDurationLabel')}
           value={durationLabel}
           onPress={() => setOpenSheet('duration')}
         />
       </Group>
 
-      <Group title="Apariencia">
+      <Group title={t('settings.appearanceSection')}>
         <GroupRow
           index={0}
           count={1}
           icon={<DropHalfIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Color de remarcado"
+          label={t('settings.accentLabel')}
           onPress={() => setOpenSheet('accent')}
           right={
             <View style={[styles.dot, { backgroundColor: prefs.accent }]} />
@@ -181,30 +228,34 @@ export default function SettingsScreen() {
 
       <NotificationsGroup />
 
-      <Group title="Integraciones">
+      <Group title={t('settings.integrationsSection')}>
         <GroupRow
           index={0}
           count={1}
           icon={<SquaresFourIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Calendarios"
+          label={t('settings.calendarsLabel')}
           onPress={() => router.push('/settings/calendars')}
           right={
             <AppText style={styles.meta}>
-              {countLabel(accounts.length, 'CUENTA', 'CUENTAS')}
+              {countLabel(
+                accounts.length,
+                t('settings.accountSingular'),
+                t('settings.accountPlural'),
+              )}
             </AppText>
           }
         />
       </Group>
 
-      <Group title="Accesibilidad">
+      <Group title={t('settings.accessibilitySection')}>
         <GroupRow
           index={0}
           count={2}
           height={SWITCH_ROW_HEIGHT}
           caret={false}
           icon={<WindIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Reducir animaciones"
-          hint="Transiciones mínimas en toda la app"
+          label={t('settings.reduceMotionLabel')}
+          hint={t('settings.reduceMotionHint')}
           onPress={() =>
             prefs.setPreference('reduceMotion', !prefs.reduceMotion)
           }
@@ -222,8 +273,8 @@ export default function SettingsScreen() {
           height={SWITCH_ROW_HEIGHT}
           caret={false}
           icon={<TextAaIcon size={ROW_ICON} color={color.textMuted} />}
-          label="Fuente monoespaciada"
-          hint="Roboto Mono en toda la interfaz"
+          label={t('settings.monoLabel')}
+          hint={t('settings.monoHint')}
           onPress={() => prefs.setPreference('mono', !prefs.mono)}
           right={
             <Switch standalone={false} value={prefs.mono} onChange={() => {}} />

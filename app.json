@@ -49,7 +49,8 @@
         {
           "calendarPermission": "D-Calendar muestra los eventos de los calendarios que ya tienes en el dispositivo."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

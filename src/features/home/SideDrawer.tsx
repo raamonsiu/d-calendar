@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Pressable,
   ScrollView,
@@ -20,6 +21,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_VERSION } from '@/data/releases';
+import { calendarKindLabel } from '@/data/translations/domain';
 import { ownerLabel } from '@/lib/calendarSources';
 import { formatAgo } from '@/lib/date';
 import { isDeviceId } from '@/lib/sourceIds';
@@ -71,10 +73,10 @@ const SPIN_MS = 900;
 
 /** Destinations in the menu footer. */
 const MENU_ITEMS = [
-  { label: 'Ajustes', icon: GearSixIcon, path: '/settings' },
-  { label: 'Ayuda y comentarios', icon: QuestionIcon, path: '/help' },
+  { labelKey: 'home.menuSettings', icon: GearSixIcon, path: '/settings' },
+  { labelKey: 'home.menuHelp', icon: QuestionIcon, path: '/help' },
   {
-    label: 'Acerca de la app y el desarrollador',
+    labelKey: 'home.menuAbout',
     icon: InfoIcon,
     path: '/about',
   },
@@ -97,6 +99,7 @@ type SideDrawerProps = {
  * dragging the panel to the left.
  */
 export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
+  const { t } = useTranslation();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -123,7 +126,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
    * `readDeviceCalendarData` and the subscription downloads are already
    * asynchronous: this is only the part that shows it.
    */
-  const { motionOff } = usePrefs();
+  const { motionOff, language } = usePrefs();
   const spin = useSharedValue(0);
 
   useEffect(() => {
@@ -241,7 +244,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
       style={[StyleSheet.absoluteFill, styles.layer]}
       pointerEvents="box-none">
       <Pressable
-        accessibilityLabel="Cerrar menú"
+        accessibilityLabel={t('home.closeMenu')}
         onPress={onClose}
         style={StyleSheet.absoluteFill}>
         <Animated.View
@@ -265,11 +268,13 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
               <AppText weight={500} style={styles.appName}>
                 D-Calendar
               </AppText>
-              <AppText style={styles.version}>VERSIÓN {APP_VERSION}</AppText>
+              <AppText style={styles.version}>
+                {t('home.version', { version: APP_VERSION })}
+              </AppText>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar menú"
+              accessibilityLabel={t('home.closeMenu')}
               hitSlop={hitSlopFor(28)}
               onPress={onClose}
               style={styles.close}>
@@ -292,10 +297,10 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 />
               </Animated.View>
               <AppText style={styles.refreshLabel}>
-                Actualizar calendarios
+                {t('home.refreshCalendars')}
               </AppText>
               <AppText style={styles.refreshMeta}>
-                {refreshing ? 'AHORA' : formatAgo(lastSync)}
+                {refreshing ? t('home.now') : formatAgo(lastSync, language)}
               </AppText>
             </Pressable>
           </View>
@@ -328,7 +333,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 onToggle={toggleCalendar}
                 header={
                   <View style={styles.otherHead}>
-                    <Label>En esta app</Label>
+                    <Label>{t('home.inThisApp')}</Label>
                     <AppText style={styles.count}>
                       {visibilitySummary(ownCalendars)}
                     </AppText>
@@ -343,7 +348,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 onToggle={toggleCalendar}
                 header={
                   <View style={styles.otherHead}>
-                    <Label>Compartidos contigo</Label>
+                    <Label>{t('home.sharedWithYou')}</Label>
                     <AppText style={styles.count}>
                       {visibilitySummary(shared)}
                     </AppText>
@@ -357,7 +362,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
               onToggle={toggleCalendar}
               header={
                 <View style={styles.otherHead}>
-                  <Label>Otros calendarios</Label>
+                  <Label>{t('home.otherCalendars')}</Label>
                   <AppText style={styles.count}>
                     {visibilitySummary(subscriptions)}
                   </AppText>
@@ -366,7 +371,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
               footer={
                 <DashedButton
                   height={36}
-                  label="AÑADIR CUENTA O CALENDARIO"
+                  label={t('home.addAccountOrCalendar')}
                   icon={<PlusIcon size={11} color={color.label} />}
                   onPress={onAddSource}
                 />
@@ -375,7 +380,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
           </ScrollView>
 
           <View style={styles.footer}>
-            {MENU_ITEMS.map(({ label, icon: Icon, path }) => (
+            {MENU_ITEMS.map(({ labelKey, icon: Icon, path }) => (
               <Pressable
                 key={path}
                 accessibilityRole="button"
@@ -386,7 +391,7 @@ export function SideDrawer({ open, onClose, onAddSource }: SideDrawerProps) {
                 ]}>
                 <Icon size={15} color={color.textMuted} />
                 <AppText numberOfLines={1} style={styles.menuLabel}>
-                  {label}
+                  {t(labelKey)}
                 </AppText>
                 <CaretRightIcon size={11} color={color.caret} />
               </Pressable>
@@ -460,6 +465,7 @@ function CalendarRow({
   onToggle: () => void;
 }) {
   const accent = useAccent();
+  const { language } = usePrefs();
 
   return (
     <Pressable
@@ -503,7 +509,9 @@ function CalendarRow({
           {ownerLabel(calendar.sharedBy)}
         </AppText>
       ) : calendar.kind ? (
-        <AppText style={styles.calendarKind}>{calendar.kind}</AppText>
+        <AppText style={styles.calendarKind}>
+          {calendarKindLabel(calendar.kind, language)}
+        </AppText>
       ) : null}
     </Pressable>
   );

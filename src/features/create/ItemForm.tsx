@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { CalendarPickerSheet } from '@/features/calendars/CalendarPickerSheet';
 import { formatTime } from '@/lib/date';
@@ -40,18 +41,21 @@ import { useItemForm, type Editing, type ItemFormState } from './useItemForm';
 
 export type { Editing } from './useItemForm';
 
-/** The three item types, with the label of their tab. */
-const KINDS: { value: ItemKind; label: string }[] = [
-  { value: 'event', label: 'EVENTO' },
-  { value: 'task', label: 'TAREA' },
-  { value: 'habit', label: 'HÁBITO' },
+/** The three item types, with the translation key of their tab label. */
+const KINDS: { value: ItemKind; labelKey: string }[] = [
+  { value: 'event', labelKey: 'kindEvent' },
+  { value: 'task', labelKey: 'kindTask' },
+  { value: 'habit', labelKey: 'kindHabit' },
 ];
 
-/** Title and CTA per type, to avoid repeating the same chain of conditions. */
-const COPY: Record<ItemKind, { placeholder: string; cta: string }> = {
-  event: { placeholder: 'Título del evento', cta: 'CREAR EVENTO' },
-  task: { placeholder: 'Título de la tarea', cta: 'CREAR TAREA' },
-  habit: { placeholder: 'Nombre del hábito', cta: 'CREAR HÁBITO' },
+/**
+ * Translation keys of the title placeholder and CTA per type, to avoid
+ * repeating the same chain of conditions.
+ */
+const COPY_KEYS: Record<ItemKind, { placeholder: string; cta: string }> = {
+  event: { placeholder: 'eventTitlePlaceholder', cta: 'createEventCta' },
+  task: { placeholder: 'taskTitlePlaceholder', cta: 'createTaskCta' },
+  habit: { placeholder: 'habitNamePlaceholder', cta: 'createHabitCta' },
 };
 
 /** Side of the close button in the top bar. */
@@ -61,28 +65,29 @@ const CLOSE_SIZE = 30;
 const REVEAL_DELAY_MS = 60;
 
 /**
- * What each scope is called, and what it does, per action.
+ * Translation keys of what each scope is called, and what it does, per
+ * action.
  *
- * Saving and deleting are told apart because the same word would be a different
- * promise: "todas" on a save rewrites the whole repetition, and on a delete it
- * takes it away. The second line is the one that makes the choice safe to make
- * quickly.
+ * Saving and deleting are told apart because the same word would be a
+ * different promise: "todas" on a save rewrites the whole repetition, and on
+ * a delete it takes it away. The hint is the one that makes the choice safe
+ * to make quickly.
  */
-const SCOPE_COPY: Record<
+const SCOPE_COPY_KEYS: Record<
   'save' | 'remove',
   { title: string; occurrence: string; series: string; hint: string }
 > = {
   save: {
-    title: 'Guardar el cambio',
-    occurrence: 'Solo en este día',
-    series: 'En todas las repeticiones',
-    hint: 'Este evento se repite.',
+    title: 'saveScopeTitle',
+    occurrence: 'saveScopeOccurrence',
+    series: 'saveScopeSeries',
+    hint: 'saveScopeHint',
   },
   remove: {
-    title: 'Eliminar',
-    occurrence: 'Solo este día',
-    series: 'Todas las repeticiones',
-    hint: 'Este evento se repite. No se puede deshacer.',
+    title: 'removeScopeTitle',
+    occurrence: 'removeScopeOccurrence',
+    series: 'removeScopeSeries',
+    hint: 'removeScopeHint',
   },
 };
 
@@ -118,6 +123,7 @@ const SCOPE_COPY: Record<
  * State and save rules live in `useItemForm`; this file only draws.
  */
 export function ItemForm({ editing }: { editing?: Editing }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const accent = useAccent();
   const prefs = usePrefs();
@@ -159,7 +165,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
         <View style={styles.topBar}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cerrar"
+            accessibilityLabel={t('create.closeLabel')}
             hitSlop={hitSlopFor(CLOSE_SIZE)}
             onPress={form.close}
             style={styles.close}>
@@ -182,8 +188,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           contentContainerStyle={styles.scroll}>
           {form.readOnly ? (
             <AppText style={styles.readOnlyNote}>
-              Este evento lo creó otra persona: se ve, pero se edita donde se
-              creó. Los avisos sí son tuyos y puedes cambiarlos.
+              {t('create.readOnlyNote')}
             </AppText>
           ) : null}
 
@@ -217,8 +222,8 @@ export function ItemForm({ editing }: { editing?: Editing }) {
                 reminders={form.reminders.times}
                 unitLabel={
                   isWeeklyFrequency(form.habit.frequency)
-                    ? 'EN LOS DÍAS MARCADOS'
-                    : 'CADA DÍA'
+                    ? t('create.habitReminderWeeklyUnit')
+                    : t('create.habitReminderDailyUnit')
                 }
                 onChange={form.reminders.setTimes}
                 onAdded={revealLast}
@@ -258,7 +263,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
               ]}>
               <TrashIcon size={15} color={accent} />
               <AppText style={[styles.deleteLabel, { color: accent }]}>
-                Eliminar
+                {t('create.deleteRowLabel')}
               </AppText>
             </Pressable>
           ) : null}
@@ -281,7 +286,11 @@ export function ItemForm({ editing }: { editing?: Editing }) {
               }>
               <Cta
                 primary
-                label={form.readOnly ? 'GUARDAR AVISOS' : 'GUARDAR CAMBIOS'}
+                label={
+                  form.readOnly
+                    ? t('create.saveNotificationsCta')
+                    : t('create.saveChangesCta')
+                }
                 onPress={form.save}
               />
             </Animated.View>
@@ -290,7 +299,7 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           <Cta
             primary
             disabled={!form.canSave}
-            label={COPY[form.kind].cta}
+            label={t(`create.${COPY_KEYS[form.kind].cta}`)}
             onPress={form.save}
           />
         )}
@@ -299,25 +308,25 @@ export function ItemForm({ editing }: { editing?: Editing }) {
       <Sheet
         open={guestSheetOpen}
         onClose={() => setGuestSheetOpen(false)}
-        title="Añadir invitado">
+        title={t('create.addGuestSheetTitle')}>
         <Field
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="correo del invitado"
+          placeholder={t('create.guestEmailPlaceholder')}
           value={guestEmail}
           onChangeText={setGuestEmail}
         />
         <Cta
           primary
           disabled={!looksLikeEmail(guestEmail)}
-          label="INVITAR"
+          label={t('create.inviteCta')}
           onPress={confirmGuest}
         />
       </Sheet>
 
       <CalendarPickerSheet
         open={calendarSheetOpen}
-        title="Calendario del evento"
+        title={t('create.eventCalendarSheetTitle')}
         options={form.calendarOptions}
         selectedId={form.event.calendarId}
         onSelect={form.event.setCalendarId}
@@ -327,11 +336,11 @@ export function ItemForm({ editing }: { editing?: Editing }) {
       <Sheet
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title="Eliminar">
+        title={t('create.deleteConfirmTitle')}>
         <AppText style={styles.confirmText}>
-          Se quitará de la app. Tendrás cinco segundos para deshacerlo.
+          {t('create.deleteConfirmText')}
         </AppText>
-        <Cta primary label="ELIMINAR" onPress={form.remove} />
+        <Cta primary label={t('create.deleteCta')} onPress={form.remove} />
       </Sheet>
 
       <ScopeSheet series={form.series} />
@@ -351,19 +360,22 @@ export function ItemForm({ editing }: { editing?: Editing }) {
  * pressing GUARDAR CAMBIOS on a Tuesday necessarily has in mind.
  */
 function ScopeSheet({ series }: { series: ItemFormState['series'] }) {
-  const copy = SCOPE_COPY[series.asked ?? 'save'];
+  const { t } = useTranslation();
+  const copyKeys = SCOPE_COPY_KEYS[series.asked ?? 'save'];
 
   return (
     <Sheet
       open={series.asked !== null}
       onClose={series.dismiss}
-      title={copy.title}>
-      <AppText style={styles.confirmText}>{copy.hint}</AppText>
+      title={t(`create.${copyKeys.title}`)}>
+      <AppText style={styles.confirmText}>{t(`create.${copyKeys.hint}`)}</AppText>
       <View style={styles.options}>
         {series.scopes.map((scope) => (
           <OptionRow
             key={scope}
-            label={scope === 'occurrence' ? copy.occurrence : copy.series}
+            label={t(
+              `create.${scope === 'occurrence' ? copyKeys.occurrence : copyKeys.series}`,
+            )}
             selected={false}
             onPress={() => series.choose(scope)}
           />
@@ -386,11 +398,12 @@ function KindTabs({
   locked: boolean;
   onChange: (next: ItemKind) => void;
 }) {
+  const { t } = useTranslation();
   const accent = useAccent();
 
   return (
     <View style={styles.tabs}>
-      {KINDS.map(({ value, label }) => {
+      {KINDS.map(({ value, labelKey }) => {
         const selected = kind === value;
         return (
           <Pressable
@@ -412,7 +425,7 @@ function KindTabs({
                 letterSpacing: 1.2,
                 color: selected ? color.text : color.label,
               }}>
-              {label}
+              {t(`create.${labelKey}`)}
             </AppText>
           </Pressable>
         );
@@ -423,6 +436,8 @@ function KindTabs({
 
 /** Title and description, common to the three item types. */
 function TitleBlock({ form }: { form: ItemFormState }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.titleBlock}>
       <Field
@@ -430,7 +445,7 @@ function TitleBlock({ form }: { form: ItemFormState }) {
         fontSize={19}
         value={form.title}
         onChangeText={form.setTitle}
-        placeholder={COPY[form.kind].placeholder}
+        placeholder={t(`create.${COPY_KEYS[form.kind].placeholder}`)}
         style={styles.titleInput}
       />
       <Divider />
@@ -439,7 +454,7 @@ function TitleBlock({ form }: { form: ItemFormState }) {
         multiline
         value={form.description}
         onChangeText={form.setDescription}
-        placeholder="Descripción"
+        placeholder={t('create.descriptionPlaceholder')}
         style={styles.descriptionInput}
       />
     </View>

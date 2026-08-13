@@ -1,6 +1,14 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
+import {
+  availabilityLabel,
+  guestStateLabel,
+  repeatRuleLabel,
+  visibilityLabel,
+} from '@/data/translations/domain';
 import { formatLongDate, formatTime, withTime } from '@/lib/date';
+import { usePrefs } from '@/theme/prefs';
 import { AppText, Label } from '@/theme/Text';
 import { color, hitSlopFor, radius } from '@/theme/tokens';
 import { Avatar } from '@/ui/Avatar';
@@ -64,17 +72,19 @@ export function EventBlocks({
   onAddGuest,
   onPickCalendar,
 }: EventBlocksProps) {
+  const { t } = useTranslation();
+  const { language } = usePrefs();
   const { event } = form;
 
   const bounds = [
     {
-      label: 'INICIO',
+      label: t('create.startLabel'),
       value: event.startsAt,
       setValue: event.setStartsAt,
       locked: false,
     },
     {
-      label: 'FIN',
+      label: t('create.endLabel'),
       value: event.endsAt,
       setValue: event.setEndsAt,
       locked: event.endLocked,
@@ -85,10 +95,10 @@ export function EventBlocks({
     <>
       <FormBlock
         first
-        title="CUÁNDO"
+        title={t('create.whenTitle')}
         right={
           <BlockSwitch
-            label="TODO EL DÍA"
+            label={t('create.allDay')}
             value={event.allDay}
             onChange={event.setAllDay}
           />
@@ -99,7 +109,7 @@ export function EventBlocks({
               <ControlButton
                 grow
                 muted={locked}
-                label={formatLongDate(value)}
+                label={formatLongDate(value, language)}
                 onPress={() => {
                   if (locked) return;
                   picker.open('date', value, (picked) =>
@@ -129,13 +139,13 @@ export function EventBlocks({
 
         {event.repeatShown ? (
           <View style={styles.rows}>
-            <Label>Repetir</Label>
+            <Label>{t('create.repeatLabel')}</Label>
             <ChipWrap>
               {event.repeatOptions.map((option) => (
                 <Chip
                   key={option}
                   height={29}
-                  label={option}
+                  label={repeatRuleLabel(option, language)}
                   selected={event.repeat === option}
                   onPress={() => event.setRepeat(option)}
                 />
@@ -151,17 +161,17 @@ export function EventBlocks({
         ) : null}
       </FormBlock>
 
-      <FormBlock title="UBICACIÓN">
+      <FormBlock title={t('create.locationTitle')}>
         <Field
-          placeholder="Dónde"
+          placeholder={t('create.wherePlaceholder')}
           value={event.location}
           onChangeText={event.setLocation}
         />
       </FormBlock>
 
-      <FormBlock title="CALENDARIO">
+      <FormBlock title={t('create.calendarTitle')}>
         <ControlButton
-          label={form.selectedCalendar?.name ?? 'Sin calendario'}
+          label={form.selectedCalendar?.name ?? t('create.noCalendar')}
           leading={
             <CalendarDot color={form.selectedCalendar?.dotColor ?? null} />
           }
@@ -172,13 +182,13 @@ export function EventBlocks({
         <Divider />
 
         <View style={styles.optionRows}>
-          <FieldRow label="DISPONIB." labelWidth={WIDE_LABEL}>
+          <FieldRow label={t('create.availabilityFieldLabel')} labelWidth={WIDE_LABEL}>
             <View style={styles.optionRow}>
               {AVAILABILITY_OPTIONS.map((option) => (
                 <Chip
                   key={option}
                   grow
-                  label={option}
+                  label={availabilityLabel(option, language)}
                   selected={event.availability === option}
                   onPress={() => event.setAvailability(option)}
                 />
@@ -186,13 +196,13 @@ export function EventBlocks({
             </View>
           </FieldRow>
           {event.visibilityShown ? (
-            <FieldRow label="VISIBILIDAD" labelWidth={WIDE_LABEL}>
+            <FieldRow label={t('create.visibilityFieldLabel')} labelWidth={WIDE_LABEL}>
               <View style={styles.optionRow}>
                 {VISIBILITY_OPTIONS.map((option) => (
                   <Chip
                     key={option}
                     grow
-                    label={option}
+                    label={visibilityLabel(option, language)}
                     selected={event.visibility === option}
                     onPress={() => event.setVisibility(option)}
                   />
@@ -203,7 +213,7 @@ export function EventBlocks({
         </View>
       </FormBlock>
 
-      <FormBlock title="INVITAR">
+      <FormBlock title={t('create.inviteTitle')}>
         {event.guests.length ? (
           <View style={styles.guestList}>
             {event.guests.map((guest) => (
@@ -212,11 +222,15 @@ export function EventBlocks({
                 <AppText numberOfLines={1} style={styles.guestName}>
                   {guest.name}
                 </AppText>
-                <AppText style={styles.guestState}>{guest.state}</AppText>
+                <AppText style={styles.guestState}>
+                  {guestStateLabel(guest.state, language)}
+                </AppText>
                 {event.guestsReadOnly ? null : (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Quitar a ${guest.name}`}
+                    accessibilityLabel={t('create.removeGuest', {
+                      name: guest.name,
+                    })}
                     hitSlop={hitSlopFor(24)}
                     onPress={() => event.removeGuest(guest.id)}
                     style={styles.removeGuest}>
@@ -230,7 +244,7 @@ export function EventBlocks({
 
         {event.guestsReadOnly ? null : (
           <DashedButton
-            label="AÑADIR INVITADO"
+            label={t('create.addGuestLabel')}
             icon={<UserPlusIcon size={13} color={color.textMuted} />}
             onPress={onAddGuest}
           />

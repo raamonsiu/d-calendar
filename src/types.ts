@@ -132,6 +132,12 @@ export type Task = {
   /** Approximate month when there is no exact date: 'Agosto' ... 'Sin mes'. */
   vagueMonth: string | null;
   done: boolean;
+  /**
+   * When `done` was last set to true, in ms; `null` while not done. This is
+   * what `purgeExpiredTasks` compares against midnight to know a done task is
+   * from an earlier day and ready to disappear.
+   */
+  doneAt: number | null;
   reminders: RelativeReminder[];
 };
 

@@ -4,7 +4,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { insertAt, patchById, withoutId } from '@/lib/collections';
 import { nextHabitProgress, nextHabitStreak, isHabitDone } from '@/lib/habits';
+import { detectLanguage } from '@/lib/language';
 import { isDeviceId } from '@/lib/sourceIds';
+import { withoutExpiredTasks } from '@/lib/tasks';
 import { color } from '@/theme/tokens';
 import type {
   Account,
@@ -116,6 +118,12 @@ type AppActions = {
   addTask: (draft: Omit<Task, 'id'>) => string;
   updateTask: (id: string, patch: Partial<Task>) => void;
   toggleTask: (id: string) => void;
+  /**
+   * Drops tasks completed on an earlier day. Nothing schedules this at
+   * midnight itself, so it is called again whenever the app comes back to
+   * the foreground; see `useTaskCleanup`.
+   */
+  purgeExpiredTasks: () => void;
 
   addHabit: (draft: Omit<Habit, 'id'>) => string;
   updateHabit: (id: string, patch: Partial<Habit>) => void;
@@ -226,14 +234,17 @@ function withReminders(
   );
 }
 
+/** Guessed once: both seed lists need the same "language at install" answer. */
+const SEED_LANGUAGE = detectLanguage();
+
 export const useAppStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
       accounts: ACCOUNTS,
       calendars: CALENDARS,
       events: seedEvents(),
-      tasks: seedTasks(),
-      habits: seedHabits(),
+      tasks: seedTasks(SEED_LANGUAGE),
+      habits: seedHabits(SEED_LANGUAGE),
       lastSync: Date.now() - INITIAL_SYNC_AGE_MS,
       refreshing: false,
       hydrated: false,
@@ -261,8 +272,18 @@ export const useAppStore = create<AppState & AppActions>()(
       toggleTask: (id) =>
         set((state) => ({
           tasks: state.tasks.map((task) =>
-            task.id === id ? { ...task, done: !task.done } : task,
+            task.id === id
+              ? {
+                  ...task,
+                  done: !task.done,
+                  doneAt: task.done ? null : Date.now(),
+                }
+              : task,
           ),
+        })),
+      purgeExpiredTasks: () =>
+        set((state) => ({
+          tasks: withoutExpiredTasks(state.tasks, Date.now()),
         })),
 
       addHabit: (draft) => {

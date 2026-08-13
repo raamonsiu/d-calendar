@@ -1,6 +1,9 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
+import { monthLabelFromSpanish } from '@/data/translations/domain';
 import { formatLongDate, formatTime, withTime } from '@/lib/date';
+import { usePrefs } from '@/theme/prefs';
 import { AppText } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
@@ -32,15 +35,17 @@ export function TaskBlock({
   form: ItemFormState;
   picker: DateTimePicker;
 }) {
+  const { t } = useTranslation();
+  const { language } = usePrefs();
   const { task } = form;
 
   return (
     <FormBlock
       first
-      title="VENCE"
+      title={t('create.dueTitle')}
       right={
         <BlockSwitch
-          label="SIN FECHA EXACTA"
+          label={t('create.noExactDate')}
           value={task.vague}
           onChange={task.setVague}
         />
@@ -50,7 +55,7 @@ export function TaskBlock({
           {task.monthOptions.map((month) => (
             <Chip
               key={month}
-              label={month}
+              label={monthLabelFromSpanish(month, language)}
               selected={task.vagueMonth === month}
               onPress={() => task.setVagueMonth(month)}
             />
@@ -58,10 +63,10 @@ export function TaskBlock({
         </ChipWrap>
       ) : (
         <View style={styles.rows}>
-          <FieldRow label="DÍA">
+          <FieldRow label={t('create.dayLabel')}>
             <ControlButton
               grow
-              label={formatLongDate(task.dueAt)}
+              label={formatLongDate(task.dueAt, language)}
               onPress={() =>
                 picker.open('date', task.dueAt, (picked) =>
                   task.setDueAt(withTime(picked, task.dueAt)),
@@ -70,11 +75,11 @@ export function TaskBlock({
             />
           </FieldRow>
 
-          <FieldRow label="HORA">
+          <FieldRow label={t('create.hourFieldLabel')}>
             <ControlButton
               grow
               muted={!task.hasTime}
-              label={task.hasTime ? formatTime(task.dueAt) : 'Sin hora'}
+              label={task.hasTime ? formatTime(task.dueAt) : t('create.noTime')}
               icon={<ClockIcon size={13} color={color.labelDim} />}
               onPress={() =>
                 picker.open('time', task.dueAt, (picked) => {
@@ -91,7 +96,9 @@ export function TaskBlock({
               hitSlop={8}
               onPress={() => task.setHasTime(false)}
               style={styles.clearTime}>
-              <AppText style={styles.clearTimeLabel}>QUITAR LA HORA</AppText>
+              <AppText style={styles.clearTimeLabel}>
+                {t('create.removeTimeLabel')}
+              </AppText>
             </Pressable>
           ) : null}
         </View>

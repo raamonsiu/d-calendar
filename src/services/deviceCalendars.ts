@@ -526,8 +526,10 @@ function toAppCalendar(
  * would show one calendar ending where the other carries on.
  *
  * Precondition: none; the permission is checked here and the read is skipped
- * without it. Postcondition: returns null when there is no permission or the
- * platform has no calendars, which the caller reads as "leave what you had".
+ * without it, never prompting for it - that only happens when the user taps
+ * the permission row in onboarding or Settings. Postcondition: returns null
+ * when there is no permission or the platform has no calendars, which the
+ * caller reads as "leave what you had".
  *
  * @param now Instant the window is centred on.
  */
@@ -535,7 +537,7 @@ export async function readDeviceCalendarData(
   now: number,
 ): Promise<DeviceCalendarData | null> {
   if (!DEVICE_CALENDARS_SUPPORTED) return null;
-  if (!(await ensureCalendarPermission())) return null;
+  if ((await getCalendarPermission()) !== 'granted') return null;
 
   const deviceCalendars = await ExpoCalendar.getCalendars();
   if (deviceCalendars.length === 0) {

@@ -49,6 +49,7 @@ export { TextAaIcon } from 'phosphor-react-native/src/icons/TextAa';
 export { ThumbsDownIcon } from 'phosphor-react-native/src/icons/ThumbsDown';
 export { ThumbsUpIcon } from 'phosphor-react-native/src/icons/ThumbsUp';
 export { TimerIcon } from 'phosphor-react-native/src/icons/Timer';
+export { TranslateIcon } from 'phosphor-react-native/src/icons/Translate';
 export { TrashIcon } from 'phosphor-react-native/src/icons/Trash';
 export { UserPlusIcon } from 'phosphor-react-native/src/icons/UserPlus';
 export { WindIcon } from 'phosphor-react-native/src/icons/Wind';

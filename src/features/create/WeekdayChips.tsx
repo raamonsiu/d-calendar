@@ -19,8 +19,8 @@ export function WeekdayChips({
   selected: number[];
   onToggle: (day: number) => void;
 }) {
-  const { weekStart } = usePrefs();
-  const initials = weekdayInitials(weekStart);
+  const { weekStart, language } = usePrefs();
+  const initials = weekdayInitials(weekStart, language);
   const firstDay = weekStartIndex(weekStart);
 
   return (
