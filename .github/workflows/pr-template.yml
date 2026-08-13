@@ -1,0 +1,143 @@
+name: PR template
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  template:
+    name: Check the template is filled in
+    runs-on: ubuntu-latest
+
+    steps:
+      # The body is passed through the environment rather than interpolated
+      # into the script, so nothing a contributor writes in it can be executed.
+      # The script lives here and not in a file so that it always comes from
+      # the base branch, never from the pull request being checked.
+      - name: Check the pull request template is filled in
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          node <<'SCRIPT'
+          const REQUIRED_SECTIONS = [
+            { name: 'TYPE', minimumLength: 3 },
+            { name: 'WHY', minimumLength: 15 },
+            { name: 'SHORT DESCRIPTION', minimumLength: 5 },
+            { name: 'LONG DESCRIPTION', minimumLength: 15 },
+          ];
+
+          const VALID_TYPES = [
+            'FEATURE',
+            'FIX',
+            'DOCS',
+            'REFACTOR',
+            'TEST',
+            'CHORE',
+          ];
+
+          const body = (process.env.PR_BODY || '').replace(/\r\n/g, '\n');
+          const problems = [];
+
+          /**
+           * Text under a `## NAME` heading, up to the next heading.
+           * Returns null when the heading is not in the body at all.
+           */
+          function sectionContent(name) {
+            const heading = new RegExp('^##[ \\t]+' + name + '[ \\t]*$', 'im');
+            const found = heading.exec(body);
+            if (!found) return null;
+
+            const afterHeading = body.slice(found.index + found[0].length);
+            const nextHeading = /^##[ \t]+/m.exec(afterHeading);
+            return nextHeading
+              ? afterHeading.slice(0, nextHeading.index)
+              : afterHeading;
+          }
+
+          /** The same text with the template's own comments taken out. */
+          function withoutComments(text) {
+            return text.replace(/<!--[\s\S]*?-->/g, '').trim();
+          }
+
+          if (!body.trim()) {
+            problems.push(
+              'The pull request body is empty. Fill in the template: ' +
+                REQUIRED_SECTIONS.map((section) => section.name).join(', ') +
+                '.',
+            );
+          } else {
+            for (const section of REQUIRED_SECTIONS) {
+              const content = sectionContent(section.name);
+
+              if (content === null) {
+                problems.push(
+                  'Missing section "## ' +
+                    section.name +
+                    '". Do not rename or remove the template headings.',
+                );
+                continue;
+              }
+
+              const written = withoutComments(content);
+
+              if (!written) {
+                problems.push(
+                  'Section "## ' +
+                    section.name +
+                    '" is empty. The template comment does not count as content.',
+                );
+                continue;
+              }
+
+              if (written.length < section.minimumLength) {
+                problems.push(
+                  'Section "## ' +
+                    section.name +
+                    '" is too short to be useful (' +
+                    written.length +
+                    ' characters, at least ' +
+                    section.minimumLength +
+                    ' expected).',
+                );
+                continue;
+              }
+
+              if (section.name === 'TYPE') {
+                const declared = written
+                  .replace(/[`*_]/g, '')
+                  .replace(/^[-+*]\s*/, '')
+                  .trim()
+                  .toUpperCase();
+
+                if (!VALID_TYPES.includes(declared)) {
+                  problems.push(
+                    'Section "## TYPE" must be exactly one of ' +
+                      VALID_TYPES.join(', ') +
+                      '. Got: "' +
+                      declared +
+                      '".',
+                  );
+                }
+              }
+            }
+          }
+
+          for (const problem of problems) {
+            console.log('::error::' + problem);
+          }
+
+          const summary = problems.length
+            ? '### Pull request template\n\n' +
+              problems.map((problem) => '- ' + problem).join('\n') +
+              '\n\nSee [CONTRIBUTING.md](../blob/HEAD/CONTRIBUTING.md).\n'
+            : '### Pull request template\n\nAll sections are filled in.\n';
+
+          require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+
+          if (problems.length) process.exit(1);
+
+          console.log('Every required section is filled in.');
+          SCRIPT
