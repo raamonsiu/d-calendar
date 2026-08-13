@@ -14,11 +14,11 @@ import { initReactI18next } from 'react-i18next';
 import { resources } from '@/data/translations';
 
 /**
- * Every namespace copy is split into. Components call `t('area.key')`
- * (docs/CONTEXT.md), so `nsSeparator` below is the dot itself: without an
- * explicit `ns` list i18next only knows the default `translation` namespace,
- * which does not exist in `resources`, and every lookup falls through to
- * returning the raw key.
+ * Every namespace copy is split into. Components call `t('area.key')`, so
+ * `nsSeparator` below is the dot itself: without an explicit `ns` list
+ * i18next only knows the default `translation` namespace, which does not
+ * exist in `resources`, and every lookup falls through to returning the raw
+ * key.
  */
 const NAMESPACES = [
   'common',

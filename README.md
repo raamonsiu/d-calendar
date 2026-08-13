@@ -149,7 +149,4 @@ npx expo export --platform android
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) : code conventions and design rules.
-- [docs/CONTEXT.md](docs/CONTEXT.md) : layer map, settled decisions and known
-  traps. It is the starting point for any new task.
 - `pre-info/handoff.md` : the designer's specification.
