@@ -42,3 +42,9 @@ example
 # generated native folders
 /ios
 /android
+
+# local-only dev notes, kept on disk but never tracked
+/AGENTS.md
+/CLAUDE.md
+/docs/CONTEXT.md
+/.claude/
