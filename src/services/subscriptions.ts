@@ -12,6 +12,7 @@
  */
 import { calendarWindow } from '@/lib/calendarWindow';
 import { parseIcs } from '@/lib/ics';
+import type { Language } from '@/lib/language';
 import type { CalEvent, Calendar } from '@/types';
 
 /** How long a download is given before it is abandoned. */
@@ -45,10 +46,12 @@ const CALENDAR_SCHEME_REAL = 'https://';
  *
  * @param calendar Subscribed calendar, with its address.
  * @param now Instant the read window is centred on.
+ * @param language Active language, for an event that carries no title.
  */
 export async function downloadSubscription(
   calendar: Calendar,
   now: number,
+  language: Language,
 ): Promise<CalEvent[] | null> {
   if (!calendar.url) return null;
 
@@ -62,7 +65,7 @@ export async function downloadSubscription(
   try {
     const response = await fetch(address, { signal: abort.signal });
     if (!response.ok) {
-      console.warn(`[suscripción] ${calendar.name}: HTTP ${response.status}`);
+      console.warn(`[subscription] ${calendar.name}: HTTP ${response.status}`);
       return null;
     }
 
@@ -76,14 +79,14 @@ export async function downloadSubscription(
       announced > MAX_CHARACTERS ? null : await response.text();
 
     if (text === null || text.length > MAX_CHARACTERS) {
-      console.warn(`[suscripción] ${calendar.name}: demasiado grande`);
+      console.warn(`[subscription] ${calendar.name}: too big`);
       return null;
     }
 
     const { from, to } = calendarWindow(now);
-    return parseIcs(text, calendar.id, from, to);
+    return parseIcs(text, calendar.id, from, to, language);
   } catch (error) {
-    console.warn(`[suscripción] ${calendar.name}: no se pudo leer`, error);
+    console.warn(`[subscription] ${calendar.name}: could not be read`, error);
     return null;
   } finally {
     clearTimeout(timeout);

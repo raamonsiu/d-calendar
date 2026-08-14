@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { useAppStore } from '@/store/useAppStore';
+import { usePrefs } from '@/theme/prefs';
 import {
   DEVICE_CALENDARS_SUPPORTED,
   readDeviceCalendarData,
@@ -23,6 +24,7 @@ import {
  * happens in the store.
  */
 export function useDeviceCalendarSync() {
+  const { language } = usePrefs();
   const reading = useRef(false);
 
   useEffect(() => {
@@ -44,10 +46,10 @@ export function useDeviceCalendarSync() {
       reading.current = true;
 
       try {
-        const data = await readDeviceCalendarData(Date.now());
+        const data = await readDeviceCalendarData(Date.now(), language);
         if (active) useAppStore.getState().finishRefresh(data);
       } catch (error) {
-        console.warn('No se pudieron leer los calendarios del sistema', error);
+        console.warn('Could not read the calendars of the system', error);
         if (active) useAppStore.getState().finishRefresh(null);
       } finally {
         reading.current = false;
@@ -72,5 +74,5 @@ export function useDeviceCalendarSync() {
       unsubscribeStore();
       appStateSubscription.remove();
     };
-  }, []);
+  }, [language]);
 }

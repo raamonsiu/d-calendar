@@ -17,13 +17,14 @@
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { TOPICS } from '@/data/help';
 import { groupRadius } from '@/lib/groupRadius';
 import { sendFeedback } from '@/services/feedback';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import { Chip } from '@/ui/Chip';
 import { Field } from '@/ui/Field';
@@ -35,8 +36,16 @@ import { useToast } from '@/ui/Toast';
 import { Cta } from '@/ui/controls';
 import { CaretRightIcon, CheckIcon, PaperPlaneTiltIcon } from '@/ui/icons';
 
-/** Kinds of feedback that can be sent. */
-const FEEDBACK_KINDS = ['Error', 'Idea', 'Otro'];
+/**
+ * Kinds of feedback that can be sent. The value travels to the developer's
+ * inbox and stays the same in every language, the way the store's own union
+ * values do; only the chip label follows the language.
+ */
+const FEEDBACK_KINDS = [
+  { value: 'Error', labelKey: 'help.kindError' },
+  { value: 'Idea', labelKey: 'help.kindIdea' },
+  { value: 'Otro', labelKey: 'help.kindOther' },
+] as const;
 
 /** CTA height on this screen, shorter than a bottom action bar. */
 const CTA_HEIGHT = 48;
@@ -45,11 +54,13 @@ const CTA_HEIGHT = 48;
 type FeedbackStep = 'form' | 'sent' | null;
 
 export default function HelpScreen() {
+  const { t } = useTranslation();
+  const { language } = usePrefs();
   const accent = useAccent();
   const toast = useToast();
 
   const [step, setStep] = useState<FeedbackStep>(null);
-  const [kind, setKind] = useState(FEEDBACK_KINDS[0]);
+  const [kind, setKind] = useState<string>(FEEDBACK_KINDS[0].value);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -69,29 +80,29 @@ export default function HelpScreen() {
     if (sent) {
       setStep('sent');
     } else {
-      toast.show('No se pudo enviar. Inténtalo de nuevo.');
+      toast.show(t('help.feedbackFailed'));
     }
   };
 
   return (
     <SecondaryScreen
-      title="Ayuda y comentarios"
+      title={t('help.title')}
       overlays={
         <Sheet
           open={!!step}
           onClose={closeFeedback}
-          title={step === 'sent' ? 'Gracias' : 'Nuevo comentario'}>
+          title={step === 'sent' ? t('help.thanks') : t('help.newFeedback')}>
           {step === 'form' ? (
             <View style={styles.form}>
               <View style={styles.kindRow}>
                 {FEEDBACK_KINDS.map((option) => (
                   <Chip
-                    key={option}
+                    key={option.value}
                     grow
                     height={34}
-                    label={option}
-                    selected={kind === option}
-                    onPress={() => setKind(option)}
+                    label={t(option.labelKey)}
+                    selected={kind === option.value}
+                    onPress={() => setKind(option.value)}
                   />
                 ))}
               </View>
@@ -106,7 +117,7 @@ export default function HelpScreen() {
                   fontSize={14}
                   value={title}
                   onChangeText={setTitle}
-                  placeholder="Título del comentario"
+                  placeholder={t('help.feedbackTitlePlaceholder')}
                 />
               </View>
 
@@ -120,7 +131,7 @@ export default function HelpScreen() {
                   multiline
                   value={body}
                   onChangeText={setBody}
-                  placeholder="Cuéntanos qué ha pasado, qué esperabas y en qué pantalla"
+                  placeholder={t('help.feedbackBodyPlaceholder')}
                   style={styles.bodyInput}
                 />
               </View>
@@ -129,7 +140,7 @@ export default function HelpScreen() {
                 <Cta
                   primary
                   disabled={!title.trim() || sending}
-                  label={sending ? 'ENVIANDO…' : 'ENVIAR'}
+                  label={sending ? t('help.sending') : t('help.send')}
                   onPress={submitFeedback}
                 />
               </View>
@@ -138,10 +149,10 @@ export default function HelpScreen() {
             <View style={styles.sent}>
               <IconCircle icon={<CheckIcon size={19} color={accent} />} />
               <AppText weight={400} style={styles.sentTitle}>
-                Comentario enviado
+                {t('help.feedbackSent')}
               </AppText>
               <AppText style={styles.sentText}>
-                Gracias. Si hace falta más contexto te escribimos.
+                {t('help.feedbackSentHint')}
               </AppText>
             </View>
           )}
@@ -149,16 +160,15 @@ export default function HelpScreen() {
       }
       footer={
         <View style={styles.footer}>
-          <Group title="Enviar comentarios">
+          <Group title={t('help.sendFeedbackSection')}>
             <View style={styles.feedbackCard}>
               <AppText style={styles.feedbackText}>
-                ¿Algo no funciona o echas algo en falta? Cuéntanoslo y lo
-                leemos todo.
+                {t('help.feedbackPitch')}
               </AppText>
               <Cta
                 primary
                 height={CTA_HEIGHT}
-                label="ENVIAR COMENTARIO"
+                label={t('help.sendFeedbackCta')}
                 icon={<PaperPlaneTiltIcon size={14} color={accent} />}
                 onPress={() => setStep('form')}
               />
@@ -166,7 +176,7 @@ export default function HelpScreen() {
           </Group>
         </View>
       }>
-      <Group title="Recursos populares">
+      <Group title={t('help.popularResources')}>
         {TOPICS.map((topic, index) => (
           <Pressable
             key={topic.slug}
@@ -179,8 +189,8 @@ export default function HelpScreen() {
             ]}>
             <topic.icon size={15} color={color.textMuted} />
             <View style={styles.topicBody}>
-              <AppText style={styles.topicTitle}>{topic.title}</AppText>
-              <AppText style={styles.topicMeta}>{topic.meta}</AppText>
+              <AppText style={styles.topicTitle}>{topic.title[language]}</AppText>
+              <AppText style={styles.topicMeta}>{topic.meta[language]}</AppText>
             </View>
             <CaretRightIcon size={11} color={color.caret} />
           </Pressable>

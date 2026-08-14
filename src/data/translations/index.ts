@@ -1,6 +1,7 @@
 import { calendars } from './calendars';
 import { common } from './common';
 import { create } from './create';
+import { help } from './help';
 import { home } from './home';
 import { onboarding } from './onboarding';
 import { pickers } from './pickers';
@@ -20,6 +21,7 @@ export const resources = {
     calendars: calendars.es,
     create: create.es,
     home: home.es,
+    help: help.es,
   },
   en: {
     common: common.en,
@@ -29,6 +31,7 @@ export const resources = {
     calendars: calendars.en,
     create: create.en,
     home: home.en,
+    help: help.en,
   },
   ca: {
     common: common.ca,
@@ -38,5 +41,6 @@ export const resources = {
     calendars: calendars.ca,
     create: create.ca,
     home: home.ca,
+    help: help.ca,
   },
 };

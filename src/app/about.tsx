@@ -17,13 +17,14 @@ import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { LICENSES } from '@/data/licenses';
 import { APP_BUILD, APP_VERSION, RELEASES } from '@/data/releases';
 import { groupRadius } from '@/lib/groupRadius';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { alpha, color, radius, tint } from '@/theme/tokens';
 import { Group } from '@/ui/Group';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
@@ -76,6 +77,8 @@ const CHANGELOG_MAX_HEIGHT = 330;
 const CARD_COUNT_DEV = 4;
 
 export default function AboutScreen() {
+  const { t } = useTranslation();
+  const { language } = usePrefs();
   const accent = useAccent();
   const toast = useToast();
   const [changelogOpen, setChangelogOpen] = useState(false);
@@ -89,47 +92,47 @@ export default function AboutScreen() {
     onPress: () => void;
   }[] = [
     {
-      label: 'Novedades',
+      label: t('help.whatsNew'),
       meta: APP_VERSION,
       Logo: SparkleIcon,
       onPress: () => setChangelogOpen(true),
     },
     {
-      label: 'Política de privacidad',
+      label: t('help.privacyPolicy'),
       Logo: ShieldCheckIcon,
       onPress: () => router.push('/legal/privacidad'),
     },
     {
-      label: 'Términos de uso',
+      label: t('help.termsOfUse'),
       Logo: ScrollIcon,
       onPress: () => router.push('/legal/terminos'),
     },
     {
-      label: 'Licencias de código abierto',
+      label: t('help.licensesTitle'),
       meta: String(LICENSES.length),
       Logo: CodeIcon,
       onPress: () => router.push('/legal/licenses'),
     },
     {
-      label: 'Valorar en Google Play',
+      label: t('help.rateOnPlay'),
       Logo: StarIcon,
-      onPress: pending('Disponible cuando la app esté publicada'),
+      onPress: pending(t('help.availableWhenPublished')),
     },
     {
-      label: 'Compartir la app',
+      label: t('help.shareApp'),
       Logo: ShareNetworkIcon,
-      onPress: pending('Disponible cuando la app esté publicada'),
+      onPress: pending(t('help.availableWhenPublished')),
     },
   ];
 
   return (
     <SecondaryScreen
-      title="Acerca de"
+      title={t('help.aboutTitle')}
       overlays={
         <Sheet
           open={changelogOpen}
           onClose={() => setChangelogOpen(false)}
-          title="Novedades">
+          title={t('help.whatsNew')}>
           <ScrollView
             style={styles.changelog}
             showsVerticalScrollIndicator={false}>
@@ -140,10 +143,10 @@ export default function AboutScreen() {
                     <AppText mono style={styles.releaseVersion}>
                       {release.version}
                     </AppText>
-                    <AppText style={styles.releaseDate}>{release.date}</AppText>
+                    <AppText style={styles.releaseDate}>{release.date[language]}</AppText>
                   </View>
                   <View style={styles.releaseNotes}>
-                    {release.notes.map((note) => (
+                    {release.notes[language].map((note) => (
                       <View key={note} style={styles.noteRow}>
                         <View
                           style={[styles.noteDot, { backgroundColor: accent }]}
@@ -168,18 +171,20 @@ export default function AboutScreen() {
           <AppText weight={500} style={styles.appName}>
             D-Calendar
           </AppText>
-          <AppText style={styles.tagline}>
-            Calendario, tareas y hábitos en una sola pantalla.
-          </AppText>
+          <AppText style={styles.tagline}>{t('help.tagline')}</AppText>
           <View style={styles.heroMeta}>
-            <AppText style={styles.microMeta}>VERSIÓN {APP_VERSION}</AppText>
+            <AppText style={styles.microMeta}>
+              {t('help.versionMeta', { version: APP_VERSION })}
+            </AppText>
             <View style={styles.metaDot} />
-            <AppText style={styles.microMeta}>BUILD {APP_BUILD}</AppText>
+            <AppText style={styles.microMeta}>
+              {t('help.buildMeta', { build: APP_BUILD })}
+            </AppText>
           </View>
         </View>
       </View>
 
-      <Group title="La app">
+      <Group title={t('help.theApp')}>
         {appRows.map((row, index) => (
           <GroupRow
             key={row.label}
@@ -195,13 +200,12 @@ export default function AboutScreen() {
         <View style={styles.privacy}>
           <LockSimpleIcon size={12} color={color.faint} />
           <AppText style={styles.privacyText}>
-            Sin cuentas propias, sin anuncios y sin rastreo: tus eventos y
-            hábitos viajan solo entre tu móvil y los calendarios que conectas.
+            {t('help.privacyPitch')}
           </AppText>
         </View>
       </Group>
 
-      <Group title="El desarrollador">
+      <Group title={t('help.theDeveloper')}>
         <View style={[styles.devCard, groupRadius(0, CARD_COUNT_DEV)]}>
           <View style={styles.devAvatar}>
             <AppText mono style={[styles.devInitials, { color: accent }]}>
@@ -212,9 +216,7 @@ export default function AboutScreen() {
             <AppText weight={500} style={styles.devName}>
               D1ITO
             </AppText>
-            <AppText style={styles.devRole}>
-              Diseño y desarrollo. Proyecto independiente, hecho a ratos.
-            </AppText>
+            <AppText style={styles.devRole}>{t('help.devRole')}</AppText>
           </View>
         </View>
 
@@ -255,7 +257,7 @@ export default function AboutScreen() {
           <View style={styles.linkBody}>
             <AppText style={styles.coffeeTitle}>Buy me a coffee</AppText>
             <AppText style={styles.coffeeHint}>
-              Mantiene la app sin anuncios
+              {t('help.coffeeHint')}
             </AppText>
           </View>
           <ArrowUpRightIcon size={12} color={accent} />
@@ -263,7 +265,7 @@ export default function AboutScreen() {
       </Group>
 
       <View style={styles.love}>
-        <AppText style={styles.loveText}>With love,</AppText>
+        <AppText style={styles.loveText}>{t('help.withLove')}</AppText>
         <HeartStraightIcon size={11} color={accent} weight="fill" />
         <AppText mono style={styles.loveName}>
           D1ITO

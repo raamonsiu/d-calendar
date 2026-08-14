@@ -28,6 +28,7 @@ const NAMESPACES = [
   'calendars',
   'create',
   'home',
+  'help',
 ] as const;
 
 i18n.use(initReactI18next).init({

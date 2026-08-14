@@ -21,6 +21,7 @@
 import * as ExpoCalendar from 'expo-calendar';
 import { Platform } from 'react-native';
 
+import { untitledLabel } from '@/data/translations/domain';
 import {
   accountOf,
   calendarDedupeKey,
@@ -33,6 +34,7 @@ import {
 } from '@/lib/calendarSources';
 import { calendarWindow } from '@/lib/calendarWindow';
 import { MS_PER_DAY } from '@/lib/date';
+import type { Language } from '@/lib/language';
 import { fromDeviceId, toDeviceId } from '@/lib/sourceIds';
 import { avatarInitial } from '@/lib/text';
 import type {
@@ -180,14 +182,18 @@ function toAlarm(reminder: RelativeReminder): ExpoCalendar.Alarm {
  * event every occurrence shares the same identifier.
  *
  * @param event Event as the device stores it.
+ * @param language Active language, for an event with no title of its own.
  */
-function toAppEvent(event: ExpoCalendar.ExpoCalendarEvent): CalEvent {
+function toAppEvent(
+  event: ExpoCalendar.ExpoCalendarEvent,
+  language: Language,
+): CalEvent {
   const startsAt = new Date(event.startDate).getTime();
   const endsAt = new Date(event.endDate).getTime();
 
   return {
     id: toDeviceId(`${event.instanceId ?? event.id}:${startsAt}`),
-    title: event.title || 'Sin título',
+    title: event.title || untitledLabel(language),
     description: event.notes ?? '',
     location: event.location ?? '',
     startsAt,
@@ -532,9 +538,11 @@ function toAppCalendar(
  * caller reads as "leave what you had".
  *
  * @param now Instant the window is centred on.
+ * @param language Active language, for events that carry no title.
  */
 export async function readDeviceCalendarData(
   now: number,
+  language: Language,
 ): Promise<DeviceCalendarData | null> {
   if (!DEVICE_CALENDARS_SUPPORTED) return null;
   if ((await getCalendarPermission()) !== 'granted') return null;
@@ -643,7 +651,7 @@ export async function readDeviceCalendarData(
 
   for (const { calendar, events: deviceEvents } of eventsByCalendar) {
     for (const deviceEvent of deviceEvents) {
-      const event = toAppEvent(deviceEvent);
+      const event = toAppEvent(deviceEvent, language);
       readEvents.set(event.id, deviceEvent);
 
       if (isEditable(deviceEvent, calendar, ownAccounts)) {
@@ -905,7 +913,7 @@ export async function createDeviceEvent(
     const guestsFailed = await updateGuests(event, calendar, draft.guests);
     return { created: true, guestsFailed };
   } catch (error) {
-    console.warn('No se pudo crear el evento en el calendario', error);
+    console.warn('Could not create the event in the calendar', error);
     return { created: false, guestsFailed: false };
   }
 }
@@ -991,7 +999,7 @@ async function updateGuests(
       await attendee.delete();
     } catch (error) {
       failed = true;
-      console.warn('No se pudo quitar al invitado', error);
+      console.warn('Could not remove the guest', error);
     }
   }
 
@@ -1006,7 +1014,7 @@ async function updateGuests(
       });
     } catch (error) {
       failed = true;
-      console.warn(`No se pudo invitar a ${guest.email}`, error);
+      console.warn(`Could not invite ${guest.email}`, error);
     }
   }
 
@@ -1136,7 +1144,7 @@ export async function updateDeviceEvent(
 
     return { saved: true, guestsFailed };
   } catch (error) {
-    console.warn('No se pudo guardar el cambio en el calendario', error);
+    console.warn('Could not save the change in the calendar', error);
     return { saved: false, guestsFailed: false };
   }
 }
@@ -1297,7 +1305,7 @@ export async function deleteDeviceEvent(
     readEvents.delete(id);
     return true;
   } catch (error) {
-    console.warn('No se pudo eliminar el evento del calendario', error);
+    console.warn('Could not delete the event from the calendar', error);
     return false;
   }
 }

@@ -49,7 +49,7 @@ export async function sendFeedback(report: FeedbackReport): Promise<boolean> {
   const publicKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
   const privateKey = process.env.EXPO_PUBLIC_EMAILJS_PRIVATE_KEY;
   if (!serviceId || !templateId || !publicKey || !privateKey) {
-    console.warn('[comentario] faltan las variables EXPO_PUBLIC_EMAILJS_*');
+    console.warn('[feedback] the EXPO_PUBLIC_EMAILJS_* variables are missing');
     return false;
   }
 
@@ -75,11 +75,11 @@ export async function sendFeedback(report: FeedbackReport): Promise<boolean> {
     });
 
     if (!response.ok) {
-      console.warn('[comentario] EmailJS respondió', await response.text());
+      console.warn('[feedback] EmailJS answered', await response.text());
     }
     return response.ok;
   } catch (error) {
-    console.warn('[comentario] no se pudo enviar', error);
+    console.warn('[feedback] could not be sent', error);
     return false;
   } finally {
     clearTimeout(timeout);

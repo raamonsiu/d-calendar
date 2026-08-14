@@ -11,12 +11,13 @@
  */
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { topicBySlug, type Block } from '@/data/help';
 import { groupRadius } from '@/lib/groupRadius';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Divider } from '@/ui/controls';
@@ -27,8 +28,8 @@ const CARD_GAP = 5;
 
 /** The two possible answers to the rating, each with its icon. */
 const VERDICTS = [
-  { value: 'yes', Icon: ThumbsUpIcon, label: 'Sí, me ha servido' },
-  { value: 'no', Icon: ThumbsDownIcon, label: 'No me ha servido' },
+  { value: 'yes', Icon: ThumbsUpIcon, labelKey: 'help.usefulYes' },
+  { value: 'no', Icon: ThumbsDownIcon, labelKey: 'help.usefulNo' },
 ] as const;
 
 type Verdict = (typeof VERDICTS)[number]['value'];
@@ -38,6 +39,8 @@ type NumberedBlock = { block: Block; step: number };
 
 export default function HelpArticleScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { t } = useTranslation();
+  const { language } = usePrefs();
   const accent = useAccent();
   const [verdict, setVerdict] = useState<Verdict | null>(null);
 
@@ -49,20 +52,20 @@ export default function HelpArticleScreen() {
    */
   const blocks = useMemo<NumberedBlock[]>(() => {
     let step = 0;
-    return (topic?.blocks ?? []).map((block) => {
+    return (topic?.blocks[language] ?? []).map((block) => {
       if (block.type === 'step') step += 1;
       return { block, step: block.type === 'step' ? step : 0 };
     });
-  }, [topic]);
+  }, [topic, language]);
 
   if (!topic) return <Redirect href="/help" />;
 
   return (
-    <SecondaryScreen compactTitle title={topic.title} contentGap={CARD_GAP}>
+    <SecondaryScreen compactTitle title={topic.title[language]} contentGap={CARD_GAP}>
       <View
         style={[styles.metaCard, groupRadius(0, 2, radius.box, radius.joined)]}>
         <View style={[styles.dot, { backgroundColor: accent }]} />
-        <AppText style={styles.meta}>{topic.meta}</AppText>
+        <AppText style={styles.meta}>{topic.meta[language]}</AppText>
       </View>
 
       <View style={[styles.body, groupRadius(1, 2, radius.box, radius.joined)]}>
@@ -73,14 +76,14 @@ export default function HelpArticleScreen() {
         <Divider style={styles.divider} />
 
         <View style={styles.verdictRow}>
-          <AppText style={styles.verdictLabel}>¿TE HA SERVIDO?</AppText>
-          {VERDICTS.map(({ value, Icon, label }) => {
+          <AppText style={styles.verdictLabel}>{t('help.wasItUseful')}</AppText>
+          {VERDICTS.map(({ value, Icon, labelKey }) => {
             const selected = verdict === value;
             return (
               <Pressable
                 key={value}
                 accessibilityRole="button"
-                accessibilityLabel={label}
+                accessibilityLabel={t(labelKey)}
                 accessibilityState={{ selected }}
                 onPress={() => setVerdict(value)}
                 style={[

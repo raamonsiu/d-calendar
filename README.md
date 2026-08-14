@@ -48,18 +48,14 @@ device language at first launch and changeable in Settings.
 
 ## Mockups
 
-<!--
-  Screenshots pending. Drop the images in docs/screenshots/ and reference them
-  here, e.g.:
-
-  <div align="center">
-    <img src="docs/screenshots/home.png"     width="30%" alt="Home" />
-    <img src="docs/screenshots/create.png"   width="30%" alt="Create an item" />
-    <img src="docs/screenshots/settings.png" width="30%" alt="Settings" />
-  </div>
--->
-
-_Screenshots coming with the next build._
+<div align="center">
+  <img src="docs/screenshots/home.png" width="30%" alt="Home: the day, its tasks and its habits" />
+  <img src="docs/screenshots/month.png" width="30%" alt="Month view, scrolling continuously" />
+  <img src="docs/screenshots/create-event.png" width="30%" alt="Creating an event" />
+  <img src="docs/screenshots/create-habit.png" width="30%" alt="Creating a habit" />
+  <img src="docs/screenshots/settings.png" width="30%" alt="Settings" />
+  <img src="docs/screenshots/help.png" width="30%" alt="Help and feedback" />
+</div>
 
 ---
 

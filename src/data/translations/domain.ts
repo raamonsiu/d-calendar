@@ -158,6 +158,26 @@ export function monthLabelFromSpanish(spanishMonth: string, language: Language) 
   return index === -1 ? spanishMonth : MONTH_LABELS[language][index];
 }
 
+const UNTITLED_LABELS: Record<Language, string> = {
+  es: 'Sin título',
+  en: 'Untitled',
+  ca: 'Sense títol',
+};
+
+/**
+ * Stand-in title for an event that arrives without one, from a device
+ * calendar or a subscription.
+ *
+ * It lives here and not behind `t()` because the two callers are a pure
+ * parser and a service, neither of which can hold a hook. It is resolved when
+ * the event is read, so a language changed afterwards reaches it on the next
+ * read: immediately for the calendars of the device, which are re-read every
+ * time the app comes back, and on the next download for a subscription.
+ *
+ * @param language Active language.
+ */
+export const untitledLabel = (language: Language) => UNTITLED_LABELS[language];
+
 export const availabilityLabel = (value: Availability, language: Language) =>
   AVAILABILITY_LABELS[language][value];
 

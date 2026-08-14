@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/theme/Text';
@@ -23,6 +24,8 @@ export function ScreenHeader({
   onBack?: () => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
+
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -32,7 +35,7 @@ export function ScreenHeader({
     <View style={styles.row}>
       <IconButton
         size={32}
-        label="Atrás"
+        label={t('common.goBack')}
         style={styles.back}
         onPress={onBack ?? goBack}>
         <ArrowLeftIcon size={20} color={color.textMuted} />

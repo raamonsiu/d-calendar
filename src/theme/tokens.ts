@@ -73,17 +73,21 @@ export const color = {
 /**
  * Closed accent palette (Settings › Apariencia).
  *
+ * The colour carries a translation key and not a name, because the name is
+ * copy and copy does not live in the tokens: the swatch is read out by its
+ * label, so it has to follow the language like everything else.
+ *
  * The field is called `hex` and not `value` on purpose: the Reanimated Babel
  * plugin warns about any `something.value` inside an inline style because it
  * believes it is a shared value.
  */
 export const ACCENTS = [
-  { name: 'Rojo', hex: '#e5252f' },
-  { name: 'Ámbar', hex: '#e5a020' },
-  { name: 'Verde', hex: '#3fae6b' },
-  { name: 'Azul', hex: '#3d7fe0' },
-  { name: 'Violeta', hex: '#c4a8e0' },
-  { name: 'Gris', hex: '#b9b9c1' },
+  { labelKey: 'common.accentRed', hex: '#e5252f' },
+  { labelKey: 'common.accentAmber', hex: '#e5a020' },
+  { labelKey: 'common.accentGreen', hex: '#3fae6b' },
+  { labelKey: 'common.accentBlue', hex: '#3d7fe0' },
+  { labelKey: 'common.accentViolet', hex: '#c4a8e0' },
+  { labelKey: 'common.accentGrey', hex: '#b9b9c1' },
 ] as const;
 
 /**

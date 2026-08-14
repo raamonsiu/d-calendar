@@ -1,6 +1,8 @@
 import ICAL from 'ical.js';
 
+import { untitledLabel } from '@/data/translations/domain';
 import { MS_PER_DAY } from '@/lib/date';
+import type { Language } from '@/lib/language';
 import { SUBSCRIPTION_ID_PREFIX } from '@/lib/sourceIds';
 import type { Availability, CalEvent, Visibility } from '@/types';
 
@@ -80,12 +82,15 @@ const MAX_EVENTS = 4000;
  * @param calendarId Id of the subscribed calendar in the app's model.
  * @param from Start of the window being read.
  * @param to End of the window being read.
+ * @param language Active language, for the stand-in title of an event that
+ *   arrives without one.
  */
 export function parseIcs(
   text: string,
   calendarId: string,
   from: Date,
   to: Date,
+  language: Language,
 ): CalEvent[] {
   const calendar = new ICAL.Component(ICAL.parse(text));
 
@@ -101,13 +106,22 @@ export function parseIcs(
     if (found.length >= MAX_EVENTS) break;
 
     if (event.isRecurring()) {
-      collectOccurrences(event, calendarId, from, to, found, maxOccurrences);
+      collectOccurrences(
+        event,
+        calendarId,
+        from,
+        to,
+        found,
+        maxOccurrences,
+        language,
+      );
     } else {
       const single = toAppEvent(
         event,
         calendarId,
         event.startDate,
         event.endDate,
+        language,
       );
       if (overlaps(single, from, to)) found.push(single);
     }
@@ -197,6 +211,7 @@ function relateExceptions(components: ICAL.Component[]) {
  * @param found List the occurrences are appended to.
  * @param maxOccurrences Most this one rule may contribute; see
  * `OCCURRENCES_PER_DAY`.
+ * @param language Active language, passed through to `toAppEvent`.
  */
 function collectOccurrences(
   event: ICAL.Event,
@@ -205,6 +220,7 @@ function collectOccurrences(
   to: Date,
   found: CalEvent[],
   maxOccurrences: number,
+  language: Language,
 ) {
   const expansion = event.iterator();
   let kept = 0;
@@ -220,6 +236,7 @@ function collectOccurrences(
       calendarId,
       occurrence.startDate,
       occurrence.endDate,
+      language,
     );
 
     if (overlaps(single, from, to)) {
@@ -252,19 +269,21 @@ function overlaps(event: CalEvent, from: Date, to: Date) {
  * @param calendarId Id of the subscribed calendar in the app's model.
  * @param startDate Start of this occurrence.
  * @param endDate End of this occurrence.
+ * @param language Active language, for an event with no `SUMMARY`.
  */
 function toAppEvent(
   event: ICAL.Event,
   calendarId: string,
   startDate: ICAL.Time,
   endDate: ICAL.Time,
+  language: Language,
 ): CalEvent {
   const startsAt = startDate.toJSDate().getTime();
   const endsAt = endDate.toJSDate().getTime();
 
   return {
     id: `${SUBSCRIPTION_ID_PREFIX}${calendarId}:${event.uid}:${startsAt}`,
-    title: event.summary || 'Sin título',
+    title: event.summary || untitledLabel(language),
     description: event.description ?? '',
     location: event.location ?? '',
     startsAt,

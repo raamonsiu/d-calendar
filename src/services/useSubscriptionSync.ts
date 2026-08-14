@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { useAppStore } from '@/store/useAppStore';
+import { usePrefs } from '@/theme/prefs';
 import { downloadSubscription } from './subscriptions';
 
 /**
@@ -27,6 +28,7 @@ const MIN_INTERVAL_MS = 15 * 60 * 1000;
  * does happens in the store.
  */
 export function useSubscriptionSync() {
+  const { language } = usePrefs();
   const running = useRef(false);
   const lastAttempt = useRef(0);
 
@@ -60,7 +62,11 @@ export function useSubscriptionSync() {
 
       try {
         for (const calendar of subscribed) {
-          const events = await downloadSubscription(calendar, Date.now());
+          const events = await downloadSubscription(
+            calendar,
+            Date.now(),
+            language,
+          );
           if (!active) return;
           if (events) {
             useAppStore.getState().finishSubscription(calendar.id, events);
@@ -94,5 +100,5 @@ export function useSubscriptionSync() {
       unsubscribeStore();
       appStateSubscription.remove();
     };
-  }, []);
+  }, [language]);
 }

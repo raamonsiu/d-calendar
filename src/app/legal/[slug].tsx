@@ -17,7 +17,7 @@ import { StyleSheet, View } from 'react-native';
 import { legalDocumentBySlug, type LegalBlock } from '@/data/legal';
 import { groupRadius } from '@/lib/groupRadius';
 import { AppText } from '@/theme/Text';
-import { useAccent } from '@/theme/prefs';
+import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { InfoIcon } from '@/ui/icons';
@@ -27,6 +27,7 @@ const CARD_GAP = 5;
 
 export default function LegalDocumentScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { language } = usePrefs();
   const document = legalDocumentBySlug(slug);
 
   if (!document) return <Redirect href="/about" />;
@@ -34,15 +35,15 @@ export default function LegalDocumentScreen() {
   return (
     <SecondaryScreen
       compactTitle
-      title={document.title}
+      title={document.title[language]}
       contentGap={CARD_GAP}>
       <View
         style={[styles.metaCard, groupRadius(0, 2, radius.box, radius.joined)]}>
-        <AppText style={styles.meta}>{document.updated}</AppText>
+        <AppText style={styles.meta}>{document.updated[language]}</AppText>
       </View>
 
       <View style={[styles.body, groupRadius(1, 2, radius.box, radius.joined)]}>
-        {document.blocks.map((block, index) => (
+        {document.blocks[language].map((block, index) => (
           <LegalBlockView key={index} block={block} />
         ))}
       </View>

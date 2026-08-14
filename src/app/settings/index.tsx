@@ -159,7 +159,7 @@ export default function SettingsScreen() {
                   <Pressable
                     key={option.hex}
                     accessibilityRole="radio"
-                    accessibilityLabel={option.name}
+                    accessibilityLabel={t(option.labelKey)}
                     accessibilityState={{ selected }}
                     onPress={() => {
                       prefs.setPreference('accent', option.hex);
