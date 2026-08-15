@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.0';
-export const APP_BUILD = '1';
+export const APP_VERSION = '1.0.1-alpha';
+export const APP_BUILD = '2';
 
 /** Every release so far came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -27,6 +27,33 @@ const AUGUST_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.0.1-alpha',
+    date: AUGUST_2026,
+    notes: {
+      es: [
+        'Un hábito vuelve a empezar cuando su día o su semana termina, en vez de quedarse marcado para siempre.',
+        'La racha se conserva solo si el periodo anterior se completó: dejarlo a medias o saltarse un día la rompe.',
+        'Las tareas completadas ahora sí desaparecen al día siguiente, también las que venías arrastrando de la versión anterior.',
+        'Los títulos largos de una tarea se leen enteros, en dos líneas.',
+        'Los avisos se ajustan mejor: los minutos van de cinco en cinco, y las horas y los días empiezan en uno.',
+      ],
+      en: [
+        'A habit starts over when its day or week is done, instead of staying ticked for ever.',
+        'The streak only survives when the previous period was completed: leaving it half way or skipping a day breaks it.',
+        'Completed tasks really do disappear the next day now, the ones carried over from the previous version included.',
+        'Long task titles can be read in full, on two lines.',
+        'Reminders fit better: minutes move in fives, and hours and days start at one.',
+      ],
+      ca: [
+        'Un hàbit torna a començar quan el seu dia o la seva setmana s’acaba, en comptes de quedar-se marcat per sempre.',
+        'La ratxa es conserva només si el període anterior es va completar: deixar-lo a mitges o saltar-se un dia la trenca.',
+        'Les tasques completades ara sí que desapareixen l’endemà, també les que arrossegaves de la versió anterior.',
+        'Els títols llargs d’una tasca es llegeixen sencers, en dues línies.',
+        'Els avisos s’ajusten millor: els minuts van de cinc en cinc, i les hores i els dies comencen a un.',
+      ],
+    },
+  },
   {
     version: '1.0',
     date: AUGUST_2026,

@@ -9,6 +9,7 @@ import {
   isSameDay,
   startOfDay,
 } from '@/lib/date';
+import { isTaskExpired } from '@/lib/tasks';
 import type { Language } from '@/theme/prefs';
 import type { Account, CalEvent, Calendar, Task } from '@/types';
 
@@ -417,16 +418,22 @@ export function taskDueLabel(task: Task, language: Language): string {
  * Tasks that show up on Home: today's, the overdue ones and the ones without an
  * exact date. Later ones are left out so the list does not grow.
  *
+ * A task completed on an earlier day is left out here too, and not only by
+ * `purgeExpiredTasks`. The purge runs when the app starts and when it comes
+ * back to the foreground, which is housekeeping; deciding it again while
+ * drawing is what makes the promise under the list true whether or not the
+ * purge happened to run.
+ *
  * Postcondition: returns a new list keeping the store order.
  *
  * @param tasks Every task in the store.
+ * @param now Instant "an earlier day" is measured against.
  */
-export function tasksForHome(tasks: Task[]) {
-  const endOfToday = startOfDay(new Date()).getTime() + MS_PER_DAY;
+export function tasksForHome(tasks: Task[], now: number = Date.now()) {
+  const endOfToday = startOfDay(new Date(now)).getTime() + MS_PER_DAY;
   return tasks.filter(
     (task) =>
-      task.dueAt == null ||
-      task.vagueMonth != null ||
-      task.dueAt < endOfToday,
+      !isTaskExpired(task, now) &&
+      (task.dueAt == null || task.vagueMonth != null || task.dueAt < endOfToday),
   );
 }

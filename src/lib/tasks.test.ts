@@ -53,6 +53,20 @@ describe('withoutExpiredTasks', () => {
     expect(withoutExpiredTasks([doneYesterday], NOW)).toEqual([]);
   });
 
+  test('una tarea marcada en una version anterior, sin doneAt, desaparece', () => {
+    const legacy = task({ id: 'a', done: true });
+    delete (legacy as Partial<Task>).doneAt;
+
+    expect(withoutExpiredTasks([legacy], NOW)).toEqual([]);
+  });
+
+  test('sin doneAt pero sin marcar se conserva', () => {
+    const legacy = task({ id: 'a' });
+    delete (legacy as Partial<Task>).doneAt;
+
+    expect(withoutExpiredTasks([legacy], NOW)).toEqual([legacy]);
+  });
+
   test('solo quita las que expiraron, deja el resto intacto', () => {
     const pending = task({ id: 'a' });
     const doneToday = task({ id: 'b', done: true, doneAt: EARLIER_TODAY });

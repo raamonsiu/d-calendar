@@ -16,8 +16,21 @@ import { ControlButton, FormBlock } from './blocks';
 /** Translation keys of a relative reminder's unit, in `ReminderUnit` order. */
 const RELATIVE_UNIT_KEYS = ['minutesBefore', 'hoursBefore', 'daysBefore'];
 
-/** Values the control cycles through when tapped. */
-const RELATIVE_VALUES = [5, 10, 15, 30, 45];
+/**
+ * Values the control cycles through, one list per unit.
+ *
+ * The step belongs to the unit and not to the control: five minutes is a
+ * sensible jump, five hours or five days is not, which is why a single list
+ * shared by the three of them offered "45 days before" and never offered "1
+ * hour before". Minutes move in fives; hours and days start at one and open
+ * up as they grow, so the usual reminders are two taps away and the long ones
+ * are still reachable without cycling through twenty-three of them.
+ */
+const RELATIVE_VALUES: Record<ReminderUnit, number[]> = {
+  0: [5, 10, 15, 30, 45],
+  1: [1, 2, 3, 6, 12],
+  2: [1, 2, 3, 7, 14],
+};
 
 /** Starting values of a new reminder. */
 const NEW_RELATIVE_VALUE = 30;
@@ -137,7 +150,10 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
                   onPress={() =>
                     props.onChange(
                       patchById(props.reminders, reminder.id, {
-                        value: nextInCycle(RELATIVE_VALUES, reminder.value),
+                        value: nextInCycle(
+                          RELATIVE_VALUES[reminder.unit],
+                          reminder.value,
+                        ),
                       }),
                     )
                   }
@@ -149,7 +165,7 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
                   onPress={() =>
                     props.onChange(
                       patchById(props.reminders, reminder.id, {
-                        unit: nextUnit(reminder.unit),
+                        ...inUnit(reminder.value, nextUnit(reminder.unit)),
                       }),
                     )
                   }
@@ -180,6 +196,28 @@ export function RemindersBlock(props: RelativeProps | TimeProps) {
  */
 function nextUnit(unit: ReminderUnit) {
   return ((unit + 1) % RELATIVE_UNIT_KEYS.length) as ReminderUnit;
+}
+
+/**
+ * A reminder moved to another unit, with its number brought into that unit's
+ * own list.
+ *
+ * Changing the unit alone would carry the number with it, and the number
+ * belonged to the unit it was chosen in: 45 minutes became 45 hours, which
+ * that control cannot even reach on its own.
+ *
+ * Postcondition: `value` is always one of `RELATIVE_VALUES[unit]`, keeping
+ * the closest one to what was on screen so the jump is as small as possible.
+ *
+ * @param value Number as it stood in the previous unit.
+ * @param unit Unit being moved to.
+ */
+function inUnit(value: number, unit: ReminderUnit) {
+  const allowed = RELATIVE_VALUES[unit];
+  const closest = allowed.reduce((best, candidate) =>
+    Math.abs(candidate - value) < Math.abs(best - value) ? candidate : best,
+  );
+  return { unit, value: closest };
 }
 
 /**

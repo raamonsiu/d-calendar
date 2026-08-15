@@ -708,6 +708,7 @@ export function useItemForm(editing?: Editing) {
     reminders: timeReminders,
     progress: editedHabit?.progress ?? 0,
     streak: editedHabit?.streak ?? 0,
+    periodStart: editedHabit?.periodStart ?? null,
   });
 
   /**

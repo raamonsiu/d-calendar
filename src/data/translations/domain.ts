@@ -1,4 +1,4 @@
-import type { Language, WeekStart } from '@/theme/prefs';
+import type { Language } from '@/lib/language';
 import type {
   Availability,
   CalendarKind,
@@ -6,6 +6,7 @@ import type {
   HabitFrequency,
   RepeatRule,
   Visibility,
+  WeekStart,
 } from '@/types';
 
 /**

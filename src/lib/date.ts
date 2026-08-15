@@ -6,7 +6,8 @@
  * from a test with no provider running.
  */
 import { MONTH_LABELS, WEEKDAY_INITIALS, WEEKDAY_LABELS } from '@/data/translations/domain';
-import type { Language, WeekStart } from '@/theme/prefs';
+import type { Language } from '@/lib/language';
+import type { WeekStart } from '@/types';
 
 /** The twelve month names in the active language, `getMonth()` indexed. */
 export const monthNames = (language: Language) => MONTH_LABELS[language];
@@ -112,7 +113,7 @@ export const isToday = (date: Date) => isSameDay(date, new Date());
  * @param date Any day of the week being looked for.
  * @param weekStart Week start preference.
  */
-function startOfWeek(date: Date, weekStart: WeekStart) {
+export function startOfWeek(date: Date, weekStart: WeekStart) {
   const first = weekStartIndex(weekStart);
   const offset = (date.getDay() - first + DAYS_PER_WEEK) % DAYS_PER_WEEK;
   return addDays(startOfDay(date), -offset);

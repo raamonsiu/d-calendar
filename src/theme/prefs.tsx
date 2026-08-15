@@ -10,6 +10,7 @@ import {
 import { AccessibilityInfo } from 'react-native';
 
 import { detectLanguage, type Language } from '@/lib/language';
+import type { WeekStart } from '@/types';
 import i18n from './i18n';
 import { color } from './tokens';
 
@@ -18,7 +19,7 @@ export type { Language };
 /** Key the preferences are stored under on the device. */
 const PREFERENCES_KEY = 'dcalendar-preferences';
 
-export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
+export type { WeekStart };
 
 /**
  * The "Violeta" accent's hex before it was moved to match the app icon's own

@@ -1,5 +1,6 @@
-import type { Language } from '@/theme/prefs';
-import type { Habit, HabitFrequency } from '@/types';
+import { MS_PER_DAY, startOfDay, startOfWeek } from '@/lib/date';
+import type { Language } from '@/lib/language';
+import type { Habit, HabitFrequency, WeekStart } from '@/types';
 
 /**
  * Habit rules: how progress moves forward, how the streak moves and how they
@@ -108,3 +109,87 @@ export function nextHabitStreak(
   if (wasDone && !isDone) return Math.max(0, streak - 1);
   return streak;
 }
+
+/**
+ * Start of the period a habit counts in, at the instant given.
+ *
+ * Postcondition: midnight of that day for a daily habit, midnight of the
+ * first day of the week for a weekly one, so two instants in the same period
+ * always return the same number.
+ *
+ * @param frequency How often the habit repeats.
+ * @param at Instant the period is looked for.
+ * @param weekStart Week start preference, which decides where a week begins.
+ */
+export function habitPeriodStart(
+  frequency: HabitFrequency,
+  at: number,
+  weekStart: WeekStart,
+): number {
+  const date = new Date(at);
+  return isWeeklyFrequency(frequency)
+    ? startOfWeek(date, weekStart).getTime()
+    : startOfDay(date).getTime();
+}
+
+/**
+ * The habit as it stands in the period containing `now`.
+ *
+ * A habit carries the repetitions of one period only. When the period it was
+ * last counted in is over, the count goes back to 0 - which is what makes it
+ * tickable again the next day or the next week - and the streak survives only
+ * if that period was completed and is the one immediately before this one:
+ * a period finished half way, or a period skipped entirely, breaks it.
+ *
+ * Precondition: none; a habit that was never counted simply joins the current
+ * period untouched. Postcondition: returns the same object when nothing
+ * changes, so a list of habits can be mapped without every card re-rendering.
+ *
+ * @param habit Habit as it is stored.
+ * @param weekStart Week start preference.
+ * @param now Instant the current period is worked out from.
+ */
+export function rolledOverHabit(
+  habit: Habit,
+  weekStart: WeekStart,
+  now: number = Date.now(),
+): Habit {
+  const current = habitPeriodStart(habit.frequency, now, weekStart);
+  if (habit.periodStart === current) return habit;
+  if (habit.periodStart === null) return { ...habit, periodStart: current };
+
+  const previous = habitPeriodStart(habit.frequency, habit.periodStart, weekStart);
+  const length = isWeeklyFrequency(habit.frequency)
+    ? MS_PER_DAY * 7
+    : MS_PER_DAY;
+
+  /**
+   * Whether the period just left is the one right before this one. The
+   * comparison allows a day of slack because a week that crosses a daylight
+   * saving change is an hour shorter or longer than seven exact days.
+   */
+  const consecutive = current - previous <= length + MS_PER_DAY;
+
+  return {
+    ...habit,
+    progress: 0,
+    streak: consecutive && isHabitDone(habit) ? habit.streak : 0,
+    periodStart: current,
+  };
+}
+
+/**
+ * Every habit brought into the period containing `now`.
+ *
+ * Postcondition: returns a new list, but each habit that needed no rollover
+ * is the very same object it was.
+ *
+ * @param habits Every habit in the store.
+ * @param weekStart Week start preference.
+ * @param now Instant the current period is worked out from.
+ */
+export const rolledOverHabits = (
+  habits: Habit[],
+  weekStart: WeekStart,
+  now: number = Date.now(),
+) => habits.map((habit) => rolledOverHabit(habit, weekStart, now));

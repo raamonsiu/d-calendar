@@ -3,7 +3,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { insertAt, patchById, withoutId } from '@/lib/collections';
-import { nextHabitProgress, nextHabitStreak, isHabitDone } from '@/lib/habits';
+import {
+  isHabitDone,
+  nextHabitProgress,
+  nextHabitStreak,
+  rolledOverHabit,
+  rolledOverHabits,
+} from '@/lib/habits';
 import { detectLanguage } from '@/lib/language';
 import { isDeviceId } from '@/lib/sourceIds';
 import { withoutExpiredTasks } from '@/lib/tasks';
@@ -16,6 +22,7 @@ import type {
   ItemKind,
   RelativeReminder,
   Task,
+  WeekStart,
 } from '@/types';
 import { ACCOUNTS, CALENDARS, seedEvents, seedHabits, seedTasks } from './seed';
 
@@ -133,7 +140,13 @@ type AppActions = {
    * Postcondition: returns true only when the habit becomes complete with this
    * tap, which is what triggers the card pulse and the haptic.
    */
-  bumpHabit: (id: string, delta: 1 | -1) => boolean;
+  bumpHabit: (id: string, delta: 1 | -1, weekStart: WeekStart) => boolean;
+  /**
+   * Brings every habit into the period it is being looked at in, so the ones
+   * whose day or week is over start again at zero. Housekeeping only: the
+   * screens already draw through `rolledOverHabits`.
+   */
+  rollHabitPeriods: (weekStart: WeekStart) => void;
 
   /** Returns what undo needs, or null when the id did not exist. */
   removeItem: (kind: ItemKind, id: string) => RemovedItem | null;
@@ -294,9 +307,16 @@ export const useAppStore = create<AppState & AppActions>()(
       updateHabit: (id, patch) =>
         set((state) => ({ habits: patchById(state.habits, id, patch) })),
 
-      bumpHabit: (id, delta) => {
-        const habit = get().habits.find((candidate) => candidate.id === id);
-        if (!habit) return false;
+      bumpHabit: (id, delta, weekStart) => {
+        const stored = get().habits.find((candidate) => candidate.id === id);
+        if (!stored) return false;
+
+        /**
+         * The tap counts in the period it happens in, not in whatever period
+         * the habit was last touched: pressing a habit whose day is over
+         * starts that day at zero and then adds this one repetition.
+         */
+        const habit = rolledOverHabit(stored, weekStart);
 
         const progress = nextHabitProgress(habit.progress, habit.target, delta);
         const wasDone = isHabitDone(habit);
@@ -306,11 +326,17 @@ export const useAppStore = create<AppState & AppActions>()(
           habits: patchById(state.habits, id, {
             progress,
             streak: nextHabitStreak(habit.streak, wasDone, isDone),
+            periodStart: habit.periodStart,
           }),
         }));
 
         return isDone && !wasDone;
       },
+
+      rollHabitPeriods: (weekStart) =>
+        set((state) => ({
+          habits: rolledOverHabits(state.habits, weekStart),
+        })),
 
       removeItem: (kind, id) => {
         const state = get();

@@ -60,7 +60,7 @@ export function TaskRow({ task, onToggle, onOpenSettings }: TaskRowProps) {
       </View>
 
       <AppText
-        numberOfLines={1}
+        numberOfLines={2}
         style={[
           styles.title,
           {
@@ -88,7 +88,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    height: 42,
+    /**
+     * A minimum and not a height: a title too long for one line takes a
+     * second one and the row grows with it, rather than cutting the task off
+     * where it stops fitting.
+     */
+    minHeight: 42,
+    paddingVertical: 4,
     paddingHorizontal: 4,
     borderRadius: radius.chip,
   },
@@ -100,6 +106,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { flex: 1, fontSize: 13.5, letterSpacing: -0.1 },
+  title: { flex: 1, fontSize: 13.5, lineHeight: 17, letterSpacing: -0.1 },
   due: { fontSize: 9.5, letterSpacing: 0.8, color: color.labelDim },
 });

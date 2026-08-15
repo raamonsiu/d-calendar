@@ -52,7 +52,7 @@ import { Onboarding } from '@/features/onboarding/Onboarding';
 import { useDeviceCalendarSync } from '@/services/useDeviceCalendarSync';
 import { useNotificationSync } from '@/services/useNotificationSync';
 import { useSubscriptionSync } from '@/services/useSubscriptionSync';
-import { useTaskCleanup } from '@/services/useTaskCleanup';
+import { useExpiryCleanup } from '@/services/useExpiryCleanup';
 import { useStoreHydrated } from '@/store/useAppStore';
 import { PreferencesProvider, usePrefs } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
@@ -63,7 +63,8 @@ SplashScreen.preventAutoHideAsync();
 /**
  * Mounts the four background jobs: reading the calendars of the device,
  * downloading the ones subscribed by URL, scheduling the reminders, and
- * dropping tasks completed on an earlier day. It draws nothing, and it has to
+ * clearing what the calendar has left behind: tasks completed on an earlier
+ * day and habits whose period is over. It draws nothing, and it has to
  * live inside `PreferencesProvider` because the notifications hook reads the
  * preference, which `RootLayout` itself creates.
  *
@@ -78,7 +79,7 @@ function BackgroundSync() {
   useDeviceCalendarSync();
   useSubscriptionSync();
   useNotificationSync();
-  useTaskCleanup();
+  useExpiryCleanup();
   return null;
 }
 

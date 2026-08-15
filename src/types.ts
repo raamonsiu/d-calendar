@@ -84,6 +84,9 @@ export type Guest = {
   state: GuestState;
 };
 
+/** First day of the week, as the week start preference persists it. */
+export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
+
 export type Availability = 'Ocupado' | 'Libre';
 export type Visibility = 'Predet.' | 'Privado' | 'Público';
 export type RepeatRule = 'No' | 'Cada día' | 'Días de la semana' | 'Cada mes';
@@ -156,4 +159,14 @@ export type Habit = {
   /** Repetitions done in the current period. */
   progress: number;
   streak: number;
+  /**
+   * Midnight of the period `progress` belongs to: the day for a daily habit,
+   * the first day of the week for a weekly one.
+   *
+   * Without it `progress` would be a number with no date attached, which is
+   * what made a habit stay ticked for ever once completed. `null` means it
+   * has never been counted, which is also what an install from before this
+   * field looks like.
+   */
+  periodStart: number | null;
 };

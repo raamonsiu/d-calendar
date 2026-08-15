@@ -132,4 +132,5 @@ export const seedHabits = (language: Language): Habit[] =>
     reminders: [],
     progress: 0,
     streak: 0,
+    periodStart: null,
   }));

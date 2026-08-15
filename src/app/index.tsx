@@ -36,6 +36,7 @@ import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
 import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
+import { rolledOverHabits } from '@/lib/habits';
 import {
   eventCountsByDay,
   eventsByDay,
@@ -95,6 +96,17 @@ export default function HomeScreen() {
   const byDay = useMemo(() => eventsByDay(shownEvents), [shownEvents]);
   const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);
   const visibleTasks = useMemo(() => tasksForHome(tasks), [tasks]);
+
+  /**
+   * The habits as they stand today, so one whose day or week is over comes up
+   * at zero and ready to be ticked again. Decided while drawing and not only
+   * by `rollHabitPeriods`, which is what keeps it right whether or not the
+   * housekeeping happened to run.
+   */
+  const shownHabits = useMemo(
+    () => rolledOverHabits(habits, weekStart),
+    [habits, weekStart],
+  );
 
   const shownWeek = useMemo(
     () => weekDays(shownDay, weekStart),
@@ -217,9 +229,9 @@ export default function HomeScreen() {
             <View style={styles.agendaBox}>
               <AgendaList
                 tasks={visibleTasks}
-                habits={habits}
+                habits={shownHabits}
                 onToggleTask={toggleTask}
-                onBumpHabit={bumpHabit}
+                onBumpHabit={(id, delta) => bumpHabit(id, delta, weekStart)}
                 onOpenItem={openItem}
               />
             </View>
