@@ -80,7 +80,7 @@ export function TaskBlock({
               grow
               muted={!task.hasTime}
               label={task.hasTime ? formatTime(task.dueAt) : t('create.noTime')}
-              icon={<ClockIcon size={13} color={color.labelDim} />}
+              icon={<ClockIcon size={13} color={color.iconFaint} />}
               onPress={() =>
                 picker.open('time', task.dueAt, (picked) => {
                   task.setDueAt(withTime(task.dueAt, picked));

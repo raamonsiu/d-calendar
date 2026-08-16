@@ -10,7 +10,7 @@ import type { HexColor } from 'react-native-android-widget';
 
 import { detectLanguage, type Language } from '@/lib/language';
 import { PREFERENCES_KEY } from '@/theme/prefs';
-import { color } from '@/theme/tokens';
+import { CONTRAST_LIFT, color } from '@/theme/tokens';
 
 /**
  * Narrows a stored colour to the shape Android can parse in a widget.
@@ -53,6 +53,32 @@ export async function readLanguage(): Promise<Language> {
   return SUPPORTED.includes(stored as Language)
     ? (stored as Language)
     : detectLanguage();
+}
+
+/**
+ * Whether the user asked for more contrast in Settings › Accesibilidad.
+ *
+ * The widget is drawn outside React, so `<AppText>` never sees it and cannot
+ * lift the colours the way it does in the app. It is read here and applied by
+ * `liftedColor` instead.
+ */
+export async function readHighContrast(): Promise<boolean> {
+  const preferences = await storedPreferences();
+  return preferences?.highContrast === true;
+}
+
+/**
+ * A palette colour as the widget should draw it.
+ *
+ * Postcondition: returns the colour untouched when the preference is off or
+ * when it already reaches AA, so only the tones that need it move.
+ *
+ * @param original Colour from the palette.
+ * @param highContrast Whether the preference is on.
+ */
+export function liftedColor(original: string, highContrast: boolean): HexColor {
+  const lifted = highContrast ? CONTRAST_LIFT[original] : undefined;
+  return (lifted ?? original) as HexColor;
 }
 
 /** Accent the user chose, or the app's default when there is none stored. */

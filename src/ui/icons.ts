@@ -21,6 +21,7 @@ export { CodeIcon } from 'phosphor-react-native/src/icons/Code';
 export { CoffeeIcon } from 'phosphor-react-native/src/icons/Coffee';
 export { DotsThreeVerticalIcon } from 'phosphor-react-native/src/icons/DotsThreeVertical';
 export { DownloadSimpleIcon } from 'phosphor-react-native/src/icons/DownloadSimple';
+export { CircleHalfIcon } from 'phosphor-react-native/src/icons/CircleHalf';
 export { DropHalfIcon } from 'phosphor-react-native/src/icons/DropHalf';
 export { EnvelopeSimpleIcon } from 'phosphor-react-native/src/icons/EnvelopeSimple';
 export { FireIcon } from 'phosphor-react-native/src/icons/Fire';

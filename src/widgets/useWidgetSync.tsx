@@ -28,7 +28,7 @@ import { asHexColor } from './widgetPreferences';
 const REDRAW_DEBOUNCE_MS = 400;
 
 export function useWidgetSync() {
-  const { language, accent: storedAccent } = usePrefs();
+  const { language, accent: storedAccent, highContrast } = usePrefs();
   const accent = asHexColor(storedAccent);
   const redrawTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,7 +44,12 @@ export function useWidgetSync() {
           const habit = await readWidgetHabit(widgetId);
           if (habit) {
             return (
-              <HabitWidget habit={habit} accent={accent} language={language} />
+              <HabitWidget
+                habit={habit}
+                accent={accent}
+                language={language}
+                highContrast={highContrast}
+              />
             );
           }
 
@@ -83,5 +88,5 @@ export function useWidgetSync() {
       if (redrawTimer.current) clearTimeout(redrawTimer.current);
       unsubscribe();
     };
-  }, [accent, language]);
+  }, [accent, language, highContrast]);
 }

@@ -1,6 +1,6 @@
 import { Keyboard, StyleSheet, TextInput, type TextInputProps } from 'react-native';
 
-import { fontFamily, scaleType } from '@/theme/Text';
+import { fontFamily, textOverrides } from '@/theme/Text';
 import { usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 
@@ -28,7 +28,7 @@ export function Field({
   style,
   ...rest
 }: FieldProps) {
-  const { mono } = usePrefs();
+  const { mono, highContrast } = usePrefs();
   return (
     <TextInput
       placeholderTextColor={color.ghost}
@@ -42,7 +42,7 @@ export function Field({
         { fontFamily: fontFamily(300, mono), fontSize },
         variant === 'boxed' && styles.boxed,
         style,
-        scaleType([{ fontSize }, style]),
+        textOverrides([{ fontSize }, style], highContrast),
       ]}
     />
   );

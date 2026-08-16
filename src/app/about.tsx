@@ -198,7 +198,7 @@ export default function AboutScreen() {
           />
         ))}
         <View style={styles.privacy}>
-          <LockSimpleIcon size={12} color={color.faint} />
+          <LockSimpleIcon size={12} color={color.iconFaint} />
           <AppText style={styles.privacyText}>
             {t('help.privacyPitch')}
           </AppText>

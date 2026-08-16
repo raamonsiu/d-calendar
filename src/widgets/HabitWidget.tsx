@@ -31,6 +31,7 @@ import { habitFrequencyLabel, habitStreakUnit, isHabitDone } from '@/lib/habits'
 import type { Language } from '@/lib/language';
 import { blend, color, radius, tint } from '@/theme/tokens';
 import type { Habit } from '@/types';
+import { liftedColor } from './widgetPreferences';
 
 /** Action the handler receives when the widget is tapped to count one more. */
 export const INCREMENT_ACTION = 'INCREMENT_HABIT';
@@ -54,6 +55,8 @@ type HabitWidgetProps = {
   /** Accent the user chose, so the widget matches the app. */
   accent: HexColor;
   language: Language;
+  /** Whether the accessibility preference asks for brighter dim tones. */
+  highContrast: boolean;
 };
 
 /**
@@ -115,17 +118,22 @@ function HabitName({
   name,
   done,
   accent,
+  highContrast,
 }: {
   name: string;
   done: boolean;
   accent: HexColor;
+  highContrast: boolean;
 }) {
   const label = (
     <TextWidget
       text={name}
       maxLines={1}
       truncate="END"
-      style={{ fontSize: 15, color: done ? color.textMuted : color.text }}
+      style={{
+        fontSize: 15,
+        color: done ? liftedColor(color.textMuted, highContrast) : color.text,
+      }}
     />
   );
 
@@ -152,7 +160,12 @@ function HabitName({
   );
 }
 
-export function HabitWidget({ habit, accent, language }: HabitWidgetProps) {
+export function HabitWidget({
+  habit,
+  accent,
+  language,
+  highContrast,
+}: HabitWidgetProps) {
   const done = isHabitDone(habit);
 
   return (
@@ -176,10 +189,19 @@ export function HabitWidget({ habit, accent, language }: HabitWidgetProps) {
       <Progress habit={habit} accent={accent} />
 
       <FlexWidget style={{ flexDirection: 'column', flexGap: 3 }}>
-        <HabitName name={habit.name} done={done} accent={accent} />
+        <HabitName
+          name={habit.name}
+          done={done}
+          accent={accent}
+          highContrast={highContrast}
+        />
         <TextWidget
           text={`${habitFrequencyLabel(habit, language)} · ${habit.streak}${habitStreakUnit(habit)}`}
-          style={{ fontSize: 10, letterSpacing: 1, color: color.label }}
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            color: liftedColor(color.label, highContrast),
+          }}
         />
       </FlexWidget>
     </FlexWidget>
@@ -210,7 +232,7 @@ export function UnassignedWidget({ text }: { text: string }) {
       <TextWidget
         text={text}
         maxLines={3}
-        style={{ fontSize: 12, textAlign: 'center', color: color.textMuted }}
+        style={{ fontSize: 12, textAlign: 'center', color: color.textNote }}
       />
     </FlexWidget>
   );

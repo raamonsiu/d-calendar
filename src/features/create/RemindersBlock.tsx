@@ -235,7 +235,7 @@ function ReminderRow({
 }) {
   return (
     <View style={styles.row}>
-      <BellIcon size={13} color={color.labelDim} />
+      <BellIcon size={13} color={color.iconFaint} />
       {children}
       <Pressable
         accessibilityRole="button"

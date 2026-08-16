@@ -29,10 +29,19 @@ import type { Habit } from '@/types';
 import { HabitWidget } from './HabitWidget';
 import { WIDGET_COPY } from './widgetCopy';
 import { readHabits, linkWidgetToHabit } from './widgetData';
-import { readAccent, readLanguage } from './widgetPreferences';
+import {
+  readAccent,
+  readHighContrast,
+  readLanguage,
+} from './widgetPreferences';
 
 /** What the screen needs before it can draw anything. */
-type Loaded = { habits: Habit[]; language: Language; accent: HexColor };
+type Loaded = {
+  habits: Habit[];
+  language: Language;
+  accent: HexColor;
+  highContrast: boolean;
+};
 
 /**
  * The screen itself. Split from the export because it reads the insets, and
@@ -49,11 +58,14 @@ function ConfigurationScreen({
   useEffect(() => {
     let subscribed = true;
 
-    Promise.all([readHabits(), readLanguage(), readAccent()]).then(
-      ([habits, language, accent]) => {
-        if (subscribed) setLoaded({ habits, language, accent });
-      },
-    );
+    Promise.all([
+      readHabits(),
+      readLanguage(),
+      readAccent(),
+      readHighContrast(),
+    ]).then(([habits, language, accent, highContrast]) => {
+      if (subscribed) setLoaded({ habits, language, accent, highContrast });
+    });
 
     return () => {
       subscribed = false;
@@ -101,6 +113,7 @@ function ConfigurationScreen({
           habit={habit}
           accent={loaded.accent}
           language={loaded.language}
+          highContrast={loaded.highContrast}
         />,
       );
     } catch (error) {

@@ -11,7 +11,11 @@
  */
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
-import { readLanguage, readAccent } from './widgetPreferences';
+import {
+  readAccent,
+  readHighContrast,
+  readLanguage,
+} from './widgetPreferences';
 import {
   bumpHabitFromWidget,
   readHabits,
@@ -37,7 +41,11 @@ import { WIDGET_COPY } from './widgetCopy';
  * @param habitId Habit to draw when it is already known, saving a read.
  */
 async function render(props: WidgetTaskHandlerProps, habitId?: string) {
-  const [language, accent] = await Promise.all([readLanguage(), readAccent()]);
+  const [language, accent, highContrast] = await Promise.all([
+    readLanguage(),
+    readAccent(),
+    readHighContrast(),
+  ]);
   const copy = WIDGET_COPY[language];
 
   const habit = habitId
@@ -46,7 +54,12 @@ async function render(props: WidgetTaskHandlerProps, habitId?: string) {
 
   if (habit) {
     props.renderWidget(
-      <HabitWidget habit={habit} accent={accent} language={language} />,
+      <HabitWidget
+        habit={habit}
+        accent={accent}
+        language={language}
+        highContrast={highContrast}
+      />,
     );
     return;
   }

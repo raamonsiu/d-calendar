@@ -56,10 +56,20 @@ export const color = {
   faint: '#4d4d55',
   ghost: '#45454d',
 
-  icon: '#5a5a62',
-  iconFaint: '#4a4a52',
-  caret: '#3f3f47',
-  knobOff: '#5c5c65',
+  /**
+   * The four tones icons and controls are drawn in.
+   *
+   * They sit higher than the greys of the same rank in the text scale, and
+   * deliberately: WCAG asks 3:1 of anything that is not text but still has to
+   * be seen, and at the values the prototype used - a caret at 1.76:1 - a
+   * control could be missed altogether. Unlike the text tones these are not
+   * behind the "Más contraste" setting: a caret nobody can find is a defect,
+   * not a preference.
+   */
+  icon: '#6a6a72',
+  iconFaint: '#63636b',
+  caret: '#63636b',
+  knobOff: '#6c6c75',
 
   /**
    * The app's own purple, from the icon's inner circle (`icon-source/icon.svg`):
@@ -89,6 +99,32 @@ export const ACCENTS = [
   { labelKey: 'common.accentViolet', hex: '#c4a8e0' },
   { labelKey: 'common.accentGrey', hex: '#b9b9c1' },
 ] as const;
+
+/**
+ * Brighter stand-in for each text colour that does not reach WCAG AA, used
+ * when "Más contraste" is on in Settings › Accesibilidad.
+ *
+ * Measured against `card`, the lightest surface text sits on and therefore
+ * the worst case. Seven of the dim greys fall under 4.5:1 there, and two of
+ * them under 3:1; the design leans on them for labels and hints at 8.5-10px,
+ * where the large-text exemption does not apply.
+ *
+ * Raising each one to the bare 4.5:1 would land them all on the same grey and
+ * flatten the hierarchy into a single tone, so they are lifted onto three
+ * levels of the palette instead, keeping their order: what was dimmest is
+ * still dimmest. `textDisabled` is deliberately the lowest of the three,
+ * because on a completed task its dimness is what says "done".
+ */
+export const CONTRAST_LIFT: Record<string, string> = {
+  [color.ghost]: color.textMuted,
+  [color.faint]: color.textMuted,
+  [color.labelDim]: color.textMuted,
+  [color.textDim]: color.textMuted,
+  [color.textQuiet]: color.textMuted,
+  [color.textSubtle]: color.textMuted,
+  [color.textDisabled]: color.textSubtle,
+  [color.label]: color.textNeutral,
+};
 
 /**
  * Global type scale. The handoff sizes are written as they are in each

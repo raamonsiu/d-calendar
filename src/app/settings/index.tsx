@@ -29,6 +29,7 @@ import { GroupRow, OptionRow } from '@/ui/controls';
 import {
   CalendarBlankIcon,
   CheckIcon,
+  CircleHalfIcon,
   DropHalfIcon,
   SquaresFourIcon,
   TextAaIcon,
@@ -250,7 +251,7 @@ export default function SettingsScreen() {
       <Group title={t('settings.accessibilitySection')}>
         <GroupRow
           index={0}
-          count={2}
+          count={3}
           height={SWITCH_ROW_HEIGHT}
           caret={false}
           icon={<WindIcon size={ROW_ICON} color={color.textMuted} />}
@@ -269,7 +270,7 @@ export default function SettingsScreen() {
         />
         <GroupRow
           index={1}
-          count={2}
+          count={3}
           height={SWITCH_ROW_HEIGHT}
           caret={false}
           icon={<TextAaIcon size={ROW_ICON} color={color.textMuted} />}
@@ -278,6 +279,25 @@ export default function SettingsScreen() {
           onPress={() => prefs.setPreference('mono', !prefs.mono)}
           right={
             <Switch standalone={false} value={prefs.mono} onChange={() => {}} />
+          }
+        />
+        <GroupRow
+          index={2}
+          count={3}
+          height={SWITCH_ROW_HEIGHT}
+          caret={false}
+          icon={<CircleHalfIcon size={ROW_ICON} color={color.textMuted} />}
+          label={t('settings.highContrastLabel')}
+          hint={t('settings.highContrastHint')}
+          onPress={() =>
+            prefs.setPreference('highContrast', !prefs.highContrast)
+          }
+          right={
+            <Switch
+              standalone={false}
+              value={prefs.highContrast}
+              onChange={() => {}}
+            />
           }
         />
       </Group>

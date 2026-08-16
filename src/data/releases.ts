@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.1.0-alpha';
-export const APP_BUILD = '3';
+export const APP_VERSION = '1.1.1-alpha';
+export const APP_BUILD = '4';
 
 /** Every release so far came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -27,6 +27,27 @@ const AUGUST_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.1.1-alpha',
+    date: AUGUST_2026,
+    notes: {
+      es: [
+        'El texto secundario y los iconos se leen mejor: se ha subido el contraste de los tonos que no llegaban al estándar de accesibilidad.',
+        'Nuevo ajuste «Más contraste», en Ajustes › Accesibilidad, para subirlo todavía más sin cambiar el resto del diseño.',
+        'Los iconos y las flechas cumplen el contraste mínimo siempre, con el ajuste puesto o no.',
+      ],
+      en: [
+        'Secondary text and icons are easier to read: the tones that fell short of the accessibility standard have been raised.',
+        'A new "More contrast" setting, in Settings › Accessibility, lifts them further without changing the rest of the design.',
+        'Icons and carets now meet the minimum contrast at all times, with the setting on or off.',
+      ],
+      ca: [
+        'El text secundari i les icones es llegeixen millor: s’ha apujat el contrast dels tons que no arribaven a l’estàndard d’accessibilitat.',
+        'Nou ajust «Més contrast», a Configuració › Accessibilitat, per apujar-lo encara més sense canviar la resta del disseny.',
+        'Les icones i les fletxes compleixen el contrast mínim sempre, amb l’ajust activat o no.',
+      ],
+    },
+  },
   {
     version: '1.1.0-alpha',
     date: AUGUST_2026,

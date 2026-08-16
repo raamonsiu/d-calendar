@@ -2,7 +2,7 @@
   "expo": {
     "name": "D-Calendar",
     "slug": "NCALENDAR",
-    "version": "1.1.0-alpha",
+    "version": "1.1.1-alpha",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dcalendar",
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 3,
+      "versionCode": 4,
       "package": "com.d1ito.NCALENDAR",
       "permissions": [
         "USE_EXACT_ALARM"

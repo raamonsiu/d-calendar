@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 
 import { usePrefs } from './prefs';
-import { TYPE_SCALE, color } from './tokens';
+import { CONTRAST_LIFT, TYPE_SCALE, color } from './tokens';
 
 /** The design only uses these three weights. */
 export type FontWeight = 300 | 400 | 500;
@@ -39,36 +39,47 @@ export function fontFamily(weight: FontWeight, mono: boolean) {
 }
 
 /**
- * Applies the global type scale to an already resolved style.
+ * The last style layer of a piece of text: the global type scale, and the
+ * brighter colour when the user asked for more contrast.
  *
- * It is returned as a separate layer so it can be placed at the end of the
- * style array: that way every component writes the handoff sizes and the global
- * adjustment lives in a single token.
+ * Both are worked out here, from the already resolved style, so they can be
+ * placed at the end of the style array and win over whatever the component
+ * wrote. That is what lets every screen keep writing the handoff sizes and
+ * the palette names, with the two global adjustments living in one token
+ * each.
  *
- * Precondition: none; it accepts nested, null or empty styles. Postcondition:
- * returns `undefined` when there is nothing to scale (neutral scale, empty
- * style, or a style with no sizes), and otherwise an object containing only
- * `fontSize` and/or `lineHeight`.
+ * Precondition: none; it accepts nested, null or empty styles.
+ * Postcondition: returns `undefined` when there is nothing to change, and
+ * otherwise an object holding only the properties that do change. A colour
+ * the lift does not know about is left exactly as it was.
  *
- * @param style Style the original sizes are read from.
+ * @param style Style the sizes and the colour are read from.
+ * @param highContrast Whether the accessibility preference is on.
  */
-export function scaleType(style: StyleProp<TextStyle>): TextStyle | undefined {
-  if (TYPE_SCALE === 1) return undefined;
-
+export function textOverrides(
+  style: StyleProp<TextStyle>,
+  highContrast: boolean,
+): TextStyle | undefined {
   const flattened = StyleSheet.flatten(style);
   if (!flattened) return undefined;
 
-  const scaled: TextStyle = {};
-  if (typeof flattened.fontSize === 'number') {
-    scaled.fontSize = flattened.fontSize * TYPE_SCALE;
-  }
-  if (typeof flattened.lineHeight === 'number') {
-    scaled.lineHeight = flattened.lineHeight * TYPE_SCALE;
+  const overrides: TextStyle = {};
+
+  if (TYPE_SCALE !== 1) {
+    if (typeof flattened.fontSize === 'number') {
+      overrides.fontSize = flattened.fontSize * TYPE_SCALE;
+    }
+    if (typeof flattened.lineHeight === 'number') {
+      overrides.lineHeight = flattened.lineHeight * TYPE_SCALE;
+    }
   }
 
-  return scaled.fontSize === undefined && scaled.lineHeight === undefined
-    ? undefined
-    : scaled;
+  if (highContrast && typeof flattened.color === 'string') {
+    const lifted = CONTRAST_LIFT[flattened.color];
+    if (lifted) overrides.color = lifted;
+  }
+
+  return Object.keys(overrides).length === 0 ? undefined : overrides;
 }
 
 type AppTextProps = TextProps & {
@@ -97,7 +108,7 @@ export function AppText({
         styles.base,
         { fontFamily: fontFamily(weight, mono ?? prefs.mono) },
         style,
-        scaleType(style),
+        textOverrides(style, prefs.highContrast),
       ]}
     />
   );

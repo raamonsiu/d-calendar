@@ -16,7 +16,6 @@ import { color } from './tokens';
 
 export type { Language };
 
-/** Key the preferences are stored under on the device. */
 /**
  * Key the preferences are stored under. Exported because the home screen
  * widget runs outside React, with no provider above it, and still needs to
@@ -68,6 +67,12 @@ export type Preferences = {
   deviceReminders: boolean;
   reduceMotion: boolean;
   mono: boolean;
+  /**
+   * Lifts the dimmest text colours onto tones that reach WCAG AA. See
+   * `CONTRAST_LIFT`; it is applied by `<AppText>`, so it reaches every piece
+   * of text without any screen knowing about it.
+   */
+  highContrast: boolean;
   language: Language;
   /** Whether the first-launch onboarding has already run. */
   onboarded: boolean;
@@ -95,6 +100,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   deviceReminders: false,
   reduceMotion: false,
   mono: false,
+  highContrast: false,
   language: detectLanguage(),
   onboarded: false,
 };
