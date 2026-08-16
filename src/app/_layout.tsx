@@ -53,6 +53,7 @@ import { useDeviceCalendarSync } from '@/services/useDeviceCalendarSync';
 import { useNotificationSync } from '@/services/useNotificationSync';
 import { useSubscriptionSync } from '@/services/useSubscriptionSync';
 import { useExpiryCleanup } from '@/services/useExpiryCleanup';
+import { useWidgetSync } from '@/widgets/useWidgetSync';
 import { useStoreHydrated } from '@/store/useAppStore';
 import { PreferencesProvider, usePrefs } from '@/theme/prefs';
 import { color } from '@/theme/tokens';
@@ -80,6 +81,7 @@ function BackgroundSync() {
   useSubscriptionSync();
   useNotificationSync();
   useExpiryCleanup();
+  useWidgetSync();
   return null;
 }
 

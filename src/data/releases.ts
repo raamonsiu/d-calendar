@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.0.1-alpha';
-export const APP_BUILD = '2';
+export const APP_VERSION = '1.1.0-alpha';
+export const APP_BUILD = '3';
 
 /** Every release so far came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -27,6 +27,27 @@ const AUGUST_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.1.0-alpha',
+    date: AUGUST_2026,
+    notes: {
+      es: [
+        'Widget de pantalla de inicio: elige un hábito al añadirlo y tócalo para sumar una repetición sin abrir la app.',
+        'El widget sigue el color de remarcado, se tacha al completar el periodo y vuelve a cero cuando el día o la semana terminan.',
+        'Mantén pulsado el widget para cambiar de hábito.',
+      ],
+      en: [
+        'Home screen widget: pick a habit when you add it, and tap it to count one more without opening the app.',
+        'The widget follows the accent colour, crosses itself out when the period is complete, and starts over when the day or the week ends.',
+        'Hold the widget to change which habit it follows.',
+      ],
+      ca: [
+        'Widget de pantalla d’inici: tria un hàbit en afegir-lo i toca’l per sumar una repetició sense obrir l’app.',
+        'El widget segueix el color de remarcat, es ratlla en completar el període i torna a zero quan el dia o la setmana s’acaben.',
+        'Mantén premut el widget per canviar d’hàbit.',
+      ],
+    },
+  },
   {
     version: '1.0.1-alpha',
     date: AUGUST_2026,

@@ -50,6 +50,7 @@ src/theme/        tokens, preferences and typography
 src/lib/          pure helpers: dates, habits, notifications, text
 src/store/        state (zustand), seed data and selectors
 src/services/     platform side effects (notifications, device calendars)
+src/widgets/      the Android home screen widget and its configuration screen
 src/data/         static content (help, changelog, translations)
 ```
 
@@ -59,6 +60,10 @@ screen. `services` is the exception: it is where the app talks to the operating
 system, so it may read `store` and `lib`, and it is imported by `app` and by
 the `features` blocks that need the system. What may never import it is `ui`,
 `theme` or `lib` - a primitive that reaches for the OS stops being reusable.
+
+`widgets` sits outside the chain too. It is drawn by Android and not by React
+Native, so it shares the tokens and the domain rules but none of the
+components, and nothing else in the app imports from it.
 
 ### Naming
 

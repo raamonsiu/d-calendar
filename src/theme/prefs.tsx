@@ -17,7 +17,12 @@ import { color } from './tokens';
 export type { Language };
 
 /** Key the preferences are stored under on the device. */
-const PREFERENCES_KEY = 'dcalendar-preferences';
+/**
+ * Key the preferences are stored under. Exported because the home screen
+ * widget runs outside React, with no provider above it, and still needs to
+ * know where the week starts to count a weekly habit.
+ */
+export const PREFERENCES_KEY = 'dcalendar-preferences';
 
 export type { WeekStart };
 

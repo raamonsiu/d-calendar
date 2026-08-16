@@ -220,6 +220,45 @@ export function alpha(hex: string, opacity: number) {
 }
 
 /**
+ * The same tint as `alpha`, flattened against the surface it sits on.
+ *
+ * The home screen widget cannot use `alpha`: Android parses the colours of a
+ * widget itself and takes no `rgba()` string, so a translucent fill has to be
+ * worked out here and handed over solid.
+ *
+ * Precondition: both colours are six digit with a leading `#`, and `opacity`
+ * is between 0 and 1. Postcondition: returns a six digit colour that looks
+ * exactly like `top` at that opacity over `bottom`.
+ *
+ * @param top Colour being laid on, normally the accent.
+ * @param bottom Colour underneath, normally a surface.
+ * @param opacity Final opacity of `top`, normally a value from `tint`.
+ */
+export function blend(
+  top: string,
+  bottom: string,
+  opacity: number,
+): `#${string}` {
+  const channelsOf = (hex: string) => {
+    const value = parseInt(hex.slice(1), 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  };
+
+  const [topRed, topGreen, topBlue] = channelsOf(top);
+  const [bottomRed, bottomGreen, bottomBlue] = channelsOf(bottom);
+
+  const mix = (over: number, under: number) =>
+    Math.round(over * opacity + under * (1 - opacity));
+
+  const mixed =
+    (mix(topRed, bottomRed) << 16) |
+    (mix(topGreen, bottomGreen) << 8) |
+    mix(topBlue, bottomBlue);
+
+  return `#${mixed.toString(16).padStart(6, '0')}`;
+}
+
+/**
  * Spreads the margin an element is missing to reach the minimum touch area from
  * handoff §6.
  *

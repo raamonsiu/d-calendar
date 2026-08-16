@@ -2,7 +2,7 @@
   "expo": {
     "name": "D-Calendar",
     "slug": "NCALENDAR",
-    "version": "1.0.1-alpha",
+    "version": "1.1.0-alpha",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dcalendar",
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 2,
+      "versionCode": 3,
       "package": "com.d1ito.NCALENDAR",
       "permissions": [
         "USE_EXACT_ALARM"
@@ -51,7 +51,28 @@
           "calendarPermission": "D-Calendar muestra los eventos de los calendarios que ya tienes en el dispositivo."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Habit",
+              "label": "D-Calendar habit",
+              "description": "Follow one habit and tick it off from the home screen.",
+              "minWidth": "160dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "320dp",
+              "maxResizeHeight": "220dp",
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

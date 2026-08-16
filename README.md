@@ -39,8 +39,8 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.0.** The app is complete and usable, but this is the first public
-> build. Expect rough edges, and please
+> **Alpha 1.1.** The app is complete and usable, but this is still an early
+> public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.
 
@@ -82,6 +82,19 @@ device language at first launch and changeable in Settings.
 - **Habits** counted daily, weekly, or N times per day or week, with streaks.
 - **Completed tasks clean themselves up** the day after you check them off, so
   the list never turns into an archive.
+- **A habit starts over** when its day or week ends, and the streak survives
+  only when the period before it was completed.
+
+### Home screen widget
+
+- **One habit on the home screen**, picked when you add the widget and changed
+  by holding it.
+- **Tap to count a repetition** without opening the app. It follows the same
+  rules as the card: the same period, the same streak.
+- **It looks like the app** - your accent colour, and the completed habit
+  crossed out the way the card does it.
+- Android only. Widgets are native by nature, and the iOS half needs a
+  different toolchain.
 
 ### Reminders
 
@@ -133,7 +146,8 @@ npx expo run:android
 ```
 
 That builds a debug APK and installs it on a connected device or a running
-emulator. The design is laid out for 412×892, so Android is the reference.
+emulator. The design is laid out for 412×892, so Android is the reference. The
+home screen widget needs this native build: it does not exist in Expo Go.
 
 For a release build you need your own signing keystore - the one used for the
 published releases is not in this repository, and it cannot be:
