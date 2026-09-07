@@ -21,7 +21,7 @@ import {
   startOfDay,
   withTime,
 } from '@/lib/date';
-import { isWeeklyFrequency } from '@/lib/habits';
+import { isHabitDone, isWeeklyFrequency } from '@/lib/habits';
 import type { Language } from '@/theme/prefs';
 import type { CalEvent, Habit, RelativeReminder, Task } from '@/types';
 
@@ -535,13 +535,19 @@ function parseClock(time: string) {
  * A weekly habit with weekdays chosen repeats once a week per weekday; every
  * other case repeats daily, including a weekly habit with no day marked.
  *
- * Postcondition: the result does not depend on the current date, because these
- * triggers are not rescheduled as time passes.
+ * Postcondition: returns an empty list once the habit has every repetition of
+ * its current period done, the same way a finished task stops reminding; a
+ * repeating trigger has no single occurrence to cancel, so the whole habit is
+ * held back from the plan instead, and rejoins it as soon as the period rolls
+ * over or a repetition is undone. The result otherwise does not depend on the
+ * current date, because these triggers are not rescheduled as time passes.
  *
  * @param habit Habit to plan.
  * @param language Active language.
  */
 function planHabit(habit: Habit, language: Language) {
+  if (isHabitDone(habit)) return [];
+
   const planned: PlannedNotification[] = [];
 
   for (const reminder of habit.reminders) {
