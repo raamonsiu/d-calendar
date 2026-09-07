@@ -18,12 +18,22 @@ import {
   formatLongDate,
   formatTime,
   isSameDay,
+  parseClock,
   startOfDay,
   withTime,
+  type ClockTime,
 } from '@/lib/date';
-import { isHabitDone, isWeeklyFrequency } from '@/lib/habits';
+import { habitPeriodStart, isHabitDone, isWeeklyFrequency } from '@/lib/habits';
+import { countLabel } from '@/lib/text';
 import type { Language } from '@/theme/prefs';
-import type { CalEvent, Habit, RelativeReminder, Task } from '@/types';
+import type {
+  CalEvent,
+  Habit,
+  LastChanceWeeklyDay,
+  RelativeReminder,
+  Task,
+  WeekStart,
+} from '@/types';
 
 /** How far ahead reminders are scheduled. */
 export const HORIZON_DAYS = 30;
@@ -65,7 +75,7 @@ export type PlannedTrigger =
  * The queue is shared with anything else the app may schedule, so the sync only
  * touches what it recognises as its own instead of emptying it wholesale.
  */
-const PLANNED_ID_PREFIXES = ['event:', 'task:', 'habit:'];
+const PLANNED_ID_PREFIXES = ['event:', 'task:', 'habit:', 'lastchance:'];
 
 /**
  * Whether a notification already in the system was put there by the planner.
@@ -87,21 +97,47 @@ export type PlannedNotification = {
   id: string;
   title: string;
   body: string;
-  /** Item the notification opens when tapped. */
+  /**
+   * Item the notification opens when tapped, or '' for one that is not about
+   * any single item - a "last chance" summary - which a tap does nothing
+   * special with.
+   */
   itemId: string;
   trigger: PlannedTrigger;
+};
+
+/**
+ * Settings of the "last chance" summaries: a same-day nudge for whatever is
+ * still pending once or several times a day, and a same-week one for whatever
+ * is still pending weekly. See `planLastChance`.
+ */
+export type LastChanceConfig = {
+  daily: boolean;
+  /** Time of day the daily summary fires, in "HH:MM" format. */
+  dailyTime: string;
+  weekly: boolean;
+  /** Which of the last two days of the week the weekly summary fires on. */
+  weeklyDay: LastChanceWeeklyDay;
+  /** Time of day the weekly summary fires, in "HH:MM" format. */
+  weeklyTime: string;
 };
 
 /**
  * Data the plan is built from.
  *
  * Precondition: `events` are the ones from the checked calendars
- * (`visibleEvents`); a hidden calendar does not notify.
+ * (`visibleEvents`); a hidden calendar does not notify. `tasks` and `habits`
+ * feed the "last chance" summaries too, so an empty list passed in because its
+ * own category is switched off also keeps it out of the summary.
  */
 export type NotificationPlanInput = {
   events: CalEvent[];
   tasks: Task[];
   habits: Habit[];
+  weekStart: WeekStart;
+  /** Hour and minute the day - and with it every habit period - rolls over at. */
+  dayEnd: ClockTime;
+  lastChance: LastChanceConfig;
 };
 
 /**
@@ -512,24 +548,6 @@ function habitBody(habit: Habit, language: Language) {
 }
 
 /**
- * Reads the "09:00" of a habit reminder.
- *
- * Postcondition: returns null when the text is not a time of day, so a broken
- * value is skipped instead of scheduling something at an unexpected hour.
- *
- * @param time Time of day in "HH:MM" format.
- */
-function parseClock(time: string) {
-  const [hourText, minuteText] = time.split(':');
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-
-  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return { hour, minute };
-}
-
-/**
  * Reminders of one habit, as repeating triggers.
  *
  * A weekly habit with weekdays chosen repeats once a week per weekday; every
@@ -582,6 +600,202 @@ function planHabit(habit: Habit, language: Language) {
   return planned;
 }
 
+/** Which day of the week, counted from `weekStart`, each option names. */
+const LAST_CHANCE_WEEKLY_DAY_OFFSET: Record<LastChanceWeeklyDay, number> = {
+  Penúltimo: 5,
+  Último: 6,
+};
+
+/** The given day at a given hour and minute. */
+function atClock(day: Date, clock: { hour: number; minute: number }) {
+  return new Date(
+    day.getFullYear(),
+    day.getMonth(),
+    day.getDate(),
+    clock.hour,
+    clock.minute,
+  ).getTime();
+}
+
+/** Copy the "last chance" summaries compose, one set per language. */
+const LAST_CHANCE_PHRASES: Record<
+  Language,
+  {
+    dailyTitle: string;
+    weeklyTitle: string;
+    habitSingular: string;
+    habitPlural: string;
+    taskSingular: string;
+    taskPlural: string;
+    joiner: string;
+    dailyBody: (items: string) => string;
+    weeklyBody: (items: string) => string;
+  }
+> = {
+  es: {
+    dailyTitle: 'Último intento',
+    weeklyTitle: 'Último intento de la semana',
+    habitSingular: 'hábito',
+    habitPlural: 'hábitos',
+    taskSingular: 'tarea',
+    taskPlural: 'tareas',
+    joiner: ' y ',
+    dailyBody: (items) => `Te quedan ${items} por completar hoy, que no se te olvide`,
+    weeklyBody: (items) =>
+      `La semana está terminando, no se te olvide que hay ${items} por finalizar`,
+  },
+  en: {
+    dailyTitle: 'Last chance',
+    weeklyTitle: 'Last chance of the week',
+    habitSingular: 'habit',
+    habitPlural: 'habits',
+    taskSingular: 'task',
+    taskPlural: 'tasks',
+    joiner: ' and ',
+    dailyBody: (items) => `You still have ${items} to finish today, don't forget`,
+    weeklyBody: (items) =>
+      `The week is wrapping up, don't forget you still have ${items} to finish`,
+  },
+  ca: {
+    dailyTitle: 'Últim intent',
+    weeklyTitle: 'Últim intent de la setmana',
+    habitSingular: 'hàbit',
+    habitPlural: 'hàbits',
+    taskSingular: 'tasca',
+    taskPlural: 'tasques',
+    joiner: ' i ',
+    dailyBody: (items) => `Et queden ${items} per completar avui, que no se t'oblidi`,
+    weeklyBody: (items) =>
+      `La setmana s'acaba, que no se t'oblidi que queden ${items} per acabar`,
+  },
+};
+
+/**
+ * "2 hábitos y 1 tarea", built from whichever of the two counts is not zero.
+ *
+ * Digits stand in for the count in every language, the same way `countLabel`
+ * already does everywhere else in the app: they read fine in a notification
+ * and stay simple across three languages, unlike spelling the number out
+ * would.
+ *
+ * Precondition: at least one of the two counts is greater than 0; the callers
+ * never reach here otherwise. Postcondition: never mentions a count of 0.
+ *
+ * @param pendingHabits Habits still not done.
+ * @param pendingTasks Tasks still not done.
+ * @param phrases Language the summary is written in.
+ */
+function lastChanceItemsPhrase(
+  pendingHabits: number,
+  pendingTasks: number,
+  phrases: (typeof LAST_CHANCE_PHRASES)[Language],
+) {
+  const parts: string[] = [];
+  if (pendingHabits > 0) {
+    parts.push(countLabel(pendingHabits, phrases.habitSingular, phrases.habitPlural));
+  }
+  if (pendingTasks > 0) {
+    parts.push(countLabel(pendingTasks, phrases.taskSingular, phrases.taskPlural));
+  }
+  return parts.join(phrases.joiner);
+}
+
+/** Which of the two "last chance" summaries is being planned. */
+type LastChanceKind = 'daily' | 'weekly';
+
+/**
+ * Where one kind of "last chance" summary fires and what it counts, ahead of
+ * whether it actually fires this time.
+ *
+ * The daily one covers a 1-a-day or N-a-day habit and a task due today (or
+ * earlier); the weekly one covers a weekly habit and a task due by the end of
+ * the week, on the last or the second to last day of it. Each leaves the
+ * other's habits out - they get their own summary.
+ *
+ * @param input Tasks and habits to look for what is pending, and the settings
+ * the summary is built from.
+ * @param now Moment the plan is built, in ms.
+ * @param kind Which summary is being scheduled.
+ */
+function lastChanceSchedule(
+  input: NotificationPlanInput,
+  now: number,
+  kind: LastChanceKind,
+) {
+  if (kind === 'daily') {
+    const todayStart = habitPeriodStart('Diario', now, input.weekStart, input.dayEnd);
+    return {
+      enabled: input.lastChance.daily,
+      time: input.lastChance.dailyTime,
+      periodStart: todayStart,
+      fireDay: new Date(todayStart),
+      windowEnd: addDays(new Date(todayStart), 1).getTime(),
+      isPending: (habit: Habit) => !isWeeklyFrequency(habit.frequency) && !isHabitDone(habit),
+    };
+  }
+
+  const weekStartAt = habitPeriodStart('Semanal', now, input.weekStart, input.dayEnd);
+  const dayOffset = LAST_CHANCE_WEEKLY_DAY_OFFSET[input.lastChance.weeklyDay];
+  return {
+    enabled: input.lastChance.weekly,
+    time: input.lastChance.weeklyTime,
+    periodStart: weekStartAt,
+    fireDay: addDays(new Date(weekStartAt), dayOffset),
+    windowEnd: addDays(new Date(weekStartAt), 7).getTime(),
+    isPending: (habit: Habit) => isWeeklyFrequency(habit.frequency) && !isHabitDone(habit),
+  };
+}
+
+/**
+ * A "last chance" summary: a nudge for whatever is still pending in the
+ * period `kind` covers, at the day and hour the user configured for it. See
+ * `lastChanceSchedule` for where each kind fires and what it counts.
+ *
+ * Postcondition: returns nothing with that kind's setting off, with a broken
+ * time of day, once the configured time has already gone by this period, or
+ * with nothing left pending: a caught-up period does not get told that it is.
+ *
+ * @param input Tasks and habits to look for what is pending, and the settings
+ * the summary is built from.
+ * @param now Moment the plan is built, in ms.
+ * @param language Active language.
+ * @param kind Which summary is being planned.
+ */
+function planLastChance(
+  input: NotificationPlanInput,
+  now: number,
+  language: Language,
+  kind: LastChanceKind,
+): PlannedNotification[] {
+  const schedule = lastChanceSchedule(input, now, kind);
+  if (!schedule.enabled) return [];
+
+  const clock = parseClock(schedule.time);
+  if (!clock) return [];
+
+  const fireInstant = atClock(schedule.fireDay, clock);
+  if (fireInstant <= now) return [];
+
+  const pendingHabits = input.habits.filter(schedule.isPending).length;
+  const pendingTasks = input.tasks.filter(
+    (task) => !task.done && task.dueAt != null && task.dueAt < schedule.windowEnd,
+  ).length;
+  if (pendingHabits === 0 && pendingTasks === 0) return [];
+
+  const phrases = LAST_CHANCE_PHRASES[language];
+  const items = lastChanceItemsPhrase(pendingHabits, pendingTasks, phrases);
+
+  return [
+    {
+      id: `lastchance:${kind}:${schedule.periodStart}`,
+      title: kind === 'daily' ? phrases.dailyTitle : phrases.weeklyTitle,
+      body: kind === 'daily' ? phrases.dailyBody(items) : phrases.weeklyBody(items),
+      itemId: '',
+      trigger: { kind: 'date', at: fireInstant },
+    },
+  ];
+}
+
 /**
  * When a planned notification fires, for sorting purposes.
  *
@@ -596,16 +810,19 @@ const firesAt = (plan: PlannedNotification) =>
 /**
  * The whole set of notifications the system should be holding.
  *
- * Habits go in first because they repeat: they cost one slot each and cover the
- * entire horizon, while events and tasks cost one slot per occurrence. The rest
- * of the budget goes to whatever fires soonest, so dropping something always
- * means dropping the furthest away, which the next rebuild will pick up.
+ * Habits and the "last chance" summaries go in first and always fit: habits
+ * repeat, so they cost one slot each and cover the entire horizon, and there
+ * is at most one daily and one weekly summary at any time. The rest of the
+ * budget goes to whatever event or task reminder fires soonest, so dropping
+ * something always means dropping the furthest away, which the next rebuild
+ * will pick up.
  *
  * Precondition: `events` only contains events of checked calendars.
  * Postcondition: at most `PENDING_LIMIT` notifications, none of them in the
  * past, and the ids are unique.
  *
- * @param input Events, tasks and habits to plan for.
+ * @param input Events, tasks and habits to plan for, and the settings the
+ * "last chance" summaries are built from.
  * @param now Moment the plan is built, in ms.
  * @param language Active language, since the plan is text the OS will show.
  */
@@ -616,7 +833,11 @@ export function planNotifications(
 ): PlannedNotification[] {
   const horizonEnd = now + HORIZON_DAYS * MS_PER_DAY;
 
-  const repeating = input.habits.flatMap((habit) => planHabit(habit, language));
+  const guaranteed = [
+    ...input.habits.flatMap((habit) => planHabit(habit, language)),
+    ...planLastChance(input, now, language, 'daily'),
+    ...planLastChance(input, now, language, 'weekly'),
+  ];
   const dated = [
     ...input.events.flatMap((event) =>
       planEvent(event, now, horizonEnd, language),
@@ -624,8 +845,8 @@ export function planNotifications(
     ...input.tasks.flatMap((task) => planTask(task, now, horizonEnd, language)),
   ].sort((first, second) => firesAt(first) - firesAt(second));
 
-  const room = Math.max(0, PENDING_LIMIT - repeating.length);
-  return [...repeating, ...dated.slice(0, room)];
+  const room = Math.max(0, PENDING_LIMIT - guaranteed.length);
+  return [...guaranteed, ...dated.slice(0, room)];
 }
 
 /**

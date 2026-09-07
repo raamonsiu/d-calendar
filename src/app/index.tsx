@@ -35,8 +35,8 @@ import { SideDrawer } from '@/features/home/SideDrawer';
 import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
 import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
-import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
-import { rolledOverHabits } from '@/lib/habits';
+import { dayKey, isSameDay, parseClock, startOfDay, weekDays } from '@/lib/date';
+import { MIDNIGHT, rolledOverHabits } from '@/lib/habits';
 import {
   eventCountsByDay,
   eventsByDay,
@@ -56,8 +56,12 @@ const COLLAPSED_BOX_HEIGHT = 200;
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { weekStart, language } = usePrefs();
+  const { weekStart, dayEndTime, language } = usePrefs();
   const accent = useAccent();
+  const dayEnd = useMemo(
+    () => parseClock(dayEndTime) ?? MIDNIGHT,
+    [dayEndTime],
+  );
 
   const [mode, setMode] = useState<CalendarMode>('today');
   const [expanded, setExpanded] = useState(false);
@@ -104,8 +108,8 @@ export default function HomeScreen() {
    * housekeeping happened to run.
    */
   const shownHabits = useMemo(
-    () => rolledOverHabits(habits, weekStart),
-    [habits, weekStart],
+    () => rolledOverHabits(habits, weekStart, dayEnd),
+    [habits, weekStart, dayEnd],
   );
 
   const shownWeek = useMemo(
@@ -231,7 +235,9 @@ export default function HomeScreen() {
                 tasks={visibleTasks}
                 habits={shownHabits}
                 onToggleTask={toggleTask}
-                onBumpHabit={(id, delta) => bumpHabit(id, delta, weekStart)}
+                onBumpHabit={(id, delta) =>
+                  bumpHabit(id, delta, weekStart, dayEnd)
+                }
                 onOpenItem={openItem}
               />
             </View>

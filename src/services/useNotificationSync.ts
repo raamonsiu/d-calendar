@@ -12,6 +12,8 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { parseClock } from '@/lib/date';
+import { MIDNIGHT, rolledOverHabits } from '@/lib/habits';
 import { planNotifications, planSignature } from '@/lib/notifications';
 import { visibleEvents } from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
@@ -43,6 +45,13 @@ export function useNotificationSync() {
     notifyHabits,
     notifyForeignEvents,
     deviceReminders,
+    weekStart,
+    dayEndTime,
+    lastChanceDaily,
+    lastChanceDailyTime,
+    lastChanceWeekly,
+    lastChanceWeeklyDay,
+    lastChanceWeeklyTime,
     language,
   } = usePrefs();
   const rebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,12 +99,33 @@ export function useNotificationSync() {
         : brought.filter((event) => state.eventReminders[event.id]);
 
       const events = [...(notifyEvents ? state.events : []), ...chosen];
+      const dayEnd = parseClock(dayEndTime) ?? MIDNIGHT;
+
+      /**
+       * Rolled over before planning, the same way Home and the widget draw
+       * them: the store is only brought into the current period on
+       * foreground, but this rebuild also runs on every store change, so a
+       * habit left done since an earlier period must not read as still done
+       * here just because nothing has triggered the housekeeping yet.
+       */
+      const habits = notifyHabits
+        ? rolledOverHabits(state.habits, weekStart, dayEnd)
+        : [];
 
       const plan = planNotifications(
         {
           events: visibleEvents(events, state.calendars),
           tasks: notifyTasks ? state.tasks : [],
-          habits: notifyHabits ? state.habits : [],
+          habits,
+          weekStart,
+          dayEnd,
+          lastChance: {
+            daily: lastChanceDaily,
+            dailyTime: lastChanceDailyTime,
+            weekly: lastChanceWeekly,
+            weeklyDay: lastChanceWeeklyDay,
+            weeklyTime: lastChanceWeeklyTime,
+          },
         },
         Date.now(),
         language,
@@ -140,6 +170,13 @@ export function useNotificationSync() {
     notifyHabits,
     notifyForeignEvents,
     deviceReminders,
+    weekStart,
+    dayEndTime,
+    lastChanceDaily,
+    lastChanceDailyTime,
+    lastChanceWeekly,
+    lastChanceWeeklyDay,
+    lastChanceWeeklyTime,
     language,
   ]);
 

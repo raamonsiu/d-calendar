@@ -10,11 +10,12 @@ import {
 import { AccessibilityInfo } from 'react-native';
 
 import { detectLanguage, type Language } from '@/lib/language';
-import type { WeekStart } from '@/types';
+import type { LastChanceWeeklyDay, WeekStart } from '@/types';
 import i18n from './i18n';
 import { color } from './tokens';
 
 export type { Language };
+export type { LastChanceWeeklyDay };
 
 /**
  * Key the preferences are stored under. Exported because the home screen
@@ -65,6 +66,22 @@ export type Preferences = {
    * while `notifyForeignEvents` is on.
    */
   deviceReminders: boolean;
+  /**
+   * Time of day habits roll over at, in "HH:MM" format. Everything before it
+   * still belongs to the day (or week) before, which is what lets someone
+   * awake past midnight finish a habit that is, for them, still "today's".
+   */
+  dayEndTime: string;
+  /** Whether the "last chance" daily summary is scheduled at all. */
+  lastChanceDaily: boolean;
+  /** Time of day the daily summary fires, in "HH:MM" format. */
+  lastChanceDailyTime: string;
+  /** Whether the "last chance" weekly summary is scheduled at all. */
+  lastChanceWeekly: boolean;
+  /** Which of the last two days of the week the weekly summary fires on. */
+  lastChanceWeeklyDay: LastChanceWeeklyDay;
+  /** Time of day the weekly summary fires, in "HH:MM" format. */
+  lastChanceWeeklyTime: string;
   reduceMotion: boolean;
   mono: boolean;
   /**
@@ -87,6 +104,18 @@ type PreferencesContextValue = Preferences & {
   ) => void;
 };
 
+/**
+ * Factory day-end: midnight, exactly what every habit rolled over at before
+ * this became a setting.
+ */
+const DEFAULT_DAY_END_TIME = '00:00';
+
+/**
+ * Factory time of the daily "last chance" summary: the day-end minus four
+ * hours, so it lands in the evening while there is still time left to act.
+ */
+const DEFAULT_LAST_CHANCE_DAILY_TIME = '20:00';
+
 const DEFAULT_PREFERENCES: Preferences = {
   accent: color.accentDefault,
   weekStart: 'Lunes',
@@ -98,6 +127,12 @@ const DEFAULT_PREFERENCES: Preferences = {
   notifyHabits: true,
   notifyForeignEvents: true,
   deviceReminders: false,
+  dayEndTime: DEFAULT_DAY_END_TIME,
+  lastChanceDaily: true,
+  lastChanceDailyTime: DEFAULT_LAST_CHANCE_DAILY_TIME,
+  lastChanceWeekly: true,
+  lastChanceWeeklyDay: 'Último',
+  lastChanceWeeklyTime: DEFAULT_DAY_END_TIME,
   reduceMotion: false,
   mono: false,
   highContrast: false,

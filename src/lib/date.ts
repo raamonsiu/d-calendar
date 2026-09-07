@@ -217,6 +217,43 @@ const padded = (value: number) => String(value).padStart(2, '0');
 export const formatTime = (date: Date) =>
   `${padded(date.getHours())}:${padded(date.getMinutes())}`;
 
+/** An hour and minute of day, the shape a "HH:MM" string parses into. */
+export type ClockTime = { hour: number; minute: number };
+
+/**
+ * Reads a "09:00" time of day.
+ *
+ * Postcondition: returns null when the text is not a time of day, so a broken
+ * stored value is skipped instead of being read as midnight or as whatever
+ * `Number` makes of it.
+ *
+ * @param time Time of day in "HH:MM" format.
+ */
+export function parseClock(time: string): ClockTime | null {
+  const [hourText, minuteText] = time.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return { hour, minute };
+}
+
+/**
+ * A "09:00" time of day as a `Date` on a fixed placeholder day, the shape the
+ * time picker opens with.
+ *
+ * Postcondition: falls back to midnight when `time` is not a valid time of
+ * day, rather than building a `Date` out of whatever `NaN`s a hand-rolled
+ * split would produce.
+ *
+ * @param time Time of day in "HH:MM" format.
+ */
+export function clockAsDate(time: string): Date {
+  const clock = parseClock(time) ?? { hour: 0, minute: 0 };
+  return new Date(2000, 0, 1, clock.hour, clock.minute);
+}
+
 /**
  * Hour of the day as a decimal, which is the unit events are positioned with on
  * the hour rails: 09:30 -> 9.5

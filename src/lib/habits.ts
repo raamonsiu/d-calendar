@@ -1,6 +1,30 @@
-import { MS_PER_DAY, startOfDay, startOfWeek } from '@/lib/date';
+import {
+  MS_PER_DAY,
+  addDays,
+  startOfDay,
+  startOfWeek,
+  type ClockTime,
+} from '@/lib/date';
 import type { Language } from '@/lib/language';
 import type { Habit, HabitFrequency, WeekStart } from '@/types';
+
+/** Midnight: the day-end every habit rolled over at before it became a setting. */
+export const MIDNIGHT: ClockTime = { hour: 0, minute: 0 };
+
+/**
+ * Whether an instant falls before a day-end, comparing local hour and minute
+ * directly instead of an elapsed duration.
+ *
+ * Postcondition: always false for the default midnight day-end, since nothing
+ * is ever earlier than 00:00.
+ *
+ * @param date Instant to place, read in local time.
+ * @param dayEnd Hour and minute the day rolls over at.
+ */
+function isBeforeDayEnd(date: Date, dayEnd: ClockTime) {
+  const hour = date.getHours();
+  return hour < dayEnd.hour || (hour === dayEnd.hour && date.getMinutes() < dayEnd.minute);
+}
 
 /**
  * Habit rules: how progress moves forward, how the streak moves and how they
@@ -113,23 +137,40 @@ export function nextHabitStreak(
 /**
  * Start of the period a habit counts in, at the instant given.
  *
- * Postcondition: midnight of that day for a daily habit, midnight of the
- * first day of the week for a weekly one, so two instants in the same period
- * always return the same number.
+ * A day-end other than midnight shifts where that boundary falls without
+ * changing its length: anything before that hour still belongs to the day (or
+ * week) before it, exactly as anything before midnight would with the
+ * default. The comparison and the final instant are both built from local
+ * calendar fields rather than elapsed milliseconds, so a day-end of, say,
+ * 04:00 still means 04:00 on a day a clock change makes 23 or 25 hours long.
+ * Two instants in the same period always return the same number.
  *
  * @param frequency How often the habit repeats.
  * @param at Instant the period is looked for.
  * @param weekStart Week start preference, which decides where a week begins.
+ * @param dayEnd Hour and minute the day - and with it every period - rolls
+ * over at.
  */
 export function habitPeriodStart(
   frequency: HabitFrequency,
   at: number,
   weekStart: WeekStart,
+  dayEnd: ClockTime = MIDNIGHT,
 ): number {
   const date = new Date(at);
-  return isWeeklyFrequency(frequency)
-    ? startOfWeek(date, weekStart).getTime()
-    : startOfDay(date).getTime();
+  const calendarDay = isBeforeDayEnd(date, dayEnd)
+    ? addDays(startOfDay(date), -1)
+    : startOfDay(date);
+  const boundaryDay = isWeeklyFrequency(frequency)
+    ? startOfWeek(calendarDay, weekStart)
+    : calendarDay;
+  return new Date(
+    boundaryDay.getFullYear(),
+    boundaryDay.getMonth(),
+    boundaryDay.getDate(),
+    dayEnd.hour,
+    dayEnd.minute,
+  ).getTime();
 }
 
 /**
@@ -147,18 +188,25 @@ export function habitPeriodStart(
  *
  * @param habit Habit as it is stored.
  * @param weekStart Week start preference.
+ * @param dayEnd Hour and minute the day rolls over at; defaults to midnight.
  * @param now Instant the current period is worked out from.
  */
 export function rolledOverHabit(
   habit: Habit,
   weekStart: WeekStart,
+  dayEnd: ClockTime = MIDNIGHT,
   now: number = Date.now(),
 ): Habit {
-  const current = habitPeriodStart(habit.frequency, now, weekStart);
+  const current = habitPeriodStart(habit.frequency, now, weekStart, dayEnd);
   if (habit.periodStart === current) return habit;
   if (habit.periodStart === null) return { ...habit, periodStart: current };
 
-  const previous = habitPeriodStart(habit.frequency, habit.periodStart, weekStart);
+  const previous = habitPeriodStart(
+    habit.frequency,
+    habit.periodStart,
+    weekStart,
+    dayEnd,
+  );
   const length = isWeeklyFrequency(habit.frequency)
     ? MS_PER_DAY * 7
     : MS_PER_DAY;
@@ -186,10 +234,12 @@ export function rolledOverHabit(
  *
  * @param habits Every habit in the store.
  * @param weekStart Week start preference.
+ * @param dayEnd Hour and minute the day rolls over at; defaults to midnight.
  * @param now Instant the current period is worked out from.
  */
 export const rolledOverHabits = (
   habits: Habit[],
   weekStart: WeekStart,
+  dayEnd: ClockTime = MIDNIGHT,
   now: number = Date.now(),
-) => habits.map((habit) => rolledOverHabit(habit, weekStart, now));
+) => habits.map((habit) => rolledOverHabit(habit, weekStart, dayEnd, now));

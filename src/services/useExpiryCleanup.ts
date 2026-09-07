@@ -15,16 +15,20 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { parseClock } from '@/lib/date';
+import { MIDNIGHT } from '@/lib/habits';
 import { useAppStore } from '@/store/useAppStore';
 import { usePrefs } from '@/theme/prefs';
 
 export function useExpiryCleanup() {
-  const { weekStart } = usePrefs();
+  const { weekStart, dayEndTime } = usePrefs();
 
   useEffect(() => {
+    const dayEnd = parseClock(dayEndTime) ?? MIDNIGHT;
+
     const clean = () => {
       useAppStore.getState().purgeExpiredTasks();
-      useAppStore.getState().rollHabitPeriods(weekStart);
+      useAppStore.getState().rollHabitPeriods(weekStart, dayEnd);
     };
 
     clean();
@@ -34,5 +38,5 @@ export function useExpiryCleanup() {
     });
 
     return () => subscription.remove();
-  }, [weekStart]);
+  }, [weekStart, dayEndTime]);
 }

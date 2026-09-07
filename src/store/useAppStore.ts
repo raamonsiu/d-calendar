@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { ClockTime } from '@/lib/date';
 import { insertAt, patchById, withoutId } from '@/lib/collections';
 import {
+  MIDNIGHT,
   isHabitDone,
   nextHabitProgress,
   nextHabitStreak,
@@ -139,14 +141,23 @@ type AppActions = {
    *
    * Postcondition: returns true only when the habit becomes complete with this
    * tap, which is what triggers the card pulse and the haptic.
+   *
+   * @param dayEnd Hour and minute the day rolls over at; defaults to midnight.
    */
-  bumpHabit: (id: string, delta: 1 | -1, weekStart: WeekStart) => boolean;
+  bumpHabit: (
+    id: string,
+    delta: 1 | -1,
+    weekStart: WeekStart,
+    dayEnd?: ClockTime,
+  ) => boolean;
   /**
    * Brings every habit into the period it is being looked at in, so the ones
    * whose day or week is over start again at zero. Housekeeping only: the
    * screens already draw through `rolledOverHabits`.
+   *
+   * @param dayEnd Hour and minute the day rolls over at; defaults to midnight.
    */
-  rollHabitPeriods: (weekStart: WeekStart) => void;
+  rollHabitPeriods: (weekStart: WeekStart, dayEnd?: ClockTime) => void;
 
   /** Returns what undo needs, or null when the id did not exist. */
   removeItem: (kind: ItemKind, id: string) => RemovedItem | null;
@@ -307,7 +318,7 @@ export const useAppStore = create<AppState & AppActions>()(
       updateHabit: (id, patch) =>
         set((state) => ({ habits: patchById(state.habits, id, patch) })),
 
-      bumpHabit: (id, delta, weekStart) => {
+      bumpHabit: (id, delta, weekStart, dayEnd = MIDNIGHT) => {
         const stored = get().habits.find((candidate) => candidate.id === id);
         if (!stored) return false;
 
@@ -316,7 +327,7 @@ export const useAppStore = create<AppState & AppActions>()(
          * the habit was last touched: pressing a habit whose day is over
          * starts that day at zero and then adds this one repetition.
          */
-        const habit = rolledOverHabit(stored, weekStart);
+        const habit = rolledOverHabit(stored, weekStart, dayEnd);
 
         const progress = nextHabitProgress(habit.progress, habit.target, delta);
         const wasDone = isHabitDone(habit);
@@ -333,9 +344,9 @@ export const useAppStore = create<AppState & AppActions>()(
         return isDone && !wasDone;
       },
 
-      rollHabitPeriods: (weekStart) =>
+      rollHabitPeriods: (weekStart, dayEnd = MIDNIGHT) =>
         set((state) => ({
-          habits: rolledOverHabits(state.habits, weekStart),
+          habits: rolledOverHabits(state.habits, weekStart, dayEnd),
         })),
 
       removeItem: (kind, id) => {

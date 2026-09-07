@@ -10,7 +10,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { rolledOverHabit } from '@/lib/habits';
+import { parseClock, type ClockTime } from '@/lib/date';
+import { MIDNIGHT, rolledOverHabit } from '@/lib/habits';
 import { useAppStore } from '@/store/useAppStore';
 import { PREFERENCES_KEY } from '@/theme/prefs';
 import type { Habit, WeekStart } from '@/types';
@@ -24,6 +25,32 @@ const FALLBACK_WEEK_START: WeekStart = 'Lunes';
 /** Habit ids the widgets track, by the widget id Android assigns. */
 type WidgetLinks = Record<string, string>;
 
+/** The two preference fields the widget reads, exactly as they are stored. */
+type StoredPreferences = { weekStart?: WeekStart; dayEndTime?: string };
+
+/**
+ * The preferences blob, read and parsed once so `readHabits` and
+ * `bumpHabitFromWidget` do not each read and parse the same AsyncStorage entry
+ * a second time for the day-end after already reading it for the week start.
+ *
+ * Postcondition: an empty object when nothing is stored or the blob cannot be
+ * parsed, which leaves every field below to fall back to its own default.
+ */
+async function readPreferences(): Promise<StoredPreferences> {
+  try {
+    const stored = await AsyncStorage.getItem(PREFERENCES_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+const weekStartOf = (preferences: StoredPreferences): WeekStart =>
+  preferences.weekStart ?? FALLBACK_WEEK_START;
+
+const dayEndOf = (preferences: StoredPreferences): ClockTime =>
+  parseClock(preferences.dayEndTime ?? '') ?? MIDNIGHT;
+
 /**
  * The week start the user chose, read straight from storage.
  *
@@ -31,13 +58,17 @@ type WidgetLinks = Record<string, string>;
  * cannot be parsed, which is what a fresh install would have anyway.
  */
 export async function readWeekStart(): Promise<WeekStart> {
-  try {
-    const stored = await AsyncStorage.getItem(PREFERENCES_KEY);
-    if (!stored) return FALLBACK_WEEK_START;
-    return JSON.parse(stored).weekStart ?? FALLBACK_WEEK_START;
-  } catch {
-    return FALLBACK_WEEK_START;
-  }
+  return weekStartOf(await readPreferences());
+}
+
+/**
+ * The day-end the user chose, read straight from storage.
+ *
+ * Postcondition: falls back to midnight when nothing is stored, the blob
+ * cannot be parsed, or the stored text is not a time of day.
+ */
+export async function readDayEnd(): Promise<ClockTime> {
+  return dayEndOf(await readPreferences());
 }
 
 /**
@@ -54,11 +85,13 @@ async function hydratedStore() {
 
 /** Every habit, already brought into the period being looked at. */
 export async function readHabits(): Promise<Habit[]> {
-  const [state, weekStart] = await Promise.all([
+  const [state, preferences] = await Promise.all([
     hydratedStore(),
-    readWeekStart(),
+    readPreferences(),
   ]);
-  return state.habits.map((habit) => rolledOverHabit(habit, weekStart));
+  const weekStart = weekStartOf(preferences);
+  const dayEnd = dayEndOf(preferences);
+  return state.habits.map((habit) => rolledOverHabit(habit, weekStart, dayEnd));
 }
 
 /**
@@ -129,18 +162,20 @@ export async function unlinkWidget(widgetId: number) {
 export async function bumpHabitFromWidget(
   habitId: string,
 ): Promise<Habit | null> {
-  const [state, weekStart] = await Promise.all([
+  const [state, preferences] = await Promise.all([
     hydratedStore(),
-    readWeekStart(),
+    readPreferences(),
   ]);
+  const weekStart = weekStartOf(preferences);
+  const dayEnd = dayEndOf(preferences);
 
   if (!state.habits.some((habit) => habit.id === habitId)) return null;
 
-  state.bumpHabit(habitId, 1, weekStart);
+  state.bumpHabit(habitId, 1, weekStart, dayEnd);
 
   const bumped = useAppStore
     .getState()
     .habits.find((habit) => habit.id === habitId);
 
-  return bumped ? rolledOverHabit(bumped, weekStart) : null;
+  return bumped ? rolledOverHabit(bumped, weekStart, dayEnd) : null;
 }

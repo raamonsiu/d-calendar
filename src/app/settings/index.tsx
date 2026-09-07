@@ -15,13 +15,16 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { weekStartLabel } from '@/data/translations/domain';
+import { LastChanceGroup } from '@/features/settings/LastChanceGroup';
 import { NotificationsGroup } from '@/features/settings/NotificationsGroup';
+import { clockAsDate, formatTime } from '@/lib/date';
 import { countLabel } from '@/lib/text';
 import { useAppStore } from '@/store/useAppStore';
 import { AppText } from '@/theme/Text';
 import { usePrefs, type Language, type WeekStart } from '@/theme/prefs';
 import { ACCENTS, color } from '@/theme/tokens';
 import { Group } from '@/ui/Group';
+import { useDateTimePicker } from '@/ui/pickers';
 import { SecondaryScreen } from '@/ui/SecondaryScreen';
 import { Sheet } from '@/ui/Sheet';
 import { Switch } from '@/ui/Switch';
@@ -30,6 +33,7 @@ import {
   CalendarBlankIcon,
   CheckIcon,
   CircleHalfIcon,
+  ClockIcon,
   DropHalfIcon,
   SquaresFourIcon,
   TextAaIcon,
@@ -75,6 +79,7 @@ export default function SettingsScreen() {
   const prefs = usePrefs();
   const accounts = useAppStore((state) => state.accounts);
   const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
+  const picker = useDateTimePicker();
 
   const closeSheet = () => setOpenSheet(null);
 
@@ -185,12 +190,14 @@ export default function SettingsScreen() {
               })}
             </View>
           </Sheet>
+
+          {picker.element}
         </>
       }>
       <Group title={t('settings.generalSection')}>
         <GroupRow
           index={0}
-          count={3}
+          count={4}
           icon={<TranslateIcon size={ROW_ICON} color={color.textMuted} />}
           label={t('settings.languageLabel')}
           value={languageLabel}
@@ -198,7 +205,7 @@ export default function SettingsScreen() {
         />
         <GroupRow
           index={1}
-          count={3}
+          count={4}
           icon={<CalendarBlankIcon size={ROW_ICON} color={color.textMuted} />}
           label={t('settings.weekStartLabel')}
           value={weekStartLabel(prefs.weekStart, prefs.language)}
@@ -206,7 +213,21 @@ export default function SettingsScreen() {
         />
         <GroupRow
           index={2}
-          count={3}
+          count={4}
+          icon={<ClockIcon size={ROW_ICON} color={color.textMuted} />}
+          label={t('settings.dayEndLabel')}
+          hint={t('settings.dayEndHint')}
+          height={SWITCH_ROW_HEIGHT}
+          value={prefs.dayEndTime}
+          onPress={() =>
+            picker.open('time', clockAsDate(prefs.dayEndTime), (picked) =>
+              prefs.setPreference('dayEndTime', formatTime(picked)),
+            )
+          }
+        />
+        <GroupRow
+          index={3}
+          count={4}
           icon={<TimerIcon size={ROW_ICON} color={color.textMuted} />}
           label={t('settings.defaultDurationLabel')}
           value={durationLabel}
@@ -228,6 +249,8 @@ export default function SettingsScreen() {
       </Group>
 
       <NotificationsGroup />
+
+      <LastChanceGroup />
 
       <Group title={t('settings.integrationsSection')}>
         <GroupRow

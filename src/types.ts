@@ -87,6 +87,12 @@ export type Guest = {
 /** First day of the week, as the week start preference persists it. */
 export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
 
+/**
+ * Which of the last two days of the week the weekly "last chance" notification
+ * fires on, as the preference persists it.
+ */
+export type LastChanceWeeklyDay = 'Penúltimo' | 'Último';
+
 export type Availability = 'Ocupado' | 'Libre';
 export type Visibility = 'Predet.' | 'Privado' | 'Público';
 export type RepeatRule = 'No' | 'Cada día' | 'Días de la semana' | 'Cada mes';
