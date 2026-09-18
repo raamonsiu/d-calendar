@@ -10,8 +10,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { parseClock, type ClockTime } from '@/lib/date';
-import { MIDNIGHT, rolledOverHabit } from '@/lib/habits';
+import type { ClockTime } from '@/lib/date';
+import { dayEndClock, rolledOverHabit } from '@/lib/habits';
 import { useAppStore } from '@/store/useAppStore';
 import { PREFERENCES_KEY } from '@/theme/prefs';
 import type { Habit, WeekStart } from '@/types';
@@ -49,7 +49,7 @@ const weekStartOf = (preferences: StoredPreferences): WeekStart =>
   preferences.weekStart ?? FALLBACK_WEEK_START;
 
 const dayEndOf = (preferences: StoredPreferences): ClockTime =>
-  parseClock(preferences.dayEndTime ?? '') ?? MIDNIGHT;
+  dayEndClock(preferences.dayEndTime);
 
 /**
  * The week start the user chose, read straight from storage.

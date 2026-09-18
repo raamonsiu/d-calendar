@@ -86,6 +86,18 @@ export function addDays(date: Date, days: number) {
 }
 
 /**
+ * Midnight at the start of the day after `date`: the end of "today" in a
+ * comparison like `dueAt < startOfNextDay(now)`.
+ *
+ * Postcondition: returns a new date a calendar day after `startOfDay(date)`,
+ * not 24 hours after it, so it stays right on the days the clock changes,
+ * which last 23 or 25 hours.
+ *
+ * @param date Any moment of the day whose end is wanted.
+ */
+export const startOfNextDay = (date: Date) => addDays(startOfDay(date), 1);
+
+/**
  * Jumps between months landing on day 1, which is what the grids need.
  *
  * Postcondition: returns day 1 of the resulting month, at midnight.

@@ -8,6 +8,15 @@
  * Hidden altogether while the master "Recordatorios" switch is off, the same
  * way `NotificationsGroup` hides its own category rows: with every
  * notification off, configuring one that will never fire has nothing to say.
+ *
+ * It is a hook handing back two elements rather than a component, because
+ * they belong in two different places of `SecondaryScreen`: the rows in the
+ * scrolling content, and the sheet for the weekly day in `overlays`. A
+ * `Sheet` is not a `Modal` - it lays itself out over its parent - so drawn
+ * inside the scroll it would open over the scrolled content, most of the way
+ * down the list, instead of over the screen. The two hour rows open the
+ * screen's own date-time picker for the same reason: it is already mounted in
+ * `overlays`.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +30,7 @@ import { Sheet } from '@/ui/Sheet';
 import { Switch } from '@/ui/Switch';
 import { GroupRow, OptionRow } from '@/ui/controls';
 import { BellIcon, CalendarBlankIcon, ClockIcon } from '@/ui/icons';
-import { useDateTimePicker } from '@/ui/pickers';
+import type { DateTimePicker } from '@/ui/pickers';
 import type { LastChanceWeeklyDay } from '@/types';
 
 /** Icon size of a settings row, the same one the screen uses. */
@@ -51,13 +60,31 @@ type Row =
       onPress: () => void;
     };
 
-export function LastChanceGroup() {
+/** The two pieces of the group, each for its own place on the screen. */
+type LastChanceGroupParts = {
+  /** The rows, for the scrolling content. */
+  group: ReactNode;
+  /** The weekly day sheet, for `SecondaryScreen`'s `overlays`. */
+  overlays: ReactNode;
+};
+
+/**
+ * The "Último aviso" rows and the sheet they open, for the settings screen to
+ * place: `group` in its content, `overlays` in its `overlays`.
+ *
+ * Postcondition: both are null while the master "Recordatorios" switch is off.
+ *
+ * @param picker The screen's own date-time picker, mounted in its overlays,
+ * which the two hour rows open.
+ */
+export function useLastChanceGroup(
+  picker: DateTimePicker,
+): LastChanceGroupParts {
   const { t } = useTranslation();
   const prefs = usePrefs();
-  const picker = useDateTimePicker();
   const [weeklyDaySheetOpen, setWeeklyDaySheetOpen] = useState(false);
 
-  if (!prefs.notifications) return null;
+  if (!prefs.notifications) return { group: null, overlays: null };
 
   const weeklyDayLabel = (day: LastChanceWeeklyDay) =>
     day === 'Último'
@@ -129,8 +156,8 @@ export function LastChanceGroup() {
       : []),
   ];
 
-  return (
-    <>
+  return {
+    group: (
       <Group title={t('settings.lastChanceSection')}>
         {rows.map((row, index) => (
           <GroupRow
@@ -152,7 +179,8 @@ export function LastChanceGroup() {
           />
         ))}
       </Group>
-
+    ),
+    overlays: (
       <Sheet
         open={weeklyDaySheetOpen}
         onClose={() => setWeeklyDaySheetOpen(false)}
@@ -171,10 +199,8 @@ export function LastChanceGroup() {
           ))}
         </View>
       </Sheet>
-
-      {picker.element}
-    </>
-  );
+    ),
+  };
 }
 
 const styles = StyleSheet.create({

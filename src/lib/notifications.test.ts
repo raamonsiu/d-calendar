@@ -1,4 +1,5 @@
 import type { Habit, LastChanceWeeklyDay, Task } from '@/types';
+import { expectDayLength } from './clockChange.testing';
 import { MIDNIGHT } from './habits';
 import { planNotifications, type NotificationPlanInput } from './notifications';
 
@@ -271,6 +272,8 @@ describe('planNotifications last chance, weekly', () => {
      * fire a day early or read as already gone by the time this test's `now`
      * arrives - either way, it would not fire at 10:00 on the intended day.
      */
+    expectDayLength(new Date(2026, 9, 25), 25);
+
     const saturdayMorning = new Date(2026, 9, 31, 9, 0).getTime();
     const plan = planNotifications(
       planInput({

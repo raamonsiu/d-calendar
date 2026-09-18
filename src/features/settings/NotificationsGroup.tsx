@@ -16,6 +16,7 @@ import { AppState, Linking } from 'react-native';
 import {
   ensureNotificationPermission,
   getNotificationPermission,
+  NOTIFICATIONS_SUPPORTED,
   type NotificationPermission,
 } from '@/services/notifications';
 import { usePrefs } from '@/theme/prefs';
@@ -120,7 +121,13 @@ export function NotificationsGroup() {
     setPermission(granted ? 'granted' : 'denied');
   };
 
-  const showDeniedRow = prefs.notifications && permission === 'denied';
+  /**
+   * Only where notifications exist at all: on web and in Expo Go the
+   * permission reads as denied too, but no system setting could change that,
+   * so a row sending the user there would promise a fix that does not exist.
+   */
+  const showDeniedRow =
+    NOTIFICATIONS_SUPPORTED && prefs.notifications && permission === 'denied';
 
   /**
    * One entry per row the group actually draws, in order: the master switch

@@ -1,6 +1,7 @@
 import {
   MS_PER_DAY,
   addDays,
+  parseClock,
   startOfDay,
   startOfWeek,
   type ClockTime,
@@ -10,6 +11,18 @@ import type { Habit, HabitFrequency, WeekStart } from '@/types';
 
 /** Midnight: the day-end every habit rolled over at before it became a setting. */
 export const MIDNIGHT: ClockTime = { hour: 0, minute: 0 };
+
+/**
+ * The day-end preference as a time of day, from the "HH:MM" text it is stored
+ * as.
+ *
+ * Postcondition: midnight when the text is missing or not a time of day, which
+ * is what every habit rolled over at before the setting existed.
+ *
+ * @param time Stored `dayEndTime`, possibly missing or malformed.
+ */
+export const dayEndClock = (time: string | undefined): ClockTime =>
+  parseClock(time ?? '') ?? MIDNIGHT;
 
 /**
  * Whether an instant falls before a day-end, comparing local hour and minute

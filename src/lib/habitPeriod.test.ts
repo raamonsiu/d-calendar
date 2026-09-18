@@ -1,4 +1,5 @@
 import type { Habit } from '@/types';
+import { expectDayLength } from './clockChange.testing';
 import { MIDNIGHT, habitPeriodStart, rolledOverHabit } from './habits';
 
 /** Lunes 10 de agosto de 2026, y los dias alrededor. */
@@ -93,6 +94,8 @@ describe('habitPeriodStart', () => {
      * 03:00, which is what shifting `at` by a fixed 4-hour duration instead of
      * comparing the local hour would give.
      */
+    expectDayLength(new Date(2026, 9, 25), 25);
+
     const smallHoursOfDstDay = new Date(2026, 9, 25, 3, 30).getTime();
     expect(habitPeriodStart('Diario', smallHoursOfDstDay, 'Lunes', dayEnd)).toBe(
       new Date(2026, 9, 24, 4, 0).getTime(),

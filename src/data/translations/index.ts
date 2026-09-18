@@ -6,6 +6,7 @@ import { home } from './home';
 import { onboarding } from './onboarding';
 import { pickers } from './pickers';
 import { settings } from './settings';
+import { welcome } from './welcome';
 
 /**
  * Assembles the resources `i18next` is initialized with: one object per
@@ -22,6 +23,7 @@ export const resources = {
     create: create.es,
     home: home.es,
     help: help.es,
+    welcome: welcome.es,
   },
   en: {
     common: common.en,
@@ -32,6 +34,7 @@ export const resources = {
     create: create.en,
     home: home.en,
     help: help.en,
+    welcome: welcome.en,
   },
   ca: {
     common: common.ca,
@@ -42,5 +45,6 @@ export const resources = {
     create: create.ca,
     home: home.ca,
     help: help.ca,
+    welcome: welcome.ca,
   },
 };

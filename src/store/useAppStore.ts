@@ -93,6 +93,15 @@ type AppState = {
    */
   deviceEvents: CalEvent[];
   /**
+   * Whether the device's calendars have been read at least once since launch:
+   * set by a read that came back, even one with nothing to read because the
+   * permission is missing, and left alone by one that failed (`failRefresh`).
+   * Not stored, like `deviceEvents` itself: on a cold start it is what tells
+   * "no events on the device" apart from "not known yet", which the welcome
+   * overlay waits on before counting today's events.
+   */
+  deviceEventsRead: boolean;
+  /**
    * Events downloaded from the calendars subscribed by URL.
    *
    * Unlike the device's, these **are** stored. The device is asked again on
@@ -205,6 +214,14 @@ type AppActions = {
    * cleared.
    */
   finishRefresh: (data: DeviceData | null) => void;
+  /**
+   * Ends a refresh whose read of the device failed. Unlike
+   * `finishRefresh(null)`, which answers "there is nothing to read", it leaves
+   * `deviceEventsRead` as it was: a failed read says nothing about the
+   * device's events, so the welcome overlay must not take their absence for a
+   * count of zero.
+   */
+  failRefresh: () => void;
 
   refresh: () => void;
 };
@@ -273,6 +290,7 @@ export const useAppStore = create<AppState & AppActions>()(
       refreshing: false,
       hydrated: false,
       deviceEvents: [],
+      deviceEventsRead: false,
       subscriptionEvents: [],
       syncingSubscriptions: false,
       ignoredAccounts: [],
@@ -464,7 +482,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
       finishRefresh: (data) =>
         set((state) => {
-          if (!data) return { refreshing: false };
+          if (!data) return { refreshing: false, deviceEventsRead: true };
 
           const wasVisible = new Map(
             state.calendars.map((calendar) => [calendar.id, calendar.visible]),
@@ -497,10 +515,13 @@ export const useAppStore = create<AppState & AppActions>()(
               })),
             ],
             deviceEvents: withReminders(data.events, state.eventReminders),
+            deviceEventsRead: true,
             refreshing: false,
             lastSync: Date.now(),
           };
         }),
+
+      failRefresh: () => set({ refreshing: false }),
 
       /**
        * Rereads the calendars of the device, which is the only syncing there
@@ -532,7 +553,9 @@ export const useAppStore = create<AppState & AppActions>()(
        * `hydrated` only describe what is going on right now: restoring them
        * would show the side menu syncing with nothing running, or claim the
        * state was read before reading it. And `deviceEvents` belongs to the
-       * device, which is asked again on every launch and always answers.
+       * device, which is asked again on every launch and always answers;
+       * `deviceEventsRead` goes with it, since what it says is whether that
+       * has happened yet in this launch.
        *
        * `subscriptionEvents` is stored, unlike those: it came from a server that
        * may not be reachable next time, and a timetable that vanishes without a

@@ -6,16 +6,19 @@
  * Where it leads: to `/settings/calendars`. Every other option is resolved
  * right here in a bottom sheet, without changing screen.
  *
- * Everything on this screen is an in-memory preference (`usePrefs`): closing
- * the app restores the defaults.
+ * Almost everything on this screen is a preference (`usePrefs`), stored on the
+ * device and applied at once; the welcome overlay's duration shows on the next
+ * cold start, since that is the only time the overlay appears. The exceptions
+ * are the account count under Integraciones, read from the store, and the
+ * notification permission, which belongs to the system.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { weekStartLabel } from '@/data/translations/domain';
-import { LastChanceGroup } from '@/features/settings/LastChanceGroup';
+import { useLastChanceGroup } from '@/features/settings/LastChanceGroup';
 import { NotificationsGroup } from '@/features/settings/NotificationsGroup';
 import { clockAsDate, formatTime } from '@/lib/date';
 import { countLabel } from '@/lib/text';
@@ -35,6 +38,7 @@ import {
   CircleHalfIcon,
   ClockIcon,
   DropHalfIcon,
+  SparkleIcon,
   SquaresFourIcon,
   TextAaIcon,
   TimerIcon,
@@ -65,14 +69,41 @@ const DURATION_OPTIONS = [
   { label: '1 h 30', minutes: 90 },
 ];
 
+/** Longest the welcome overlay can be set to stay up, in seconds. */
+const LONGEST_WELCOME_SECONDS = 10;
+
+/**
+ * Every whole second the welcome overlay can stay up for, from 0 to
+ * `LONGEST_WELCOME_SECONDS`. Zero is how the overlay is turned off, so the
+ * list doubles as its switch.
+ */
+const WELCOME_SECONDS_OPTIONS = Array.from(
+  { length: LONGEST_WELCOME_SECONDS + 1 },
+  (_, seconds) => seconds,
+);
+
 /** Icon size of a settings row. */
 const ROW_ICON = 15;
 
 /** Height of the rows carrying a switch, which have two lines of text. */
 const SWITCH_ROW_HEIGHT = 62;
 
-/** Which of the four sheets is open. */
-type OpenSheet = 'language' | 'weekStart' | 'duration' | 'accent' | null;
+/**
+ * Tallest a list of options gets inside a sheet. The eleven welcome durations
+ * go in a scroll view capped at it, so they never push the sheet past the top
+ * of a small screen; the shorter lists (language, week start, duration) are
+ * plain views that never reach it.
+ */
+const SHEET_LIST_MAX_HEIGHT = 320;
+
+/** Which of the five sheets is open. */
+type OpenSheet =
+  | 'language'
+  | 'weekStart'
+  | 'duration'
+  | 'accent'
+  | 'welcome'
+  | null;
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -80,6 +111,7 @@ export default function SettingsScreen() {
   const accounts = useAppStore((state) => state.accounts);
   const [openSheet, setOpenSheet] = useState<OpenSheet>(null);
   const picker = useDateTimePicker();
+  const lastChance = useLastChanceGroup(picker);
 
   const closeSheet = () => setOpenSheet(null);
 
@@ -91,6 +123,11 @@ export default function SettingsScreen() {
   const languageLabel =
     LANGUAGE_OPTIONS.find((option) => option.value === prefs.language)
       ?.label ?? prefs.language;
+
+  const welcomeLabel = (seconds: number) =>
+    seconds === 0
+      ? t('settings.welcomeOff')
+      : t('settings.welcomeSecondsValue', { seconds });
 
   return (
     <SecondaryScreen
@@ -191,6 +228,29 @@ export default function SettingsScreen() {
             </View>
           </Sheet>
 
+          <Sheet
+            open={openSheet === 'welcome'}
+            onClose={closeSheet}
+            title={t('settings.welcomeLabel')}>
+            <ScrollView
+              style={styles.scrollOptions}
+              contentContainerStyle={styles.optionList}>
+              {WELCOME_SECONDS_OPTIONS.map((seconds) => (
+                <OptionRow
+                  key={seconds}
+                  label={welcomeLabel(seconds)}
+                  selected={prefs.welcomeSeconds === seconds}
+                  onPress={() => {
+                    prefs.setPreference('welcomeSeconds', seconds);
+                    closeSheet();
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </Sheet>
+
+          {lastChance.overlays}
+
           {picker.element}
         </>
       }>
@@ -248,9 +308,22 @@ export default function SettingsScreen() {
         />
       </Group>
 
+      <Group title={t('settings.welcomeSection')}>
+        <GroupRow
+          index={0}
+          count={1}
+          height={SWITCH_ROW_HEIGHT}
+          icon={<SparkleIcon size={ROW_ICON} color={color.textMuted} />}
+          label={t('settings.welcomeLabel')}
+          hint={t('settings.welcomeHint')}
+          value={welcomeLabel(prefs.welcomeSeconds)}
+          onPress={() => setOpenSheet('welcome')}
+        />
+      </Group>
+
       <NotificationsGroup />
 
-      <LastChanceGroup />
+      {lastChance.group}
 
       <Group title={t('settings.integrationsSection')}>
         <GroupRow
@@ -331,7 +404,9 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   dot: { width: 18, height: 18, borderRadius: 9 },
   meta: { fontSize: 9, letterSpacing: 1.1, color: color.faint },
-  options: { gap: 2, maxHeight: 320 },
+  options: { gap: 2, maxHeight: SHEET_LIST_MAX_HEIGHT },
+  scrollOptions: { maxHeight: SHEET_LIST_MAX_HEIGHT },
+  optionList: { gap: 2 },
   swatches: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -35,15 +35,11 @@ import { SideDrawer } from '@/features/home/SideDrawer';
 import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
 import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
-import { dayKey, isSameDay, parseClock, startOfDay, weekDays } from '@/lib/date';
-import { MIDNIGHT, rolledOverHabits } from '@/lib/habits';
-import {
-  eventCountsByDay,
-  eventsByDay,
-  tasksForHome,
-  visibleEvents,
-} from '@/store/selectors';
+import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
+import { dayEndClock, rolledOverHabits } from '@/lib/habits';
+import { eventCountsByDay, eventsByDay, tasksForHome } from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
+import { useShownEvents } from '@/store/useShownEvents';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, layer, radius, size, space } from '@/theme/tokens';
@@ -58,10 +54,7 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { weekStart, dayEndTime, language } = usePrefs();
   const accent = useAccent();
-  const dayEnd = useMemo(
-    () => parseClock(dayEndTime) ?? MIDNIGHT,
-    [dayEndTime],
-  );
+  const dayEnd = useMemo(() => dayEndClock(dayEndTime), [dayEndTime]);
 
   const [mode, setMode] = useState<CalendarMode>('today');
   const [expanded, setExpanded] = useState(false);
@@ -75,28 +68,11 @@ export default function HomeScreen() {
    */
   const [shownDay, setShownDay] = useState(() => startOfDay(new Date()));
 
-  const events = useAppStore((state) => state.events);
-  const deviceEvents = useAppStore((state) => state.deviceEvents);
-  const subscriptionEvents = useAppStore((state) => state.subscriptionEvents);
-  const calendars = useAppStore((state) => state.calendars);
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
   const toggleTask = useAppStore((state) => state.toggleTask);
   const bumpHabit = useAppStore((state) => state.bumpHabit);
-
-  /**
-   * The app's own events, the ones read from the device and the ones downloaded
-   * from a subscription are drawn the same: they only differ in where they came
-   * from and in what tapping one does.
-   */
-  const shownEvents = useMemo(
-    () =>
-      visibleEvents(
-        [...events, ...deviceEvents, ...subscriptionEvents],
-        calendars,
-      ),
-    [events, deviceEvents, subscriptionEvents, calendars],
-  );
+  const shownEvents = useShownEvents();
   const byDay = useMemo(() => eventsByDay(shownEvents), [shownEvents]);
   const counts = useMemo(() => eventCountsByDay(shownEvents), [shownEvents]);
   const visibleTasks = useMemo(() => tasksForHome(tasks), [tasks]);

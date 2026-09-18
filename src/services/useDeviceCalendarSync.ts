@@ -39,7 +39,9 @@ export function useDeviceCalendarSync() {
      * A failure is reported and swallowed: reading the device is not something
      * the app can do anything about, and it must not take the screen down with
      * it. Reporting it is not optional though, because a silent failure here
-     * looks exactly like a device with no calendars.
+     * looks exactly like a device with no calendars. For the same reason it
+     * ends through `failRefresh` and not `finishRefresh(null)`: the calendars
+     * are not marked as read, so nothing takes the failure for an empty day.
      */
     const read = async () => {
       if (reading.current) return;
@@ -50,7 +52,7 @@ export function useDeviceCalendarSync() {
         if (active) useAppStore.getState().finishRefresh(data);
       } catch (error) {
         console.warn('Could not read the calendars of the system', error);
-        if (active) useAppStore.getState().finishRefresh(null);
+        if (active) useAppStore.getState().failRefresh();
       } finally {
         reading.current = false;
       }

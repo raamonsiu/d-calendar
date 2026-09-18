@@ -29,6 +29,7 @@ const NAMESPACES = [
   'create',
   'home',
   'help',
+  'welcome',
 ] as const;
 
 i18n.use(initReactI18next).init({

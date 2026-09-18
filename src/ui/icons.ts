@@ -15,6 +15,7 @@ export { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank
 export { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
 export { CaretLeftIcon } from 'phosphor-react-native/src/icons/CaretLeft';
 export { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
+export { CaretUpIcon } from 'phosphor-react-native/src/icons/CaretUp';
 export { CheckIcon } from 'phosphor-react-native/src/icons/Check';
 export { ClockIcon } from 'phosphor-react-native/src/icons/Clock';
 export { CodeIcon } from 'phosphor-react-native/src/icons/Code';

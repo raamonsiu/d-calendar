@@ -101,6 +101,22 @@ export const ACCENTS = [
 ] as const;
 
 /**
+ * The hex of one of the palette accents, by the label it is offered under, so
+ * what reads from the palette does not depend on the order of `ACCENTS`:
+ * adding an accent there must not repaint anything else.
+ *
+ * Postcondition: falls back to `text` if that label is ever dropped from the
+ * palette, so a colour keeps resolving instead of the module failing to load.
+ *
+ * @param labelKey Translation key the accent is listed under.
+ */
+function paletteHex(labelKey: (typeof ACCENTS)[number]['labelKey']): string {
+  return (
+    ACCENTS.find((accent) => accent.labelKey === labelKey)?.hex ?? color.text
+  );
+}
+
+/**
  * Brighter stand-in for each text colour that does not reach WCAG AA, used
  * when "Más contraste" is on in Settings › Accesibilidad.
  *
@@ -171,7 +187,10 @@ export const size = {
   controlSmall: 36,
 } as const;
 
-/** A single set of durations (handoff §3). Do not invent others. */
+/**
+ * A single set of durations (handoff §3, plus `swipeAway` and `hintPause`, see
+ * their notes). Do not invent others.
+ */
 export const duration = {
   /** Hover, pressed and colour changes. */
   press: 180,
@@ -185,6 +204,20 @@ export const duration = {
   overlay: 280,
   /** Pulse on completing a habit. */
   pulse: 320,
+  /**
+   * The welcome overlay sliding off the top on its own once its time is up.
+   * Not part of handoff §3: it was asked for on top of it, and it is slower
+   * than `panel` because it travels the whole height of the screen with no
+   * finger carrying it.
+   */
+  swipeAway: 650,
+  /**
+   * Pause before each bounce of a hint that repeats, like the welcome
+   * overlay's swipe-up arrow: long enough that the bounce reads as a nudge and
+   * not as a jitter. Not part of handoff §3 either, which has no repeating
+   * hint.
+   */
+  hintPause: 900,
 } as const;
 
 /** cubic-bezier(.2,.8,.2,1) from the handoff. */
@@ -209,6 +242,13 @@ export const layer = {
   panel: 30,
   /** Toasts, over the panels as well. */
   toast: 40,
+  /**
+   * The welcome overlay shown on a cold start, over every screen and panel:
+   * it stands for the whole app until it leaves. The toast layer is mounted
+   * above it by `ToastProvider`, so a toast would still draw on top; nothing
+   * raises one while the overlay is up.
+   */
+  welcome: 50,
 } as const;
 
 /**
@@ -293,6 +333,26 @@ export function blend(
 
   return `#${mixed.toString(16).padStart(6, '0')}`;
 }
+
+/**
+ * How much of each palette colour survives in `itemColor` once lifted towards
+ * `text`: enough to keep the hue, little enough that it reads light on the
+ * dark background.
+ */
+const ITEM_COLOR_STRENGTH = 0.6;
+
+/**
+ * Colour of each kind of item where the three are counted side by side and
+ * have to be told apart at a glance: the welcome overlay. Taken from the
+ * accent palette Settings offers and lifted towards `text`. It is the one
+ * place colour goes beyond the accent, which handoff §6 does not foresee; it
+ * was asked for on top of it.
+ */
+export const itemColor = {
+  event: blend(paletteHex('common.accentBlue'), color.text, ITEM_COLOR_STRENGTH),
+  task: blend(paletteHex('common.accentAmber'), color.text, ITEM_COLOR_STRENGTH),
+  habit: blend(paletteHex('common.accentGreen'), color.text, ITEM_COLOR_STRENGTH),
+} as const;
 
 /**
  * Spreads the margin an element is missing to reach the minimum touch area from

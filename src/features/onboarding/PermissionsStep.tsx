@@ -10,6 +10,7 @@ import {
 import {
   ensureNotificationPermission,
   getNotificationPermission,
+  NOTIFICATIONS_SUPPORTED,
 } from '@/services/notifications';
 import { color } from '@/theme/tokens';
 import { Group } from '@/ui/Group';
@@ -27,7 +28,8 @@ type PermissionStatus = 'granted' | 'denied' | 'undetermined';
  * prompt once, so tapping again opens the system settings instead, which is
  * the only place left to change it.
  *
- * @param index Position inside the two-row group, for `groupRadius`.
+ * @param index Position inside the group, for `groupRadius`.
+ * @param count How many rows the group draws, for `groupRadius`.
  * @param label Name of the permission, e.g. "Calendario".
  * @param hint What the app does with it once granted.
  * @param icon Icon drawn to the left of the row.
@@ -36,6 +38,7 @@ type PermissionStatus = 'granted' | 'denied' | 'undetermined';
  */
 function PermissionRow({
   index,
+  count,
   label,
   hint,
   icon,
@@ -43,6 +46,7 @@ function PermissionRow({
   ensure,
 }: {
   index: number;
+  count: number;
   label: string;
   hint: string;
   icon: ReactNode;
@@ -91,7 +95,7 @@ function PermissionRow({
   return (
     <GroupRow
       index={index}
-      count={2}
+      count={count}
       height={62}
       icon={icon}
       label={label}
@@ -106,28 +110,38 @@ function PermissionRow({
  * Second onboarding step: asks for the calendar and notification permissions,
  * one row each, reusing the exact functions Settings already asks them with.
  * Never blocks moving on - asking is the point, not gatekeeping.
+ *
+ * The notifications row is left out where notifications do not exist at all,
+ * on web and in Expo Go: the permission reads as denied there too, but there
+ * is nothing to grant, and a row sending the user to the system settings would
+ * promise a fix that does not exist.
  */
 export function PermissionsStep() {
   const { t } = useTranslation();
+  const rowCount = NOTIFICATIONS_SUPPORTED ? 2 : 1;
 
   return (
     <Group title={t('onboarding.permissionsTitle')}>
       <PermissionRow
         index={0}
+        count={rowCount}
         label={t('onboarding.calendarPermissionLabel')}
         hint={t('onboarding.calendarPermissionHint')}
         icon={<CalendarBlankIcon size={15} color={color.textMuted} />}
         getStatus={getCalendarPermission}
         ensure={ensureCalendarPermission}
       />
-      <PermissionRow
-        index={1}
-        label={t('onboarding.notificationsPermissionLabel')}
-        hint={t('onboarding.notificationsPermissionHint')}
-        icon={<BellIcon size={15} color={color.textMuted} />}
-        getStatus={getNotificationPermission}
-        ensure={ensureNotificationPermission}
-      />
+      {NOTIFICATIONS_SUPPORTED ? (
+        <PermissionRow
+          index={1}
+          count={rowCount}
+          label={t('onboarding.notificationsPermissionLabel')}
+          hint={t('onboarding.notificationsPermissionHint')}
+          icon={<BellIcon size={15} color={color.textMuted} />}
+          getStatus={getNotificationPermission}
+          ensure={ensureNotificationPermission}
+        />
+      ) : null}
     </Group>
   );
 }

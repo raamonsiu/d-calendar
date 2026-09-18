@@ -12,8 +12,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
-import { parseClock } from '@/lib/date';
-import { MIDNIGHT, rolledOverHabits } from '@/lib/habits';
+import { dayEndClock, rolledOverHabits } from '@/lib/habits';
 import { planNotifications, planSignature } from '@/lib/notifications';
 import { visibleEvents } from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
@@ -99,7 +98,7 @@ export function useNotificationSync() {
         : brought.filter((event) => state.eventReminders[event.id]);
 
       const events = [...(notifyEvents ? state.events : []), ...chosen];
-      const dayEnd = parseClock(dayEndTime) ?? MIDNIGHT;
+      const dayEnd = dayEndClock(dayEndTime);
 
       /**
        * Rolled over before planning, the same way Home and the widget draw

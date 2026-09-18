@@ -15,18 +15,51 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.1.1-alpha';
-export const APP_BUILD = '4';
+export const APP_VERSION = '1.2.1-alpha';
+export const APP_BUILD = '5';
 
-/** Every release so far came out in the same month. */
+/** Every release up to 1.1.1 came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
   es: 'AGOSTO 2026',
   en: 'AUGUST 2026',
   ca: 'AGOST 2026',
 };
 
+const SEPTEMBER_2026: Record<Language, string> = {
+  es: 'SEPTIEMBRE 2026',
+  en: 'SEPTEMBER 2026',
+  ca: 'SETEMBRE 2026',
+};
+
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.2.1-alpha',
+    date: SEPTEMBER_2026,
+    notes: {
+      es: [
+        'Pantalla de bienvenida al abrir la app: un saludo según la hora y lo que te queda hoy en eventos, tareas y hábitos.',
+        'Se va sola a los pocos segundos, o antes si deslizas hacia arriba.',
+        'Nuevo ajuste «Pantalla de bienvenida», en Ajustes, para elegir cuántos segundos dura, de 0 a 10; con 0 no se muestra.',
+        'El arranque ya no parpadea: la app abre directamente en esa pantalla, sin la pantalla de carga con el icono.',
+        'Nuevo «Último aviso», en Ajustes › Notificaciones: un resumen diario, y otro semanal, de lo que quede pendiente, a la hora que elijas.',
+      ],
+      en: [
+        'A welcome screen when you open the app: a greeting for the time of day, and what you have left today in events, tasks and habits.',
+        'It leaves by itself after a few seconds, or sooner if you swipe up.',
+        'A new "Welcome screen" setting, in Settings, chooses how many seconds it stays, from 0 to 10; at 0 it never shows.',
+        'Opening the app no longer flashes: it starts on that screen, with no loading screen showing the icon.',
+        'A new "Last chance" group, in Settings › Notifications: a daily summary, and a weekly one, of whatever is still pending, at the time you choose.',
+      ],
+      ca: [
+        'Pantalla de benvinguda en obrir l’app: una salutació segons l’hora i el que et queda avui en esdeveniments, tasques i hàbits.',
+        'Se’n va sola al cap de pocs segons, o abans si llisques amunt.',
+        'Nou ajust «Pantalla de benvinguda», a Configuració, per triar quants segons dura, de 0 a 10; amb 0 no es mostra.',
+        'L’arrencada ja no parpelleja: l’app obre directament en aquesta pantalla, sense la pantalla de càrrega amb la icona.',
+        'Nou «Últim avís», a Configuració › Notificacions: un resum diari, i un de setmanal, del que quedi pendent, a l’hora que triïs.',
+      ],
+    },
+  },
   {
     version: '1.1.1-alpha',
     date: AUGUST_2026,

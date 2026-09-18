@@ -82,6 +82,11 @@ export type Preferences = {
   lastChanceWeeklyDay: LastChanceWeeklyDay;
   /** Time of day the weekly summary fires, in "HH:MM" format. */
   lastChanceWeeklyTime: string;
+  /**
+   * How long the welcome overlay stays up on a cold start, in whole seconds
+   * from 0 to 10. Zero is how it is turned off: there is no separate switch.
+   */
+  welcomeSeconds: number;
   reduceMotion: boolean;
   mono: boolean;
   /**
@@ -116,6 +121,12 @@ const DEFAULT_DAY_END_TIME = '00:00';
  */
 const DEFAULT_LAST_CHANCE_DAILY_TIME = '20:00';
 
+/**
+ * Factory duration of the welcome overlay: long enough to read the three
+ * counts, short enough that nobody waits on it.
+ */
+const DEFAULT_WELCOME_SECONDS = 5;
+
 const DEFAULT_PREFERENCES: Preferences = {
   accent: color.accentDefault,
   weekStart: 'Lunes',
@@ -133,6 +144,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   lastChanceWeekly: true,
   lastChanceWeeklyDay: 'Último',
   lastChanceWeeklyTime: DEFAULT_DAY_END_TIME,
+  welcomeSeconds: DEFAULT_WELCOME_SECONDS,
   reduceMotion: false,
   mono: false,
   highContrast: false,
@@ -157,9 +169,12 @@ const PreferencesContext = createContext<PreferencesContextValue>({
  * settings. They are stored on the device, so the accent, the week start and
  * the reminders switch survive closing the app.
  *
- * Nothing is drawn until they have been read: the preferences decide the accent
- * and the typeface, and starting with the defaults would repaint the whole
- * interface a moment later.
+ * Nothing is drawn until they have been read, nor until the system has said
+ * whether it asks for reduced motion. The preferences decide the accent and the
+ * typeface, and starting with the defaults would repaint the whole interface a
+ * moment later; and anything that starts animating on its first render, like
+ * the welcome overlay, would otherwise choose before `motionOff` knew the
+ * system's half of it.
  */
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<Preferences>(
@@ -167,6 +182,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   );
   const [hydrated, setHydrated] = useState(false);
   const [systemReduceMotion, setSystemReduceMotion] = useState(false);
+  const [systemMotionKnown, setSystemMotionKnown] = useState(false);
 
   /**
    * Reads what was stored, falling back to the defaults for anything missing so
@@ -179,6 +195,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
    * for someone who has never opened the app, not someone updating it. And an
    * `accent` left over from before the "Violeta" swatch changed hex is mapped
    * onto its new value, so it still matches a swatch in Settings › Apariencia.
+   *
+   * The stored language reaches `i18next` here, before the preferences are
+   * set, and not only through the effect below: the first screen mounts in the
+   * same render as `hydrated`, and an effect would switch the language after
+   * that screen had already been drawn in the device's one. With inline
+   * resources the switch is synchronous.
    */
   useEffect(() => {
     let subscribed = true;
@@ -188,7 +210,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         if (!subscribed) return;
         if (stored) {
           const parsed = JSON.parse(stored);
-          setPreferences({
+          const restored: Preferences = {
             ...DEFAULT_PREFERENCES,
             ...parsed,
             accent:
@@ -196,7 +218,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
                 ? color.accentDefault
                 : (parsed.accent ?? DEFAULT_PREFERENCES.accent),
             onboarded: parsed.onboarded ?? true,
-          });
+          };
+          i18n.changeLanguage(restored.language);
+          setPreferences(restored);
         }
       })
       .catch(() => {})
@@ -222,9 +246,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let subscribed = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (subscribed) setSystemReduceMotion(enabled);
-    });
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (subscribed) setSystemReduceMotion(enabled);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (subscribed) setSystemMotionKnown(true);
+      });
     const subscription = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
       setSystemReduceMotion,
@@ -237,8 +266,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   /**
    * Keeps `i18next` in step with the preference: on mount (the default guessed
-   * from the device), and again whenever hydration overrides it or the user
-   * changes it in Settings.
+   * from the device), and again whenever the user changes it in Settings.
+   * Hydration switches it itself, before its first render.
    */
   useEffect(() => {
     i18n.changeLanguage(preferences.language);
@@ -254,7 +283,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     [preferences, systemReduceMotion],
   );
 
-  if (!hydrated) return null;
+  if (!hydrated || !systemMotionKnown) return null;
 
   return (
     <PreferencesContext.Provider value={value}>
@@ -265,7 +294,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
 export const usePrefs = () => useContext(PreferencesContext);
 
-/** The accent, the only thing in the app that carries colour. */
+/** The accent: the only colour in the app, besides the welcome overlay's `itemColor`. */
 export const useAccent = () => useContext(PreferencesContext).accent;
 
 /**

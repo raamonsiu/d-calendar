@@ -15,8 +15,7 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
-import { parseClock } from '@/lib/date';
-import { MIDNIGHT } from '@/lib/habits';
+import { dayEndClock } from '@/lib/habits';
 import { useAppStore } from '@/store/useAppStore';
 import { usePrefs } from '@/theme/prefs';
 
@@ -24,7 +23,7 @@ export function useExpiryCleanup() {
   const { weekStart, dayEndTime } = usePrefs();
 
   useEffect(() => {
-    const dayEnd = parseClock(dayEndTime) ?? MIDNIGHT;
+    const dayEnd = dayEndClock(dayEndTime);
 
     const clean = () => {
       useAppStore.getState().purgeExpiredTasks();

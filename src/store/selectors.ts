@@ -1,17 +1,19 @@
 import { NO_MONTH_VALUE, monthLabelFromSpanish } from '@/data/translations/domain';
 import {
   HOURS_PER_DAY,
-  MS_PER_DAY,
   dayKey,
   decimalHours,
   formatShortDate,
   formatTime,
   isSameDay,
   startOfDay,
+  startOfNextDay,
+  type ClockTime,
 } from '@/lib/date';
+import { isHabitDone, rolledOverHabits } from '@/lib/habits';
 import { isTaskExpired } from '@/lib/tasks';
 import type { Language } from '@/theme/prefs';
-import type { Account, CalEvent, Calendar, Task } from '@/types';
+import type { Account, CalEvent, Calendar, Habit, Task, WeekStart } from '@/types';
 
 /** Copy this module needs, one set per language. */
 const SELECTOR_LABELS: Record<
@@ -387,8 +389,13 @@ export function layoutDayColumn(
  *
  * @param task Task whose due date is being described.
  * @param language Active language.
+ * @param now Instant "today" and "overdue" are measured against.
  */
-export function taskDueLabel(task: Task, language: Language): string {
+export function taskDueLabel(
+  task: Task,
+  language: Language,
+  now: number = Date.now(),
+): string {
   const labels = SELECTOR_LABELS[language];
 
   if (task.vagueMonth) {
@@ -399,16 +406,16 @@ export function taskDueLabel(task: Task, language: Language): string {
   if (task.dueAt == null) return '';
 
   const dueAt = new Date(task.dueAt);
-  const now = new Date();
-  const today = startOfDay(now);
+  const current = new Date(now);
+  const today = startOfDay(current);
 
   const isOverdue =
-    !task.done && task.dueAt < now.getTime() && !isSameDay(dueAt, now);
+    !task.done && task.dueAt < now && !isSameDay(dueAt, current);
   if (isOverdue) return labels.overdue;
 
   if (isSameDay(dueAt, today)) return task.hasTime ? formatTime(dueAt) : labels.today;
 
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY);
+  const tomorrow = startOfNextDay(current);
   if (isSameDay(dueAt, tomorrow)) return labels.tomorrow;
 
   return formatShortDate(dueAt, language);
@@ -430,10 +437,97 @@ export function taskDueLabel(task: Task, language: Language): string {
  * @param now Instant "an earlier day" is measured against.
  */
 export function tasksForHome(tasks: Task[], now: number = Date.now()) {
-  const endOfToday = startOfDay(new Date(now)).getTime() + MS_PER_DAY;
+  const tomorrowStart = startOfNextDay(new Date(now)).getTime();
   return tasks.filter(
     (task) =>
       !isTaskExpired(task, now) &&
-      (task.dueAt == null || task.vagueMonth != null || task.dueAt < endOfToday),
+      (task.dueAt == null ||
+        task.vagueMonth != null ||
+        task.dueAt < tomorrowStart),
   );
+}
+
+/** How many events, tasks and habits are still pending today, for the welcome overlay. */
+export type WelcomeCounts = { events: number; tasks: number; habits: number };
+
+/**
+ * Counts for the welcome overlay shown on a cold start: events left to happen
+ * today, tasks due today or earlier and still not done, and habits still
+ * pending in their current period.
+ *
+ * Postcondition: an event counts on the day it starts, which is the day Home
+ * shows it on - a timed one while it has not ended, an all-day one for the
+ * whole day whatever hours it is stored with - so one that began yesterday
+ * and is still running does not count, just as Home does not show it today. A
+ * task without an exact due date never counts, matching what "hoy" can mean
+ * for it.
+ *
+ * @param events Events already narrowed to the visible calendars.
+ * @param tasks Every task in the store.
+ * @param habits Every habit in the store, not yet rolled over.
+ * @param weekStart First day of the week, for rolling weekly habits over.
+ * @param dayEnd Hour a habit's day or week actually ends.
+ * @param now Instant "today" is measured against.
+ */
+export function welcomeCounts(
+  events: CalEvent[],
+  tasks: Task[],
+  habits: Habit[],
+  weekStart: WeekStart,
+  dayEnd: ClockTime,
+  now: number = Date.now(),
+): WelcomeCounts {
+  const today = startOfDay(new Date(now));
+  const tomorrowStart = startOfNextDay(today).getTime();
+
+  const pendingEvents = events.filter(
+    (event) =>
+      isSameDay(new Date(event.startsAt), today) &&
+      (event.allDay || event.endsAt > now),
+  ).length;
+
+  const pendingTasks = tasks.filter(
+    (task) => !task.done && task.dueAt != null && task.dueAt < tomorrowStart,
+  ).length;
+
+  const pendingHabits = rolledOverHabits(habits, weekStart, dayEnd, now).filter(
+    (habit) => !isHabitDone(habit),
+  ).length;
+
+  return { events: pendingEvents, tasks: pendingTasks, habits: pendingHabits };
+}
+
+/** What the welcome overlay says: the counts it can vouch for. */
+export type WelcomeMessage = {
+  /** Events left today, or null while the device's calendars are unread. */
+  events: number | null;
+  tasks: number;
+  habits: number;
+  /** True only when every count is known and all of them are zero. */
+  allDone: boolean;
+};
+
+/**
+ * What the welcome overlay can say from the counts, given whether the
+ * device's calendars have been read yet.
+ *
+ * Postcondition: before that read, `events` is null and `allDone` false
+ * whatever the other counts are: a cold start holds none of the device's
+ * events, so a zero there would be a guess, not a count.
+ *
+ * @param counts What `welcomeCounts` found in the store.
+ * @param calendarsRead Whether the device's calendars have been read, or
+ * there are none to read.
+ */
+export function welcomeMessage(
+  counts: WelcomeCounts,
+  calendarsRead: boolean,
+): WelcomeMessage {
+  return {
+    events: calendarsRead ? counts.events : null,
+    tasks: counts.tasks,
+    habits: counts.habits,
+    allDone:
+      calendarsRead && counts.events + counts.tasks + counts.habits === 0,
+  };
 }
