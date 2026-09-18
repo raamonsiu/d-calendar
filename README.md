@@ -39,7 +39,7 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.1.** The app is complete and usable, but this is still an early
+> **Alpha 1.2.1.** The app is complete and usable, but this is still an early
 > public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.
@@ -104,9 +104,15 @@ device language at first launch and changeable in Settings.
   calendars can each be turned off on their own.
 - **Alarms inherited** from device calendars are off by default, because the
   calendar they came from already announces them.
+- **Last chance** - an optional summary of whatever is still pending, daily at
+  the hour you choose, and weekly on the day you choose.
 
 ### Interface
 
+- **A welcome screen on every cold start** - the greeting for the time of day
+  and what is left today in events, tasks and habits. It leaves by itself, or
+  sooner if you swipe up, and how long it stays is yours to set in Settings,
+  from ten seconds down to none at all.
 - **Three languages** - Spanish, English and Catalan.
 - **Six accent colours**, a monospaced-font mode and a reduce-animations mode
   that also follows the system accessibility setting.
@@ -148,6 +154,10 @@ npx expo run:android
 That builds a debug APK and installs it on a connected device or a running
 emulator. The design is laid out for 412×892, so Android is the reference. The
 home screen widget needs this native build: it does not exist in Expo Go.
+
+On Windows, `npm run android:device` does the same through
+`scripts/run-android.ps1`, which points the Android SDK and Android Studio's
+own JDK at that one command, so neither has to be set up in the shell.
 
 For a release build you need your own signing keystore - the one used for the
 published releases is not in this repository, and it cannot be:
