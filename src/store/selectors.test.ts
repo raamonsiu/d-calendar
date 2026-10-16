@@ -1,5 +1,6 @@
 import { expectDayLength } from '@/lib/clockChange.testing';
 import { MIDNIGHT } from '@/lib/habits';
+import { expandEvents } from '@/lib/occurrences';
 import type { CalEvent, Habit, Task } from '@/types';
 import {
   layoutDay,
@@ -333,14 +334,40 @@ describe('welcomeCounts', () => {
     expect(counts.events).toBe(0);
   });
 
-  test('does not count an event that began yesterday and is still running, just like Home', () => {
+  test('counts an event that began yesterday and is still running, just like Home', () => {
     const overnight = event({
       id: 'a',
       startsAt: new Date(2025, 11, 31, 22, 0).getTime(),
       endsAt: at(13, 0),
     });
 
-    const counts = welcomeCounts([overnight], [], [], 'Lunes', MIDNIGHT, noon);
+    const counts = welcomeCounts(
+      expandEvents([overnight], at(0), at(23, 59)),
+      [],
+      [],
+      'Lunes',
+      MIDNIGHT,
+      noon,
+    );
+
+    expect(counts.events).toBe(1);
+  });
+
+  test('stops counting the part of yesterday that is over', () => {
+    const overnight = event({
+      id: 'a',
+      startsAt: new Date(2025, 11, 31, 22, 0).getTime(),
+      endsAt: at(11, 0),
+    });
+
+    const counts = welcomeCounts(
+      expandEvents([overnight], at(0), at(23, 59)),
+      [],
+      [],
+      'Lunes',
+      MIDNIGHT,
+      noon,
+    );
 
     expect(counts.events).toBe(0);
   });

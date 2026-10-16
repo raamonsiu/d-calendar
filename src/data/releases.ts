@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.2.1-alpha';
-export const APP_BUILD = '5';
+export const APP_VERSION = '1.2.2-alpha';
+export const APP_BUILD = '6';
 
 /** Every release up to 1.1.1 came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -33,6 +33,33 @@ const SEPTEMBER_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.2.2-alpha',
+    date: SEPTEMBER_2026,
+    notes: {
+      es: [
+        'Un evento que se repite ya se ve en todos los días en que se repite, y no solo el día en que lo creaste: antes el aviso sonaba y el día salía vacío.',
+        'Un evento que pasa de medianoche aparece en los dos días, con las horas que ocupa en cada uno.',
+        'Un evento de varios días, un viaje o unas vacaciones, aparece en todos sus días y no solo en el primero.',
+        'Los puntos de la semana y del mes, y el número de eventos de la cabecera, cuentan ahora cada día tal y como es.',
+        'La pantalla de bienvenida cuenta también lo que empezó ayer y todavía está en marcha.',
+      ],
+      en: [
+        'A repeating event now shows on every day it repeats on, and not only on the day you created it: the reminder used to fire while the day looked empty.',
+        'An event that runs past midnight shows on both days, with the hours it takes on each.',
+        'An event of several days, a trip or a holiday, shows on all of them and not only on the first.',
+        'The dots on the week and the month, and the event count in the header, now count every day as it really is.',
+        'The welcome screen also counts what started yesterday and is still running.',
+      ],
+      ca: [
+        'Un esdeveniment que es repeteix ja es veu tots els dies en què es repeteix, i no només el dia que el vas crear: abans l’avís sonava i el dia sortia buit.',
+        'Un esdeveniment que passa de mitjanit apareix els dos dies, amb les hores que ocupa a cadascun.',
+        'Un esdeveniment de diversos dies, un viatge o unes vacances, apareix tots els dies i no només el primer.',
+        'Els punts de la setmana i del mes, i el nombre d’esdeveniments de la capçalera, ara compten cada dia tal com és.',
+        'La pantalla de benvinguda compta també el que va començar ahir i encara està en marxa.',
+      ],
+    },
+  },
   {
     version: '1.2.1-alpha',
     date: SEPTEMBER_2026,

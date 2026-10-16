@@ -167,7 +167,10 @@ export function visibleEvents(events: CalEvent[], calendars: Calendar[]) {
  * time, and days with no events are absent from the map, so the caller uses
  * `?? []`.
  *
- * @param events Events already filtered by visibility.
+ * @param events Events as `useShownEvents` hands them over: narrowed to the
+ * visible calendars and already opened out into one entry per day, so a
+ * repetition and an event that runs past midnight arrive here as the separate
+ * days they are drawn on.
  */
 export function eventsByDay(events: CalEvent[]) {
   const byDay = new Map<string, CalEvent[]>();
@@ -190,9 +193,11 @@ export function eventsByDay(events: CalEvent[]) {
  * How many events fall on each day, for the week and month dots.
  *
  * Postcondition: the key is the one from `dayKey`; days with no events are
- * absent from the map, so the caller uses `?? 0`.
+ * absent from the map, so the caller uses `?? 0`. A trip counts on each of its
+ * days, which is what the dots of the week and the month are asked for.
  *
- * @param events Events already filtered by visibility.
+ * @param events Events as `useShownEvents` hands them over, already opened out
+ * into one entry per day.
  */
 export function eventCountsByDay(events: CalEvent[]) {
   const counts = new Map<string, number>();
@@ -457,12 +462,13 @@ export type WelcomeCounts = { events: number; tasks: number; habits: number };
  *
  * Postcondition: an event counts on the day it starts, which is the day Home
  * shows it on - a timed one while it has not ended, an all-day one for the
- * whole day whatever hours it is stored with - so one that began yesterday
- * and is still running does not count, just as Home does not show it today. A
- * task without an exact due date never counts, matching what "hoy" can mean
- * for it.
+ * whole day whatever hours it is stored with. One that began yesterday and is
+ * still running counts too, because `useShownEvents` hands today's part of it
+ * over as a day of its own, which is also the day Home draws it on. A task
+ * without an exact due date never counts, matching what "hoy" can mean for it.
  *
- * @param events Events already narrowed to the visible calendars.
+ * @param events Events as `useShownEvents` hands them over: narrowed to the
+ * visible calendars and already opened out into one entry per day.
  * @param tasks Every task in the store.
  * @param habits Every habit in the store, not yet rolled over.
  * @param weekStart First day of the week, for rolling weekly habits over.

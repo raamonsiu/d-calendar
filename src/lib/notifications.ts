@@ -20,10 +20,10 @@ import {
   isSameDay,
   parseClock,
   startOfDay,
-  withTime,
   type ClockTime,
 } from '@/lib/date';
 import { habitPeriodStart, isHabitDone, isWeeklyFrequency } from '@/lib/habits';
+import { eventOccurrences } from '@/lib/occurrences';
 import { countLabel } from '@/lib/text';
 import type { Language } from '@/theme/prefs';
 import type {
@@ -379,60 +379,6 @@ function taskBody(
   const phrases = NOTIFICATION_PHRASES[language];
   if (!hasTime) return phrases.taskDueOn(dayComplement(instant, firesAt, language));
   return phrases.taskDueAt(whenPhrase(instant, firesAt, language));
-}
-
-/**
- * Whether a repeating event falls on a given day.
- *
- * Precondition: `event.repeat` is not 'No'. Postcondition: a weekly event with
- * no weekdays chosen falls on the weekday of its first occurrence, and a
- * monthly one simply does not happen in months that are too short.
- *
- * @param event Event whose rule is being read.
- * @param day Candidate day.
- * @param firstOccurrence First occurrence of the event.
- */
-function repeatsOnDay(event: CalEvent, day: Date, firstOccurrence: Date) {
-  if (event.repeat === 'Cada día') return true;
-  if (event.repeat === 'Días de la semana') {
-    const weekdays =
-      event.weekdays.length > 0 ? event.weekdays : [firstOccurrence.getDay()];
-    return weekdays.includes(day.getDay());
-  }
-  return day.getDate() === firstOccurrence.getDate();
-}
-
-/**
- * Instants an event happens at inside a window.
- *
- * Every occurrence keeps the time of day of the first one; only the day moves.
- *
- * Precondition: `from` is 1 or more and `to` is 1 or more; both are instants in
- * ms. Postcondition: returns them in ascending order, at most one per day, and
- * an empty list when the event does not reach the window.
- *
- * @param event Event to expand.
- * @param from Start of the window, inclusive.
- * @param to End of the window, inclusive.
- */
-export function eventOccurrences(event: CalEvent, from: number, to: number) {
-  if (event.repeat === 'No') {
-    const withinWindow = event.startsAt >= from && event.startsAt <= to;
-    return withinWindow ? [event.startsAt] : [];
-  }
-
-  const firstOccurrence = new Date(event.startsAt);
-  const firstDay = startOfDay(new Date(Math.max(from, event.startsAt)));
-  const dayCount = Math.ceil((to - firstDay.getTime()) / MS_PER_DAY);
-
-  const occurrences: number[] = [];
-  for (let dayOffset = 0; dayOffset <= dayCount; dayOffset += 1) {
-    const day = addDays(firstDay, dayOffset);
-    const instant = withTime(day, firstOccurrence).getTime();
-    if (instant < from || instant > to) continue;
-    if (repeatsOnDay(event, day, firstOccurrence)) occurrences.push(instant);
-  }
-  return occurrences;
 }
 
 /**

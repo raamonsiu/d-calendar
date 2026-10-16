@@ -39,7 +39,7 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.2.1.** The app is complete and usable, but this is still an early
+> **Alpha 1.2.2.** The app is complete and usable, but this is still an early
 > public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.
@@ -65,6 +65,9 @@ device language at first launch and changeable in Settings.
 
 - **Four views on one screen** - today, the week, the expanded day and the
   expanded month, switched without leaving Home.
+- **Every day an event touches** - one that repeats is drawn on each day it
+  repeats on, a night that runs past midnight on both of them, and a trip on
+  all of its days.
 - **The calendars your phone already has** - read through `expo-calendar`, so
   Google, Outlook and iCloud arrive with no OAuth of the app's own.
 - **Real editing** - events you own can be edited, moved and deleted. A
