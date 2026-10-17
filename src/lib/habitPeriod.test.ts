@@ -1,6 +1,13 @@
 import type { Habit } from '@/types';
 import { expectDayLength } from './clockChange.testing';
-import { MIDNIGHT, habitPeriodStart, rolledOverHabit } from './habits';
+import {
+  MIDNIGHT,
+  habitPeriodStart,
+  isHabitPending,
+  isWeekClosing,
+  rolledOverHabit,
+  weekClosingWeekdays,
+} from './habits';
 
 /** Lunes 10 de agosto de 2026, y los dias alrededor. */
 const MONDAY = new Date(2026, 7, 10, 9, 0).getTime();
@@ -100,6 +107,71 @@ describe('habitPeriodStart', () => {
     expect(habitPeriodStart('Diario', smallHoursOfDstDay, 'Lunes', dayEnd)).toBe(
       new Date(2026, 9, 24, 4, 0).getTime(),
     );
+  });
+});
+
+describe('isWeekClosing', () => {
+  test('is false mid-week and true on the last two days of a week starting on Monday', () => {
+    expect(isWeekClosing(THURSDAY, 'Lunes')).toBe(false);
+    expect(isWeekClosing(new Date(2026, 7, 14, 23, 59).getTime(), 'Lunes')).toBe(false);
+    expect(isWeekClosing(new Date(2026, 7, 15, 0, 0).getTime(), 'Lunes')).toBe(true);
+    expect(isWeekClosing(new Date(2026, 7, 16, 23, 59).getTime(), 'Lunes')).toBe(true);
+    expect(isWeekClosing(NEXT_MONDAY, 'Lunes')).toBe(false);
+  });
+
+  test('follows the week start preference', () => {
+    const friday = new Date(2026, 7, 14, 12, 0).getTime();
+    expect(isWeekClosing(THURSDAY, 'Sábado')).toBe(true);
+    expect(isWeekClosing(friday, 'Sábado')).toBe(true);
+    expect(isWeekClosing(friday, 'Domingo')).toBe(true);
+    expect(isWeekClosing(THURSDAY, 'Domingo')).toBe(false);
+  });
+
+  test('a custom day-end shifts the closing days with it', () => {
+    const dayEnd = { hour: 4, minute: 0 };
+    const saturdaySmallHours = new Date(2026, 7, 15, 2, 0).getTime();
+    const saturdayAtDayEnd = new Date(2026, 7, 15, 4, 0).getTime();
+    const mondaySmallHours = new Date(2026, 7, 17, 2, 0).getTime();
+    expect(isWeekClosing(saturdaySmallHours, 'Lunes', dayEnd)).toBe(false);
+    expect(isWeekClosing(saturdayAtDayEnd, 'Lunes', dayEnd)).toBe(true);
+    expect(isWeekClosing(mondaySmallHours, 'Lunes', dayEnd)).toBe(true);
+  });
+
+  test('stays on calendar days in the week the clock goes back', () => {
+    /** Sunday 25 October 2026 is 25 hours long, so that week lasts 7 days and 1 hour. */
+    expectDayLength(new Date(2026, 9, 25), 25);
+    expect(isWeekClosing(new Date(2026, 9, 23, 23, 59).getTime(), 'Lunes')).toBe(false);
+    expect(isWeekClosing(new Date(2026, 9, 24, 0, 0).getTime(), 'Lunes')).toBe(true);
+    expect(isWeekClosing(new Date(2026, 9, 25, 23, 30).getTime(), 'Lunes')).toBe(true);
+    expect(isWeekClosing(new Date(2026, 9, 26, 0, 0).getTime(), 'Lunes')).toBe(false);
+  });
+});
+
+describe('weekClosingWeekdays', () => {
+  test('gives the two days before the week starts, as getDay() indexes', () => {
+    expect(weekClosingWeekdays('Lunes')).toEqual([6, 0]);
+    expect(weekClosingWeekdays('Domingo')).toEqual([5, 6]);
+    expect(weekClosingWeekdays('Sábado')).toEqual([4, 5]);
+  });
+});
+
+describe('isHabitPending', () => {
+  const saturday = new Date(2026, 7, 15, 12, 0).getTime();
+
+  test('a daily habit is pending any day until it is done', () => {
+    expect(isHabitPending(habit(), 'Lunes', MIDNIGHT, TUESDAY)).toBe(true);
+    expect(isHabitPending(habit({ progress: 5 }), 'Lunes', MIDNIGHT, TUESDAY)).toBe(false);
+  });
+
+  test('a weekly habit is pending only on the closing days of its week', () => {
+    const weekly = habit({ frequency: 'X por semana', target: 3, progress: 1 });
+    expect(isHabitPending(weekly, 'Lunes', MIDNIGHT, TUESDAY)).toBe(false);
+    expect(isHabitPending(weekly, 'Lunes', MIDNIGHT, saturday)).toBe(true);
+  });
+
+  test('a weekly habit already done is never pending', () => {
+    const done = habit({ frequency: 'Semanal', target: 1, progress: 1 });
+    expect(isHabitPending(done, 'Lunes', MIDNIGHT, saturday)).toBe(false);
   });
 });
 

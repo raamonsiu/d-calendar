@@ -117,6 +117,60 @@ describe('planNotifications with habits', () => {
     );
     expect(plan).toHaveLength(1);
   });
+
+  test('a weekly habit with no day marked reminds only on the last two days of the week', () => {
+    const plan = planNotifications(
+      planInput({
+        habits: [habit({ frequency: 'X por semana', target: 3, progress: 1 })],
+      }),
+      NOW,
+      'en',
+    );
+    expect(plan.map((entry) => entry.trigger)).toEqual([
+      { kind: 'weekly', weekday: 6, hour: 9, minute: 0 },
+      { kind: 'weekly', weekday: 0, hour: 9, minute: 0 },
+    ]);
+  });
+
+  test('the closing days of a weekly reminder follow the week start preference', () => {
+    const plan = planNotifications(
+      planInput({
+        weekStart: 'Domingo',
+        habits: [habit({ frequency: 'Semanal' })],
+      }),
+      NOW,
+      'en',
+    );
+    expect(plan.map((entry) => entry.trigger)).toEqual([
+      { kind: 'weekly', weekday: 5, hour: 9, minute: 0 },
+      { kind: 'weekly', weekday: 6, hour: 9, minute: 0 },
+    ]);
+  });
+
+  test('a weekly habit with days marked keeps reminding on those days', () => {
+    const plan = planNotifications(
+      planInput({
+        habits: [habit({ frequency: 'Semanal', weekdays: [2, 4] })],
+      }),
+      NOW,
+      'en',
+    );
+    expect(plan.map((entry) => entry.trigger)).toEqual([
+      { kind: 'weekly', weekday: 2, hour: 9, minute: 0 },
+      { kind: 'weekly', weekday: 4, hour: 9, minute: 0 },
+    ]);
+  });
+
+  test('a daily habit keeps a daily trigger whatever weekdays it carries', () => {
+    const plan = planNotifications(
+      planInput({ habits: [habit({ weekdays: [2] })] }),
+      NOW,
+      'en',
+    );
+    expect(plan.map((entry) => entry.trigger)).toEqual([
+      { kind: 'daily', hour: 9, minute: 0 },
+    ]);
+  });
 });
 
 describe('planNotifications last chance, daily', () => {

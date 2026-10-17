@@ -13,6 +13,7 @@
  * many times it fires, which is why habits use one.
  */
 import {
+  DAYS_PER_WEEK,
   MS_PER_DAY,
   addDays,
   formatLongDate,
@@ -22,7 +23,13 @@ import {
   startOfDay,
   type ClockTime,
 } from '@/lib/date';
-import { habitPeriodStart, isHabitDone, isWeeklyFrequency } from '@/lib/habits';
+import {
+  WEEK_CLOSING_DAYS,
+  habitPeriodStart,
+  isHabitDone,
+  isWeeklyFrequency,
+  weekClosingWeekdays,
+} from '@/lib/habits';
 import { eventOccurrences } from '@/lib/occurrences';
 import { countLabel } from '@/lib/text';
 import type { Language } from '@/theme/prefs';
@@ -496,8 +503,9 @@ function habitBody(habit: Habit, language: Language) {
 /**
  * Reminders of one habit, as repeating triggers.
  *
- * A weekly habit with weekdays chosen repeats once a week per weekday; every
- * other case repeats daily, including a weekly habit with no day marked.
+ * A daily habit repeats daily. A weekly habit repeats once a week per weekday:
+ * the ones the user chose, or with none chosen the closing days of the week
+ * (`weekClosingWeekdays`), the only days an incomplete week is chased on.
  *
  * Postcondition: returns an empty list once the habit has every repetition of
  * its current period done, the same way a finished task stops reminding; a
@@ -507,12 +515,15 @@ function habitBody(habit: Habit, language: Language) {
  * current date, because these triggers are not rescheduled as time passes.
  *
  * @param habit Habit to plan.
+ * @param weekStart Week start preference, which decides the closing days.
  * @param language Active language.
  */
-function planHabit(habit: Habit, language: Language) {
+function planHabit(habit: Habit, weekStart: WeekStart, language: Language) {
   if (isHabitDone(habit)) return [];
 
   const planned: PlannedNotification[] = [];
+  const weekdays =
+    habit.weekdays.length > 0 ? habit.weekdays : weekClosingWeekdays(weekStart);
 
   for (const reminder of habit.reminders) {
     const clock = parseClock(reminder.time);
@@ -524,9 +535,7 @@ function planHabit(habit: Habit, language: Language) {
       itemId: habit.id,
     };
 
-    const weekly =
-      isWeeklyFrequency(habit.frequency) && habit.weekdays.length > 0;
-    if (!weekly) {
+    if (!isWeeklyFrequency(habit.frequency)) {
       planned.push({
         ...content,
         id: `habit:${habit.id}:${reminder.id}`,
@@ -535,7 +544,7 @@ function planHabit(habit: Habit, language: Language) {
       continue;
     }
 
-    for (const weekday of habit.weekdays) {
+    for (const weekday of weekdays) {
       planned.push({
         ...content,
         id: `habit:${habit.id}:${reminder.id}:${weekday}`,
@@ -546,10 +555,14 @@ function planHabit(habit: Habit, language: Language) {
   return planned;
 }
 
-/** Which day of the week, counted from `weekStart`, each option names. */
+/**
+ * Which day of the week, counted from `weekStart`, each option names: the two
+ * of them are the closing days of the week (`WEEK_CLOSING_DAYS`), the same
+ * ones a weekly habit counts as pending on.
+ */
 const LAST_CHANCE_WEEKLY_DAY_OFFSET: Record<LastChanceWeeklyDay, number> = {
-  Penúltimo: 5,
-  Último: 6,
+  Penúltimo: DAYS_PER_WEEK - WEEK_CLOSING_DAYS,
+  Último: DAYS_PER_WEEK - 1,
 };
 
 /** The given day at a given hour and minute. */
@@ -780,7 +793,7 @@ export function planNotifications(
   const horizonEnd = now + HORIZON_DAYS * MS_PER_DAY;
 
   const guaranteed = [
-    ...input.habits.flatMap((habit) => planHabit(habit, language)),
+    ...input.habits.flatMap((habit) => planHabit(habit, input.weekStart, language)),
     ...planLastChance(input, now, language, 'daily'),
     ...planLastChance(input, now, language, 'weekly'),
   ];

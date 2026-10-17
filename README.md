@@ -39,7 +39,7 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.2.2.** The app is complete and usable, but this is still an early
+> **Alpha 1.2.3.** The app is complete and usable, but this is still an early
 > public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.

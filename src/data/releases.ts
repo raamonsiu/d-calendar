@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.2.2-alpha';
-export const APP_BUILD = '6';
+export const APP_VERSION = '1.2.3-alpha';
+export const APP_BUILD = '7';
 
 /** Every release up to 1.1.1 came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -31,8 +31,35 @@ const SEPTEMBER_2026: Record<Language, string> = {
   ca: 'SETEMBRE 2026',
 };
 
+const OCTOBER_2026: Record<Language, string> = {
+  es: 'OCTUBRE 2026',
+  en: 'OCTOBER 2026',
+  ca: 'OCTUBRE 2026',
+};
+
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.2.3-alpha',
+    date: OCTOBER_2026,
+    notes: {
+      es: [
+        'Un hábito semanal, de una o de varias veces por semana, solo se da por pendiente los dos últimos días de la semana: antes salía cada día en la pantalla de bienvenida aunque ya llevaras parte hecha o pensaras hacerlo otro día.',
+        'Su recordatorio, si no le marcaste días, suena también solo esos dos últimos días, en lugar de cada día. Si le marcaste días, sigue sonando en los que elegiste.',
+        'El último aviso semanal sigue saliendo el penúltimo o el último día, como elijas en Ajustes, y el diario no cuenta los hábitos semanales.',
+      ],
+      en: [
+        "A weekly habit, once or several times a week, only counts as pending on the last two days of the week: it used to show up every day on the welcome screen even when you had already done part of it or meant to do it another day.",
+        "Its reminder, if you didn't mark any days, also fires only on those last two days instead of every day. If you marked days, it keeps firing on the ones you chose.",
+        'The weekly last chance summary still comes on the second to last or the last day, as you pick in Settings, and the daily one leaves weekly habits out.',
+      ],
+      ca: [
+        'Un hàbit setmanal, d’una o de diverses vegades per setmana, només es dona per pendent els dos últims dies de la setmana: abans sortia cada dia a la pantalla de benvinguda encara que ja en portessis una part feta o pensessis fer-lo un altre dia.',
+        'El seu recordatori, si no li vas marcar dies, també sona només aquests dos últims dies, en lloc de cada dia. Si li vas marcar dies, continua sonant els que vas triar.',
+        'L’últim avís setmanal continua sortint el penúltim o l’últim dia, com triïs a Ajustos, i el diari no compta els hàbits setmanals.',
+      ],
+    },
+  },
   {
     version: '1.2.2-alpha',
     date: SEPTEMBER_2026,

@@ -1,9 +1,11 @@
 import {
+  DAYS_PER_WEEK,
   MS_PER_DAY,
   addDays,
   parseClock,
   startOfDay,
   startOfWeek,
+  weekStartIndex,
   type ClockTime,
 } from '@/lib/date';
 import type { Language } from '@/lib/language';
@@ -184,6 +186,86 @@ export function habitPeriodStart(
     dayEnd.hour,
     dayEnd.minute,
   ).getTime();
+}
+
+/**
+ * How many days at the end of the week a weekly habit is chased on.
+ *
+ * A weekly habit can be done any day of the week, so being undone on a Tuesday
+ * says nothing: the user may have done one of its N repetitions today, or plan
+ * to do it later. Only the last days of the week are the point where an undone
+ * one is really at risk, and those are the only days it is reported as pending
+ * and reminded about.
+ */
+export const WEEK_CLOSING_DAYS = 2;
+
+/**
+ * Whether an instant falls on the closing days of its week: the last
+ * `WEEK_CLOSING_DAYS` of the weekly period it belongs to.
+ *
+ * The week is the one a weekly habit counts in, so a day-end other than
+ * midnight shifts the closing days with it, and the boundary is built from
+ * calendar days so it stays right on a week that changes the clock.
+ *
+ * Postcondition: true on exactly `WEEK_CLOSING_DAYS` days of every week.
+ *
+ * @param now Instant to place.
+ * @param weekStart Week start preference.
+ * @param dayEnd Hour and minute the day rolls over at; defaults to midnight.
+ */
+export function isWeekClosing(
+  now: number,
+  weekStart: WeekStart,
+  dayEnd: ClockTime = MIDNIGHT,
+) {
+  const weekStartAt = habitPeriodStart('Semanal', now, weekStart, dayEnd);
+  const closingStart = addDays(
+    new Date(weekStartAt),
+    DAYS_PER_WEEK - WEEK_CLOSING_DAYS,
+  ).getTime();
+  return now >= closingStart;
+}
+
+/**
+ * The closing days of the week as `getDay()` indexes, in the order they come.
+ *
+ * Postcondition: returns `WEEK_CLOSING_DAYS` indexes, the last of them the day
+ * right before `weekStart`.
+ *
+ * @param weekStart Week start preference.
+ */
+export function weekClosingWeekdays(weekStart: WeekStart) {
+  const first = weekStartIndex(weekStart);
+  return Array.from(
+    { length: WEEK_CLOSING_DAYS },
+    (_, index) => (first + DAYS_PER_WEEK - WEEK_CLOSING_DAYS + index) % DAYS_PER_WEEK,
+  );
+}
+
+/**
+ * Whether a habit counts as still pending at an instant.
+ *
+ * A daily habit is pending while its day is not complete. A weekly one is
+ * pending only on the closing days of its week (`isWeekClosing`): before
+ * them, an incomplete week is simply a week still under way.
+ *
+ * Precondition: `habit` is already rolled over to the period containing `now`
+ * (`rolledOverHabit`). Postcondition: always false for a complete habit.
+ *
+ * @param habit Habit to read.
+ * @param weekStart Week start preference.
+ * @param dayEnd Hour and minute the day rolls over at.
+ * @param now Instant the question is asked at.
+ */
+export function isHabitPending(
+  habit: Habit,
+  weekStart: WeekStart,
+  dayEnd: ClockTime,
+  now: number,
+) {
+  if (isHabitDone(habit)) return false;
+  if (!isWeeklyFrequency(habit.frequency)) return true;
+  return isWeekClosing(now, weekStart, dayEnd);
 }
 
 /**

@@ -10,7 +10,7 @@ import {
   startOfNextDay,
   type ClockTime,
 } from '@/lib/date';
-import { isHabitDone, rolledOverHabits } from '@/lib/habits';
+import { isHabitPending, rolledOverHabits } from '@/lib/habits';
 import { isTaskExpired } from '@/lib/tasks';
 import type { Language } from '@/theme/prefs';
 import type { Account, CalEvent, Calendar, Habit, Task, WeekStart } from '@/types';
@@ -466,6 +466,8 @@ export type WelcomeCounts = { events: number; tasks: number; habits: number };
  * still running counts too, because `useShownEvents` hands today's part of it
  * over as a day of its own, which is also the day Home draws it on. A task
  * without an exact due date never counts, matching what "hoy" can mean for it.
+ * A weekly habit counts only on the closing days of its week
+ * (`isHabitPending`): earlier on, an incomplete week is still under way.
  *
  * @param events Events as `useShownEvents` hands them over: narrowed to the
  * visible calendars and already opened out into one entry per day.
@@ -497,7 +499,7 @@ export function welcomeCounts(
   ).length;
 
   const pendingHabits = rolledOverHabits(habits, weekStart, dayEnd, now).filter(
-    (habit) => !isHabitDone(habit),
+    (habit) => isHabitPending(habit, weekStart, dayEnd, now),
   ).length;
 
   return { events: pendingEvents, tasks: pendingTasks, habits: pendingHabits };

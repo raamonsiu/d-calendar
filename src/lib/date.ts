@@ -22,7 +22,8 @@ export const MS_PER_DAY = 86400000;
 /** Hours a day is drawn with: all of them, from 00 to 23. */
 export const HOURS_PER_DAY = 24;
 
-const DAYS_PER_WEEK = 7;
+/** Days in a week, the length of every weekly period. */
+export const DAYS_PER_WEEK = 7;
 
 /**
  * Translates the week start preference into a `getDay()` index.

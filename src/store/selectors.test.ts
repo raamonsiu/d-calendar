@@ -371,6 +371,57 @@ describe('welcomeCounts', () => {
 
     expect(counts.events).toBe(0);
   });
+
+  test('a weekly habit still under way mid-week does not count, a daily one does', () => {
+    const weekly = habit({ id: 'a', frequency: 'Semanal' });
+    const halfDone = habit({ id: 'b', frequency: 'X por semana', target: 3, progress: 1 });
+    const daily = habit({ id: 'c' });
+
+    const counts = welcomeCounts(
+      [],
+      [],
+      [weekly, halfDone, daily],
+      'Lunes',
+      MIDNIGHT,
+      noon,
+    );
+
+    expect(counts.habits).toBe(1);
+  });
+
+  test('a weekly habit still pending counts on the last two days of the week', () => {
+    const weekly = habit({ id: 'a', frequency: 'Semanal' });
+    const halfDone = habit({ id: 'b', frequency: 'X por semana', target: 3, progress: 1 });
+    const saturday = new Date(2026, 0, 3, 12, 0).getTime();
+    const sunday = new Date(2026, 0, 4, 12, 0).getTime();
+
+    for (const day of [saturday, sunday]) {
+      const counts = welcomeCounts([], [], [weekly, halfDone], 'Lunes', MIDNIGHT, day);
+      expect(counts.habits).toBe(2);
+    }
+  });
+
+  test('a weekly habit already done does not count on the closing days either', () => {
+    const saturday = new Date(2026, 0, 3, 12, 0).getTime();
+    const done = habit({
+      id: 'a',
+      frequency: 'Semanal',
+      progress: 1,
+      periodStart: new Date(2025, 11, 29).getTime(),
+    });
+
+    const counts = welcomeCounts([], [], [done], 'Lunes', MIDNIGHT, saturday);
+
+    expect(counts.habits).toBe(0);
+  });
+
+  test('the closing days follow the week start preference', () => {
+    const weekly = habit({ id: 'a', frequency: 'Semanal' });
+
+    const counts = welcomeCounts([], [], [weekly], 'Sábado', MIDNIGHT, noon);
+
+    expect(counts.habits).toBe(1);
+  });
 });
 
 describe('tasksForHome', () => {
