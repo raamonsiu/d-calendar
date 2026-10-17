@@ -7,6 +7,7 @@ import {
   splitAllDay,
   taskDueLabel,
   tasksForHome,
+  weekColumnItems,
   welcomeCounts,
   welcomeMessage,
 } from './selectors';
@@ -116,6 +117,52 @@ describe('layoutDayColumn', () => {
       COLUMN_WIDTH,
     );
     expect(placed.width).toBe(COLUMN_WIDTH - CARD_INSET);
+  });
+});
+
+describe('weekColumnItems', () => {
+  const ids = (events: CalEvent[]) => events.map((entry) => entry.id);
+
+  test('puts the all-day events first and keeps the rest by start time', () => {
+    const morning = timedEvent('a', 9, 10);
+    const holiday = event({ id: 'b', allDay: true });
+    const evening = timedEvent('c', 19, 20);
+
+    const { shown, hidden } = weekColumnItems([morning, holiday, evening], 5);
+    expect(ids(shown)).toEqual(['b', 'a', 'c']);
+    expect(hidden).toBe(0);
+  });
+
+  test('shows them all when they fit exactly', () => {
+    const events = [timedEvent('a', 9, 10), timedEvent('b', 11, 12)];
+    expect(weekColumnItems(events, 2)).toEqual({ shown: events, hidden: 0 });
+  });
+
+  test('gives the last row to the count when they do not fit', () => {
+    const events = [
+      timedEvent('a', 8, 9),
+      timedEvent('b', 10, 11),
+      timedEvent('c', 12, 13),
+      timedEvent('d', 14, 15),
+    ];
+
+    const { shown, hidden } = weekColumnItems(events, 3);
+    expect(ids(shown)).toEqual(['a', 'b']);
+    expect(hidden).toBe(2);
+  });
+
+  test('with room for a single row, that row is the count', () => {
+    const events = [timedEvent('a', 8, 9), timedEvent('b', 10, 11)];
+    expect(weekColumnItems(events, 1)).toEqual({ shown: [], hidden: 2 });
+  });
+
+  test('with no room at all, shows nothing and counts everything', () => {
+    const events = [timedEvent('a', 8, 9)];
+    expect(weekColumnItems(events, 0)).toEqual({ shown: [], hidden: 1 });
+  });
+
+  test('an empty day has nothing to show or hide', () => {
+    expect(weekColumnItems([], 4)).toEqual({ shown: [], hidden: 0 });
   });
 });
 

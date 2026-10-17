@@ -8,9 +8,8 @@ import { color } from '@/theme/tokens';
 const MAX_DOTS = 3;
 
 /**
- * How many events a day has, drawn the way the collapsed week and the month
- * grid do it: up to three accent dots and, if there are more, a "+N" next to
- * them.
+ * How many events a day has, drawn the way the month grid does it: up to
+ * three accent dots and, if there are more, a "+N" next to them.
  *
  * With `count` at 0 it draws nothing.
  */

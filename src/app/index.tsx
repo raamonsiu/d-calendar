@@ -30,9 +30,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
 import { AgendaList } from '@/features/home/AgendaList';
 import { DayView } from '@/features/home/DayView';
-import { MonthExpanded } from '@/features/home/MonthExpanded';
+import { MonthView } from '@/features/home/MonthView';
 import { SideDrawer } from '@/features/home/SideDrawer';
-import { WeekStrip } from '@/features/home/WeekStrip';
+import { WeekView } from '@/features/home/WeekView';
 import { homeHeaderCopy } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
 import { dayEndClock, rolledOverHabits } from '@/lib/habits';
@@ -181,14 +181,14 @@ export default function HomeScreen() {
                   onPressEvent={(event) => openItem(event.id)}
                 />
               ) : calendarView === 'Semana' ? (
-                <WeekStrip
-                  counts={counts}
+                <WeekView
+                  eventsByDay={byDay}
                   initialDay={shownDay}
                   onShowWeek={setShownDay}
                   onPressDay={openDay}
                 />
               ) : (
-                <MonthExpanded
+                <MonthView
                   counts={counts}
                   initialDay={shownDay}
                   onShowMonth={setShownDay}

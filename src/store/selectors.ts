@@ -345,6 +345,44 @@ export function layoutDayColumn(
   );
 }
 
+/** What a column of the week view draws: the events that fit and how many do not. */
+export type WeekColumnItems = { shown: CalEvent[]; hidden: number };
+
+/**
+ * The events a day's column in the week view has room for, in the order they
+ * are drawn: the all-day ones first, as the day view's heading does, then the
+ * rest by start time.
+ *
+ * When they do not all fit, the last row is given over to the "+N" that counts
+ * the rest, so `shown` stops one row short of `maxRows`: a column whose rows
+ * were all events would say nothing about the ones left out.
+ *
+ * Precondition: `events` are the events of one day sorted by start time, which
+ * is what `eventsByDay` returns. Postcondition: `shown.length + hidden` is
+ * `events.length`, `shown` never takes more than `maxRows` rows counting the
+ * "+N" one, and a `maxRows` of 0 or less shows nothing and hides everything.
+ * The input is not mutated.
+ *
+ * @param events Events of the day.
+ * @param maxRows Rows the column has room for.
+ */
+export function weekColumnItems(
+  events: CalEvent[],
+  maxRows: number,
+): WeekColumnItems {
+  const { allDay, timed } = splitAllDay(events);
+  const ordered = [...allDay, ...timed];
+  const rows = Math.max(0, Math.floor(maxRows));
+
+  if (ordered.length <= rows) return { shown: ordered, hidden: 0 };
+
+  const shownCount = Math.max(0, rows - 1);
+  return {
+    shown: ordered.slice(0, shownCount),
+    hidden: ordered.length - shownCount,
+  };
+}
+
 /**
  * Due label shown on the right of a task row.
  *

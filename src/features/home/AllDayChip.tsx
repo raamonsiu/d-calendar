@@ -11,9 +11,8 @@ import type { CalEvent } from '@/types';
  *
  * On the grid they would run from midnight to midnight and cover the whole day,
  * hiding everything that does happen at an hour. So they come out of it and sit
- * in a band of their own, which the two hour views place where it stays in
- * sight: above the rail in the day strip, and in the pinned heading of each
- * column in the expanded grid.
+ * in a band of their own, which the day view places where it stays in sight:
+ * in the heading pinned above the hours.
  *
  * The dot is the same one the cards of the grid carry, which is one of the six
  * places handoff §6 allows the accent. Nothing else here has colour.

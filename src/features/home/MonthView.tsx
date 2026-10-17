@@ -37,7 +37,7 @@ const MONTH_GAP = 22;
 /** How many months the list keeps mounted around the visible one. */
 const WINDOW_SIZE = 5;
 
-type MonthExpandedProps = {
+type MonthViewProps = {
   counts: Map<string, number>;
   /** Month the view opens on is the one holding this day. Read once. */
   initialDay: Date;
@@ -47,19 +47,19 @@ type MonthExpandedProps = {
 };
 
 /**
- * Expanded month view (handoff §5.4): continuous vertical scroll, no paging
+ * Month view (handoff §5.4): continuous vertical scroll, no paging
  * between months.
  *
  * The grid is drawn once the container has been measured, because the cell side
  * comes from the available width. Today is marked with the accent and every
  * cell carries the dots for its events.
  */
-export function MonthExpanded({
+export function MonthView({
   counts,
   initialDay,
   onShowMonth,
   onPressDay,
-}: MonthExpandedProps) {
+}: MonthViewProps) {
   const { t } = useTranslation();
   const accent = useAccent();
   const { weekStart, language } = usePrefs();
