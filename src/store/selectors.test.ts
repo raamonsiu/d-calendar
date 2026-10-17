@@ -3,7 +3,6 @@ import { MIDNIGHT } from '@/lib/habits';
 import { expandEvents } from '@/lib/occurrences';
 import type { CalEvent, Habit, Task } from '@/types';
 import {
-  layoutDay,
   layoutDayColumn,
   splitAllDay,
   taskDueLabel,
@@ -63,42 +62,6 @@ describe('splitAllDay', () => {
   });
 });
 
-describe('layoutDay', () => {
-  const HOUR_WIDTH = 62;
-
-  test('un evento de una hora empieza donde su hora empieza', () => {
-    const [placed] = layoutDay([timedEvent('a', 9, 10)], HOUR_WIDTH);
-    expect(placed.left).toBe(9 * HOUR_WIDTH);
-  });
-
-  test('dos eventos que no se superponen comparten el carril 0', () => {
-    const morning = timedEvent('a', 9, 10);
-    const afternoon = timedEvent('b', 14, 15);
-
-    const placed = layoutDay([morning, afternoon], HOUR_WIDTH);
-    expect(placed.map((entry) => entry.lane)).toEqual([0, 0]);
-  });
-
-  test('dos eventos que se superponen van a carriles distintos', () => {
-    const first = timedEvent('a', 9, 10);
-    const overlapping = event({ id: 'b', startsAt: at(9, 30), endsAt: at(10, 30) });
-
-    const placed = layoutDay([first, overlapping], HOUR_WIDTH);
-    expect(placed[0].lane).not.toBe(placed[1].lane);
-  });
-
-  test('un evento que acaba al dia siguiente se corta al final del dia', () => {
-    const overnight = event({
-      id: 'a',
-      startsAt: at(22),
-      endsAt: new Date(2026, 0, 2, 1, 0).getTime(),
-    });
-
-    const [placed] = layoutDay([overnight], HOUR_WIDTH);
-    expect(placed.width).toBe((24 - 22) * HOUR_WIDTH - 5);
-  });
-});
-
 describe('layoutDayColumn', () => {
   const HOUR_HEIGHT = 60;
   const COLUMN_WIDTH = 104;
@@ -112,6 +75,38 @@ describe('layoutDayColumn', () => {
     const placed = layoutDayColumn([first, overlapping], HOUR_HEIGHT, COLUMN_WIDTH);
     expect(placed[0].width).toBeLessThan(COLUMN_WIDTH);
     expect(placed[1].width).toBeLessThan(COLUMN_WIDTH);
+  });
+
+  test('an event starts where its hour starts', () => {
+    const [placed] = layoutDayColumn([timedEvent('a', 9, 10)], HOUR_HEIGHT, COLUMN_WIDTH);
+    expect(placed.top).toBe(9 * HOUR_HEIGHT);
+  });
+
+  test('two events that do not overlap both start at the left edge', () => {
+    const morning = timedEvent('a', 9, 10);
+    const afternoon = timedEvent('b', 14, 15);
+
+    const placed = layoutDayColumn([morning, afternoon], HOUR_HEIGHT, COLUMN_WIDTH);
+    expect(placed.map((entry) => entry.left)).toEqual([0, 0]);
+  });
+
+  test('two overlapping events go side by side', () => {
+    const first = timedEvent('a', 9, 10);
+    const overlapping = event({ id: 'b', startsAt: at(9, 30), endsAt: at(10, 30) });
+
+    const placed = layoutDayColumn([first, overlapping], HOUR_HEIGHT, COLUMN_WIDTH);
+    expect(placed[0].left).not.toBe(placed[1].left);
+  });
+
+  test('an event ending the next day is cut at the end of this one', () => {
+    const overnight = event({
+      id: 'a',
+      startsAt: at(22),
+      endsAt: new Date(2026, 0, 2, 1, 0).getTime(),
+    });
+
+    const [placed] = layoutDayColumn([overnight], HOUR_HEIGHT, COLUMN_WIDTH);
+    expect(placed.height).toBe((24 - 22) * HOUR_HEIGHT - CARD_INSET);
   });
 
   test('un evento solo en su hora ocupa la columna entera', () => {

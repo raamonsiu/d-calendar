@@ -3,7 +3,7 @@ import { useRef } from 'react';
 /**
  * Reports which item of a scrolling list is showing, once per change.
  *
- * The four views of the calendar box all do the same thing while scrolling:
+ * The three views of the calendar box all do the same thing while scrolling:
  * work out which day, week or month they have reached, and tell Home about it.
  * They differ only in the arithmetic that gets to the index, which is why that
  * part stays in each of them and this part does not.

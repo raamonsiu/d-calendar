@@ -29,7 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
 import { AgendaList } from '@/features/home/AgendaList';
-import { DayExpanded } from '@/features/home/DayExpanded';
+import { DayView } from '@/features/home/DayView';
 import { MonthExpanded } from '@/features/home/MonthExpanded';
 import { SideDrawer } from '@/features/home/SideDrawer';
 import { WeekStrip } from '@/features/home/WeekStrip';
@@ -68,8 +68,8 @@ export default function HomeScreen() {
   const [addSourceOpen, setAddSourceOpen] = useState(false);
 
   /**
-   * The day the calendar box is on. The four views report it as they scroll and
-   * read it when they mount, which is what makes switching mode or size keep the
+   * The day the calendar box is on. The three views report it as they scroll
+   * and read it when they mount, which is what makes switching view keep the
    * day instead of jumping back to today.
    */
   const [shownDay, setShownDay] = useState(() => startOfDay(new Date()));
@@ -174,7 +174,7 @@ export default function HomeScreen() {
 
             <View style={styles.boxContent}>
               {calendarView === 'Día' ? (
-                <DayExpanded
+                <DayView
                   eventsByDay={byDay}
                   initialDay={shownDay}
                   onShowDay={setShownDay}

@@ -234,16 +234,6 @@ export function splitAllDay(events: CalEvent[]) {
   return { allDay, timed };
 }
 
-/** An event already placed on the hour rail, which runs left to right. */
-export type LaidOutEvent = {
-  event: CalEvent;
-  /** 0 or 1: the design only allows two lanes for overlaps. */
-  lane: number;
-  left: number;
-  width: number;
-  startLabel: string;
-};
-
 /** An event already placed on a day column, which runs top to bottom. */
 export type ColumnEvent = {
   event: CalEvent;
@@ -272,8 +262,7 @@ type PlacedEvent = {
 
 /**
  * Works out, for the events of one day, which lane each goes in and which hours
- * it covers. It is the part the two layouts share; what changes between them is
- * only which axis those hours are turned into.
+ * it covers, ahead of turning those hours into positions on the day column.
  *
  * Each event goes into the first lane that has already finished by its start
  * time; when every lane is busy, a new one is opened. The lane comes back modulo
@@ -312,36 +301,6 @@ function placeEvents(events: CalEvent[]): PlacedEvent[] {
         candidate.startsAtHour < other.endsAtHour,
     ),
   }));
-}
-
-/**
- * Places the events of a day on the hour rail, where an hour is a width.
- *
- * Precondition: as in `placeEvents`; `hourWidth` is the width of one hour in px.
- * Postcondition: one entry per event, in the same order, with `left` measured
- * from midnight and a width of at least `minWidth`.
- *
- * @param events Events of the day, sorted.
- * @param hourWidth Width of one hour in px.
- * @param minWidth Minimum card width for the title to fit.
- */
-export function layoutDay(
-  events: CalEvent[],
-  hourWidth: number,
-  minWidth = 84,
-): LaidOutEvent[] {
-  return placeEvents(events).map(
-    ({ event, lane, startsAtHour, endsAtHour }) => ({
-      event,
-      lane,
-      left: startsAtHour * hourWidth,
-      width: Math.max(
-        minWidth,
-        (endsAtHour - startsAtHour) * hourWidth - CARD_INSET,
-      ),
-      startLabel: formatTime(new Date(event.startsAt)),
-    }),
-  );
 }
 
 /**

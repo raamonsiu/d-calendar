@@ -39,26 +39,24 @@ import {
 import { useShownIndex } from './useShownIndex';
 
 /**
- * Days that can be scrolled through, counted from the one the grid opens on and
- * cut short by the read window when the grid opens near one of its edges.
+ * Days that can be paged through, counted from the one the view opens on and
+ * cut short by the read window when it opens near one of its edges.
  *
- * The columns are all mounted at once: a grid that pins its hours on the left
- * and its days on top cannot hand the horizontal axis to a virtualised list
- * without every column growing its own vertical scroll. A month back and two
- * forward is as far as this view is worth reading anyway; beyond that the month
+ * The pages are all mounted at once: a grid that pins its hours on the left
+ * and its day on top cannot hand the horizontal axis to a virtualised list
+ * without every page growing its own vertical scroll. A month back and two
+ * forward is as far as a day at a time is worth paging; beyond that the month
  * view is what answers.
  */
 const MAX_DAYS_BEFORE = 30;
 const MAX_DAYS_AFTER = 60;
 
-/** Width of a day column and height of the row naming the days. */
-const DAY_COLUMN_WIDTH = 104;
-const HEADER_HEIGHT = 34;
+/** Height of the row naming the day. */
+const HEADER_HEIGHT = 26;
 
 /**
- * Chips of all-day events a column draws before collapsing the rest into a
- * count. Two, because the heading takes its room from the grid and a column is
- * only ~104px wide: what fits there is a hint, not a list.
+ * Chips of all-day events the heading draws before collapsing the rest into a
+ * count. Two, because the heading takes its room from the hours underneath.
  */
 const MAX_ALL_DAY_ROWS = 2;
 
@@ -68,38 +66,44 @@ const OPEN_HOUR = 8;
 /** The opening position leaves a little room above the hour it lands on. */
 const OPEN_MARGIN = 20;
 
-type DayExpandedProps = {
+type DayViewProps = {
   /** Events of every day, from `eventsByDay`. */
   eventsByDay: Map<string, CalEvent[]>;
-  /** Day the grid opens on. Read once, when it mounts. */
+  /** Day the view opens on. Read once, when it mounts. */
   initialDay: Date;
-  /** Reports the day the grid has been scrolled to. */
+  /** Reports the day the view has been paged to. */
   onShowDay: (day: Date) => void;
   onPressEvent: (event: CalEvent) => void;
 };
 
 /**
- * Expanded day view: hours going down, days going across, which is the way a
- * calendar is usually read. A card is as tall as its event lasts, so a morning
- * looks like a morning instead of like a row of equal boxes.
+ * Day view: one day across the whole box, its hours going down from 00 to 23.
+ * A card is as tall as its event lasts, so a morning looks like a morning
+ * instead of like a row of equal boxes.
  *
- * The hour column stays pinned on the left and the day names pinned on top. To
- * pull that off, the column lives outside the horizontal scroll and is moved
+ * The two axes do two different things. Up and down travels the hours of the
+ * day and stops dead at both ends - there is nothing above midnight or below
+ * 23:59 of this day to bounce into. Sideways pages a whole day at a time, so a
+ * swipe is "the next day" and never half of two.
+ *
+ * The hour column stays pinned on the left and the day's name pinned on top.
+ * To pull that off, the column lives outside the horizontal scroll and is moved
  * vertically by the same offset as the content, read on the UI thread.
  */
-export function DayExpanded({
+export function DayView({
   eventsByDay,
   initialDay,
   onShowDay,
   onPressEvent,
-}: DayExpandedProps) {
-  const [height, setHeight] = useState(0);
+}: DayViewProps) {
+  const [box, setBox] = useState({ width: 0, height: 0 });
   const scrollY = useSharedValue(0);
+  const pageWidth = Math.max(0, box.width - HOUR_GUTTER_WIDTH);
 
   /**
-   * The days are laid out around the one the grid opens on, which is read once:
-   * `initialDay` is a starting position and not a command, so a later scroll
-   * never fights the day the parent last heard about.
+   * The days are laid out around the one the view opens on, which is read
+   * once: `initialDay` is a starting position and not a command, so a later
+   * swipe never fights the day the parent last heard about.
    */
   const [openingDay] = useState(() => startOfDay(initialDay));
 
@@ -135,28 +139,23 @@ export function DayExpanded({
     transform: [{ translateY: -scrollY.value }],
   }));
 
-  /**
-   * The day being shown is the one under the left edge of the grid: with two or
-   * three columns on screen, that is the one the header is naming.
-   */
+  /** Paging makes this exact: the view settles on a whole page, so the index is a division. */
   const onScrollHorizontal = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
   ) => {
+    if (pageWidth === 0) return;
     reportIndex(
       Math.min(
         days.length - 1,
-        Math.max(
-          0,
-          Math.round(event.nativeEvent.contentOffset.x / DAY_COLUMN_WIDTH),
-        ),
+        Math.max(0, Math.round(event.nativeEvent.contentOffset.x / pageWidth)),
       ),
     );
   };
 
   /**
-   * The heading is as tall as the busiest day on screen needs, and every column
-   * gets that height whether it uses it or not: they sit in one row, so a
-   * heading that grew only where there was something would leave the grids
+   * The heading is as tall as the busiest day needs, and every page gets that
+   * height whether it uses it or not: the pages share one vertical scroll, so
+   * a heading that grew only where there was something would leave the hours
    * underneath starting at different heights.
    */
   const allDayByDay = useMemo(
@@ -173,12 +172,17 @@ export function DayExpanded({
       MAX_ALL_DAY_ROWS,
     );
 
-  const bodyHeight = Math.max(0, height - headerHeight);
+  const bodyHeight = Math.max(0, box.height - headerHeight);
 
   return (
     <View
       style={styles.root}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
+      onLayout={(event) =>
+        setBox({
+          width: event.nativeEvent.layout.width,
+          height: event.nativeEvent.layout.height,
+        })
+      }>
       <View style={styles.gutter}>
         <View style={{ height: headerHeight }} />
         <View style={[styles.gutterClip, { height: bodyHeight }]}>
@@ -188,19 +192,26 @@ export function DayExpanded({
         </View>
       </View>
 
-      {height > 0 ? (
+      {pageWidth > 0 && box.height > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: daysBefore * DAY_COLUMN_WIDTH, y: 0 }}
+          snapToInterval={pageWidth}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          bounces={false}
+          overScrollMode="never"
+          contentOffset={{ x: daysBefore * pageWidth, y: 0 }}
           onScroll={onScrollHorizontal}
           scrollEventThrottle={32}>
-          <View style={{ width: days.length * DAY_COLUMN_WIDTH }}>
+          <View style={{ width: days.length * pageWidth }}>
             <View style={[styles.header, { height: headerHeight }]}>
               {days.map((day, index) => (
                 <DayHeading
                   key={dayKey(day)}
                   day={day}
+                  width={pageWidth}
                   allDay={allDayByDay[index]}
                   onPressEvent={onPressEvent}
                 />
@@ -211,15 +222,18 @@ export function DayExpanded({
               onScroll={onScrollVertical}
               scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
+              bounces={false}
+              overScrollMode="never"
               contentOffset={{ x: 0, y: openingTop }}
               style={{ height: bodyHeight }}>
               <View style={styles.body}>
                 <HourGridRows />
 
                 {days.map((day) => (
-                  <DayColumn
+                  <DayPage
                     key={dayKey(day)}
                     day={day}
+                    width={pageWidth}
                     events={eventsByDay.get(dayKey(day)) ?? []}
                     onPressEvent={onPressEvent}
                   />
@@ -234,19 +248,21 @@ export function DayExpanded({
 }
 
 /**
- * Name and number of a day, in the row pinned above the grid, with whatever the
- * day holds that has no hour underneath.
+ * Initial and number of a day, in the row pinned above the hours, with
+ * whatever the day holds that has no hour underneath.
  *
  * This is where an all-day event belongs in this view: the row does not scroll
- * with the hours, so the chip stays in sight wherever the grid has been dragged
- * to, which is the one thing a block on the grid could not do.
+ * with the hours, so the chip stays in sight wherever the hours have been
+ * dragged to, which is the one thing a block on the grid could not do.
  */
 function DayHeading({
   day,
+  width,
   allDay,
   onPressEvent,
 }: {
   day: Date;
+  width: number;
   allDay: CalEvent[];
   onPressEvent: (event: CalEvent) => void;
 }) {
@@ -256,7 +272,7 @@ function DayHeading({
   const hidden = allDay.length - MAX_ALL_DAY_ROWS;
 
   return (
-    <View style={styles.heading}>
+    <View style={[styles.heading, { width }]}>
       <View style={styles.headingRow}>
         <AppText
           style={[
@@ -290,30 +306,32 @@ function DayHeading({
 }
 
 /**
- * One day of the grid: its own vertical strip, with the events placed by hour
+ * One day of the view: its own vertical strip, with the events placed by hour
  * and the "now" line when the day is today.
  */
-function DayColumn({
+function DayPage({
   day,
+  width,
   events,
   onPressEvent,
 }: {
   day: Date;
+  width: number;
   events: CalEvent[];
   onPressEvent: (event: CalEvent) => void;
 }) {
   const accent = useAccent();
   const { timed } = splitAllDay(events);
-  const laidOut = layoutDayColumn(timed, HOUR_HEIGHT, DAY_COLUMN_WIDTH);
+  const laidOut = layoutDayColumn(timed, HOUR_HEIGHT, width);
   const nowTop = isToday(day) ? hourToTop(decimalHours(new Date())) : null;
 
   return (
-    <View style={styles.column}>
+    <View style={[styles.page, { width }]}>
       {nowTop !== null ? (
         <View style={[styles.nowLine, { top: nowTop, backgroundColor: accent }]} />
       ) : null}
 
-      {laidOut.map(({ event, top, height, left, width, startLabel }) => (
+      {laidOut.map(({ event, top, height, left, width: cardWidth, startLabel }) => (
         <Pressable
           key={event.id}
           accessibilityRole="button"
@@ -325,7 +343,7 @@ function DayColumn({
               top,
               height,
               left,
-              width,
+              width: cardWidth,
               borderColor: pressed ? color.outline : color.border,
               backgroundColor: pressed ? color.cardPressed : color.cardHover,
             },
@@ -346,7 +364,6 @@ const styles = StyleSheet.create({
   gutterClip: { overflow: 'hidden' },
   header: { flexDirection: 'row', backgroundColor: color.box },
   heading: {
-    width: DAY_COLUMN_WIDTH,
     gap: CHIP_GAP,
     paddingHorizontal: 3,
     borderLeftWidth: 1,
@@ -354,15 +371,15 @@ const styles = StyleSheet.create({
   },
   headingRow: {
     height: HEADER_HEIGHT,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
+    gap: 6,
+    paddingLeft: 5,
   },
   headingInitial: { fontSize: 8, letterSpacing: 1.4 },
   headingNumber: { fontSize: 15 },
   body: { height: DAY_HEIGHT, flexDirection: 'row' },
-  column: {
-    width: DAY_COLUMN_WIDTH,
+  page: {
     height: DAY_HEIGHT,
     borderLeftWidth: 1,
     borderLeftColor: color.lineSoft,

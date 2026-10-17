@@ -5,13 +5,8 @@ import { AppText } from '@/theme/Text';
 import { color } from '@/theme/tokens';
 
 /**
- * The hour grid of the expanded day view: hours going down, days going across,
- * which is the way a calendar is usually read.
- *
- * It is the same day as `hourRail`, turned on its side, and it is a separate
- * file for the same reason the two views are separate: the measurements have
- * nothing to do with each other. An hour is comfortable at 62px wide and cramped
- * at 62px tall.
+ * The hour grid of the day view: hours going down, which is the way a
+ * calendar is usually read, and the axis a day has a top and a bottom on.
  */
 
 /** Height of one hour in px. */
