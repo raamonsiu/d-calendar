@@ -93,6 +93,9 @@ export type WeekStart = 'Lunes' | 'Sábado' | 'Domingo';
  */
 export type LastChanceWeeklyDay = 'Penúltimo' | 'Último';
 
+/** View of the calendar box on Home, as the preference persists it. */
+export type CalendarView = 'Día' | 'Semana' | 'Mes';
+
 export type Availability = 'Ocupado' | 'Libre';
 export type Visibility = 'Predet.' | 'Privado' | 'Público';
 export type RepeatRule = 'No' | 'Cada día' | 'Días de la semana' | 'Cada mes';

@@ -10,12 +10,12 @@ import {
 import { AccessibilityInfo } from 'react-native';
 
 import { detectLanguage, type Language } from '@/lib/language';
-import type { LastChanceWeeklyDay, WeekStart } from '@/types';
+import type { CalendarView, LastChanceWeeklyDay, WeekStart } from '@/types';
 import i18n from './i18n';
 import { color } from './tokens';
 
 export type { Language };
-export type { LastChanceWeeklyDay };
+export type { CalendarView, LastChanceWeeklyDay };
 
 /**
  * Key the preferences are stored under. Exported because the home screen
@@ -87,6 +87,11 @@ export type Preferences = {
    * from 0 to 10. Zero is how it is turned off: there is no separate switch.
    */
   welcomeSeconds: number;
+  /**
+   * View the calendar box on Home was last left on, so the app opens on the
+   * same one it was closed on.
+   */
+  calendarView: CalendarView;
   reduceMotion: boolean;
   mono: boolean;
   /**
@@ -145,6 +150,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   lastChanceWeeklyDay: 'Último',
   lastChanceWeeklyTime: DEFAULT_DAY_END_TIME,
   welcomeSeconds: DEFAULT_WELCOME_SECONDS,
+  calendarView: 'Día',
   reduceMotion: false,
   mono: false,
   highContrast: false,

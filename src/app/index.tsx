@@ -15,10 +15,11 @@
  *   or a habit.
  * - `/settings`, `/help` and `/about` from the side menu.
  *
- * The calendar box has four states, combining mode (day or week) with size
- * (collapsed or expanded). All four travel through days, and the one they are
- * showing is kept here: switching between them keeps the day, and tapping a day
- * in the week or month view opens it in the day strip.
+ * The calendar box has three views - day, week and month - picked with the
+ * selector at its top left and remembered across launches. All three travel
+ * through days, and the one they are showing is kept here: switching between
+ * them keeps the day, and tapping a day in the week or month view opens it in
+ * the day view.
  */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -29,12 +30,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
 import { AgendaList } from '@/features/home/AgendaList';
 import { DayExpanded } from '@/features/home/DayExpanded';
-import { ModeColumn } from '@/features/home/ModeColumn';
 import { MonthExpanded } from '@/features/home/MonthExpanded';
 import { SideDrawer } from '@/features/home/SideDrawer';
-import { TodayTimeline } from '@/features/home/TodayTimeline';
 import { WeekStrip } from '@/features/home/WeekStrip';
-import { homeHeaderCopy, type CalendarMode } from '@/features/home/homeHeader';
+import { homeHeaderCopy } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
 import { dayEndClock, rolledOverHabits } from '@/lib/habits';
 import { eventCountsByDay, eventsByDay, tasksForHome } from '@/store/selectors';
@@ -43,21 +42,28 @@ import { useShownEvents } from '@/store/useShownEvents';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, layer, radius, size, space } from '@/theme/tokens';
+import type { CalendarView } from '@/types';
+import { Tabs } from '@/ui/Tabs';
 import { Cta, IconButton } from '@/ui/controls';
 import { ListIcon, PlusIcon } from '@/ui/icons';
 
-/** Height of the calendar box while collapsed. */
-const COLLAPSED_BOX_HEIGHT = 200;
+/** The three views of the calendar box, in the order the selector shows them. */
+const CALENDAR_VIEWS: { value: CalendarView; labelKey: string }[] = [
+  { value: 'Día', labelKey: 'home.viewDay' },
+  { value: 'Semana', labelKey: 'home.viewWeek' },
+  { value: 'Mes', labelKey: 'home.viewMonth' },
+];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { weekStart, dayEndTime, language } = usePrefs();
+  const { weekStart, dayEndTime, language, calendarView, setPreference } =
+    usePrefs();
   const accent = useAccent();
   const dayEnd = useMemo(() => dayEndClock(dayEndTime), [dayEndTime]);
 
-  const [mode, setMode] = useState<CalendarMode>('today');
-  const [expanded, setExpanded] = useState(false);
+  const setCalendarView = (next: CalendarView) =>
+    setPreference('calendarView', next);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addSourceOpen, setAddSourceOpen] = useState(false);
 
@@ -99,8 +105,7 @@ export default function HomeScreen() {
 
   const today = startOfDay(new Date());
   const header = homeHeaderCopy({
-    mode,
-    expanded,
+    view: calendarView,
     shownDay,
     dayEventCount: byDay.get(dayKey(shownDay))?.length ?? 0,
     weekEventCount,
@@ -110,14 +115,14 @@ export default function HomeScreen() {
   });
 
   /**
-   * Opens a day tapped in the week or the month view: the day strip, scrolled
+   * Opens a day tapped in the week or the month view: the day view, scrolled
    * to it. It is the view that answers "what is happening that day", which is
-   * the question the tap asked.
+   * the question the tap asked. It is also the view remembered from then on,
+   * since it is the one on screen.
    */
   const openDay = (day: Date) => {
     setShownDay(day);
-    setMode('today');
-    setExpanded(false);
+    setCalendarView('Día');
   };
 
   /**
@@ -125,18 +130,6 @@ export default function HomeScreen() {
    * the one that decides whether it can be changed.
    */
   const openItem = (id: string) => router.push(`/item/${id}`);
-
-  const modeColumn = (
-    <ModeColumn
-      label={header.modeLabel}
-      other={header.otherModeLabel}
-      expanded={expanded}
-      onToggleMode={() =>
-        setMode((current) => (current === 'today' ? 'week' : 'today'))
-      }
-      onToggleExpand={() => setExpanded((current) => !current)}
-    />
-  );
 
   return (
     <View style={styles.root}>
@@ -166,59 +159,57 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        {expanded ? (
-          <View style={[styles.box, styles.boxExpanded]}>
-            {modeColumn}
-            {mode === 'today' ? (
-              <DayExpanded
-                eventsByDay={byDay}
-                initialDay={shownDay}
-                onShowDay={setShownDay}
-                onPressEvent={(event) => openItem(event.id)}
-              />
-            ) : (
-              <MonthExpanded
-                counts={counts}
-                initialDay={shownDay}
-                onShowMonth={setShownDay}
-                onPressDay={openDay}
-              />
-            )}
-          </View>
-        ) : (
-          <View style={styles.collapsed}>
-            <View style={[styles.box, styles.boxCollapsed]}>
-              {modeColumn}
-              {mode === 'today' ? (
-                <TodayTimeline
+        <View style={styles.body}>
+          <View style={styles.box}>
+            <Tabs
+              compact
+              accessibilityLabel={t('home.calendarViewLabel')}
+              options={CALENDAR_VIEWS.map(({ value, labelKey }) => ({
+                value,
+                label: t(labelKey),
+              }))}
+              value={calendarView}
+              onChange={setCalendarView}
+            />
+
+            <View style={styles.boxContent}>
+              {calendarView === 'Día' ? (
+                <DayExpanded
                   eventsByDay={byDay}
                   initialDay={shownDay}
                   onShowDay={setShownDay}
                   onPressEvent={(event) => openItem(event.id)}
                 />
-              ) : (
+              ) : calendarView === 'Semana' ? (
                 <WeekStrip
                   counts={counts}
                   initialDay={shownDay}
                   onShowWeek={setShownDay}
                   onPressDay={openDay}
                 />
+              ) : (
+                <MonthExpanded
+                  counts={counts}
+                  initialDay={shownDay}
+                  onShowMonth={setShownDay}
+                  onPressDay={openDay}
+                />
               )}
             </View>
-
-            <View style={styles.agendaBox}>
-              <AgendaList
-                tasks={visibleTasks}
-                habits={shownHabits}
-                onToggleTask={toggleTask}
-                onBumpHabit={(id, delta) =>
-                  bumpHabit(id, delta, weekStart, dayEnd)
-                }
-                onOpenItem={openItem}
-              />
-            </View>
           </View>
-        )}
+
+          <View style={styles.agendaBox}>
+            <AgendaList
+              tasks={visibleTasks}
+              habits={shownHabits}
+              onToggleTask={toggleTask}
+              onBumpHabit={(id, delta) =>
+                bumpHabit(id, delta, weekStart, dayEnd)
+              }
+              onOpenItem={openItem}
+            />
+          </View>
+        </View>
 
         <Cta
           label={t('home.createButtonLabel')}
@@ -281,18 +272,18 @@ const styles = StyleSheet.create({
     color: color.label,
     textTransform: 'uppercase',
   },
-  collapsed: { flex: 1, gap: 10 },
+  body: { flex: 1, gap: 10 },
   box: {
+    height: '40%',
     backgroundColor: color.box,
     borderWidth: 1,
     borderColor: color.borderBox,
     borderRadius: radius.box,
     padding: 11,
-    flexDirection: 'row',
     gap: 10,
+    overflow: 'hidden',
   },
-  boxCollapsed: { height: COLLAPSED_BOX_HEIGHT, overflow: 'hidden' },
-  boxExpanded: { flex: 1, overflow: 'hidden' },
+  boxContent: { flex: 1, minHeight: 0 },
   agendaBox: {
     flex: 1,
     backgroundColor: color.box,

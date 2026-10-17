@@ -28,6 +28,7 @@ import {
 } from '@/theme/tokens';
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
+import { Tabs } from '@/ui/Tabs';
 import { Cta, Divider, OptionRow } from '@/ui/controls';
 import { TrashIcon, XIcon } from '@/ui/icons';
 import { useDateTimePicker } from '@/ui/pickers';
@@ -399,38 +400,17 @@ function KindTabs({
   onChange: (next: ItemKind) => void;
 }) {
   const { t } = useTranslation();
-  const accent = useAccent();
 
   return (
-    <View style={styles.tabs}>
-      {KINDS.map(({ value, labelKey }) => {
-        const selected = kind === value;
-        return (
-          <Pressable
-            key={value}
-            accessibilityRole="tab"
-            accessibilityState={{ selected, disabled: locked }}
-            disabled={locked}
-            onPress={() => onChange(value)}
-            style={[styles.tab, selected && styles.tabSelected]}>
-            <View
-              style={[
-                styles.tabDot,
-                { backgroundColor: selected ? accent : 'transparent' },
-              ]}
-            />
-            <AppText
-              style={{
-                fontSize: 9.5,
-                letterSpacing: 1.2,
-                color: selected ? color.text : color.label,
-              }}>
-              {t(`create.${labelKey}`)}
-            </AppText>
-          </Pressable>
-        );
-      })}
-    </View>
+    <Tabs
+      options={KINDS.map(({ value, labelKey }) => ({
+        value,
+        label: t(`create.${labelKey}`),
+      }))}
+      value={kind}
+      locked={locked}
+      onChange={onChange}
+    />
   );
 }
 
@@ -479,27 +459,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabs: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 3,
-    backgroundColor: color.surface,
-    borderRadius: radius.segment,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    height: 30,
-    borderRadius: radius.chip,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  tabSelected: { backgroundColor: color.control, borderColor: color.edge },
-  tabDot: { width: 4, height: 4, borderRadius: 2 },
   scroll: { gap: 10, paddingBottom: 4 },
   blocks: { gap: BLOCK_GAP },
   titleBlock: {
