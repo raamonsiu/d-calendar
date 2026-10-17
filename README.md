@@ -39,7 +39,7 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.2.3.** The app is complete and usable, but this is still an early
+> **Alpha 1.3.0.** The app is complete and usable, but this is still an early
 > public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.
@@ -63,8 +63,12 @@ device language at first launch and changeable in Settings.
 
 ### Calendar
 
-- **Four views on one screen** - today, the week, the expanded day and the
-  expanded month, switched without leaving Home.
+- **Day, week and month on one screen** - picked with a selector at the top
+  of the calendar box and remembered across launches. The day reads its hours
+  top to bottom and pages a day at a time; the week lists each day's events in
+  its own column.
+- **A calendar box that makes room for itself** - it takes whatever the task
+  and habit list leaves free, from 40% of the screen up to 70%.
 - **Every day an event touches** - one that repeats is drawn on each day it
   repeats on, a night that runs past midnight on both of them, and a trip on
   all of its days.

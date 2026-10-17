@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.2.3-alpha';
-export const APP_BUILD = '7';
+export const APP_VERSION = '1.3.0-alpha';
+export const APP_BUILD = '8';
 
 /** Every release up to 1.1.1 came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -39,6 +39,33 @@ const OCTOBER_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.3.0-alpha',
+    date: OCTOBER_2026,
+    notes: {
+      es: [
+        'Nuevo selector Día / Semana / Mes arriba a la izquierda del calendario, en lugar de los dos botones de la columna. La app recuerda la última vista que elegiste.',
+        'El día se lee ahora de arriba abajo, de 00 a 23 y sin pasarse de ninguno de los dos extremos; deslizando a los lados pasas de un día al siguiente.',
+        'La semana muestra en cada columna los títulos de los eventos de ese día, y un «+N» cuando no caben todos. Tocar un día lo abre en la vista de día.',
+        'El calendario es más alto: ocupa como mínimo el 40% de la pantalla y crece hasta el 70% cuando tienes pocas tareas y hábitos.',
+        'Desaparece el botón de expandir: el calendario ya se hace sitio solo.',
+      ],
+      en: [
+        'New Day / Week / Month selector at the top left of the calendar, instead of the two buttons in the column. The app remembers the last view you picked.',
+        'The day now reads top to bottom, from 00 to 23 without going past either end; swiping sideways moves from one day to the next.',
+        "Each column of the week shows the titles of that day's events, and a \"+N\" when they don't all fit. Tapping a day opens it in the day view.",
+        'The calendar is taller: it takes at least 40% of the screen and grows up to 70% when you have few tasks and habits.',
+        'The expand button is gone: the calendar now makes room for itself.',
+      ],
+      ca: [
+        'Nou selector Dia / Setmana / Mes a dalt a l’esquerra del calendari, en lloc dels dos botons de la columna. L’app recorda l’última vista que vas triar.',
+        'El dia es llegeix ara de dalt a baix, de 00 a 23 i sense passar-se de cap dels dos extrems; lliscant als costats passes d’un dia al següent.',
+        'La setmana mostra a cada columna els títols dels esdeveniments d’aquell dia, i un «+N» quan no hi caben tots. Tocar un dia l’obre a la vista de dia.',
+        'El calendari és més alt: ocupa com a mínim el 40% de la pantalla i creix fins al 70% quan tens poques tasques i hàbits.',
+        'Desapareix el botó d’expandir: el calendari ja es fa lloc sol.',
+      ],
+    },
+  },
   {
     version: '1.2.3-alpha',
     date: OCTOBER_2026,
