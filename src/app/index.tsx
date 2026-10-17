@@ -22,9 +22,15 @@
  * the day view.
  */
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
@@ -36,12 +42,21 @@ import { WeekView } from '@/features/home/WeekView';
 import { homeHeaderCopy } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
 import { dayEndClock, rolledOverHabits } from '@/lib/habits';
+import { calendarBoxHeight, settledHeight } from '@/lib/layout';
 import { eventCountsByDay, eventsByDay, tasksForHome } from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
 import { useShownEvents } from '@/store/useShownEvents';
 import { AppText } from '@/theme/Text';
-import { useAccent, usePrefs } from '@/theme/prefs';
-import { color, layer, radius, size, space } from '@/theme/tokens';
+import { useAccent, useDuration, usePrefs } from '@/theme/prefs';
+import {
+  EASE_OUT,
+  color,
+  duration,
+  layer,
+  radius,
+  size,
+  space,
+} from '@/theme/tokens';
 import type { CalendarView } from '@/types';
 import { Tabs } from '@/ui/Tabs';
 import { Cta, IconButton } from '@/ui/controls';
@@ -54,12 +69,25 @@ const CALENDAR_VIEWS: { value: CalendarView; labelKey: string }[] = [
   { value: 'Mes', labelKey: 'home.viewMonth' },
 ];
 
+/** Room between the calendar box and the list under it. */
+const BODY_GAP = 10;
+
+/** Top and bottom border of the list's box, which its content does not count. */
+const AGENDA_BORDERS = 2;
+
+/**
+ * Smallest change of height the calendar box moves for: below it, ticking a
+ * habit or a task would make the box twitch for a few pixels.
+ */
+const BOX_HEIGHT_THRESHOLD = 24;
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { weekStart, dayEndTime, language, calendarView, setPreference } =
     usePrefs();
   const accent = useAccent();
+  const resolveDuration = useDuration();
   const dayEnd = useMemo(() => dayEndClock(dayEndTime), [dayEndTime]);
 
   const setCalendarView = (next: CalendarView) =>
@@ -73,6 +101,52 @@ export default function HomeScreen() {
    * day instead of jumping back to today.
    */
   const [shownDay, setShownDay] = useState(() => startOfDay(new Date()));
+
+  /**
+   * The calendar box takes whatever the list under it leaves free, between
+   * 40% and 70% of the room the two share (`calendarBoxHeight`). The height
+   * it settles on is adjusted during render and only moves for a change worth
+   * seeing (`settledHeight`); the box then glides to it.
+   */
+  const [bodyHeight, setBodyHeight] = useState(0);
+  const [agendaHeight, setAgendaHeight] = useState(0);
+  const [boxHeight, setBoxHeight] = useState(0);
+  const targetBoxHeight = calendarBoxHeight(
+    bodyHeight,
+    agendaHeight + AGENDA_BORDERS,
+    BODY_GAP,
+  );
+  const nextBoxHeight = settledHeight(
+    boxHeight,
+    targetBoxHeight,
+    BOX_HEIGHT_THRESHOLD,
+  );
+  if (nextBoxHeight !== boxHeight) setBoxHeight(nextBoxHeight);
+
+  const animatedBoxHeight = useSharedValue(0);
+
+  /**
+   * The first height is taken at once, so the box does not grow out of
+   * nothing when Home opens; every later one is a glide.
+   */
+  useEffect(() => {
+    if (boxHeight <= 0) return;
+    animatedBoxHeight.value =
+      animatedBoxHeight.value <= 0
+        ? boxHeight
+        : withTiming(boxHeight, {
+            duration: resolveDuration(duration.panel),
+            easing: Easing.bezier(...EASE_OUT),
+          });
+  }, [boxHeight, animatedBoxHeight, resolveDuration]);
+
+  /**
+   * Until the room has been measured the box keeps the 40% its stylesheet
+   * gives it, rather than starting at nothing.
+   */
+  const boxHeightStyle = useAnimatedStyle(() =>
+    animatedBoxHeight.value > 0 ? { height: animatedBoxHeight.value } : {},
+  );
 
   const tasks = useAppStore((state) => state.tasks);
   const habits = useAppStore((state) => state.habits);
@@ -159,8 +233,10 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        <View style={styles.body}>
-          <View style={styles.box}>
+        <View
+          style={styles.body}
+          onLayout={(event) => setBodyHeight(event.nativeEvent.layout.height)}>
+          <Animated.View style={[styles.box, boxHeightStyle]}>
             <Tabs
               compact
               accessibilityLabel={t('home.calendarViewLabel')}
@@ -196,7 +272,7 @@ export default function HomeScreen() {
                 />
               )}
             </View>
-          </View>
+          </Animated.View>
 
           <View style={styles.agendaBox}>
             <AgendaList
@@ -207,6 +283,7 @@ export default function HomeScreen() {
                 bumpHabit(id, delta, weekStart, dayEnd)
               }
               onOpenItem={openItem}
+              onContentHeightChange={setAgendaHeight}
             />
           </View>
         </View>
@@ -272,7 +349,7 @@ const styles = StyleSheet.create({
     color: color.label,
     textTransform: 'uppercase',
   },
-  body: { flex: 1, gap: 10 },
+  body: { flex: 1, gap: BODY_GAP },
   box: {
     height: '40%',
     backgroundColor: color.box,

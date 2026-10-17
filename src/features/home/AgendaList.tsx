@@ -32,6 +32,11 @@ type AgendaListProps = {
   onBumpHabit: (id: string, delta: 1 | -1) => boolean;
   /** Opens the detail of a task or a habit. */
   onOpenItem: (id: string) => void;
+  /**
+   * Reports the height the list needs to show everything it holds, which is
+   * what lets Home give the calendar box whatever room the list leaves free.
+   */
+  onContentHeightChange?: (height: number) => void;
 };
 
 /**
@@ -40,7 +45,8 @@ type AgendaListProps = {
  * caption explains that a completed one disappears the next day.
  *
  * The habit grid is measured with `onLayout` and the cards are drawn once the
- * column width is known.
+ * column width is known. The height of the whole content is reported up as it
+ * changes, for Home to size the calendar box with.
  */
 export function AgendaList({
   tasks,
@@ -48,6 +54,7 @@ export function AgendaList({
   onToggleTask,
   onBumpHabit,
   onOpenItem,
+  onContentHeightChange,
 }: AgendaListProps) {
   const { t } = useTranslation();
   const [gridWidth, setGridWidth] = useState(0);
@@ -81,6 +88,7 @@ export function AgendaList({
       }
       stickySectionHeadersEnabled
       showsVerticalScrollIndicator={false}
+      onContentSizeChange={(_, height) => onContentHeightChange?.(height)}
       contentContainerStyle={styles.content}
       renderSectionHeader={({ section }) => (
         <View

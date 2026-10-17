@@ -48,3 +48,53 @@ export function indexOfDay(
   );
   return Math.min(days.length - 1, Math.max(0, offset));
 }
+
+/**
+ * Least and most of the room below the Home header the calendar box takes,
+ * as a share of it. The least is what the box needs for a few hours of a day
+ * or a few rows of a week to read; the most keeps the task and habit list
+ * from shrinking to its two headings.
+ */
+export const CALENDAR_MIN_SHARE = 0.4;
+export const CALENDAR_MAX_SHARE = 0.7;
+
+/**
+ * Height of the calendar box on Home: whatever the task and habit list leaves
+ * free, kept between `CALENDAR_MIN_SHARE` and `CALENDAR_MAX_SHARE` of the room
+ * the two share.
+ *
+ * Precondition: every argument is in px; `available` is 0 while it has not
+ * been measured. Postcondition: 0 while there is no room measured, otherwise a
+ * height between the two shares of `available`, inclusive.
+ *
+ * @param available Room the box and the list share, gap included.
+ * @param listContent Height the list needs to show all it holds.
+ * @param gap Room between the box and the list.
+ */
+export function calendarBoxHeight(
+  available: number,
+  listContent: number,
+  gap: number,
+) {
+  if (available <= 0) return 0;
+  const least = available * CALENDAR_MIN_SHARE;
+  const most = available * CALENDAR_MAX_SHARE;
+  return Math.min(most, Math.max(least, available - gap - listContent));
+}
+
+/**
+ * The height a box settles on, given the one it has and the one it is asked
+ * to take: a change smaller than `threshold` is ignored, so ticking a habit
+ * that moves the list by a few pixels does not make the box twitch.
+ *
+ * Postcondition: `target` when `current` is 0 or less (nothing settled yet)
+ * or when the two are at least `threshold` apart; `current` otherwise.
+ *
+ * @param current Height the box has now.
+ * @param target Height it is being asked to take.
+ * @param threshold Smallest change worth moving for.
+ */
+export function settledHeight(current: number, target: number, threshold: number) {
+  if (current <= 0) return target;
+  return Math.abs(target - current) < threshold ? current : target;
+}
