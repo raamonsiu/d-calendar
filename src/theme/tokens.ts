@@ -275,6 +275,8 @@ export const tint = {
   todayPressed: 0.2,
   /** Track of a switch that is on. */
   track: 0.22,
+  /** Countdown bar of a toast while it has all its time left. */
+  countdown: 0.6,
 } as const;
 
 /**

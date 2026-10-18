@@ -4,10 +4,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { color, space } from '@/theme/tokens';
 import { ScreenHeader } from './ScreenHeader';
+import { ToastSlot } from './Toast';
 
 /** Room above the header and below the last group, on top of the safe area. */
 const TOP_PADDING = 12;
 const BOTTOM_PADDING = 14;
+
+/** Gap between the header, the scroll, the toast and the footer. */
+const SCREEN_GAP = 12;
 
 /** Gap between groups on a list screen. */
 const GROUP_GAP = 16;
@@ -69,6 +73,8 @@ export function SecondaryScreen({
           {children}
         </ScrollView>
 
+        <ToastSlot gap={SCREEN_GAP} />
+
         {footer}
       </View>
       {overlays}
@@ -78,6 +84,6 @@ export function SecondaryScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.background },
-  screen: { flex: 1, paddingHorizontal: space.screen, gap: 12 },
+  screen: { flex: 1, paddingHorizontal: space.screen, gap: SCREEN_GAP },
   content: { paddingBottom: 6 },
 });

@@ -62,6 +62,7 @@ import type { CalendarView } from '@/types';
 import { Tabs } from '@/ui/Tabs';
 import { Cta, IconButton } from '@/ui/controls';
 import { ListIcon, PlusIcon } from '@/ui/icons';
+import { ToastSlot } from '@/ui/Toast';
 
 /** The three views of the calendar box, in the order the selector shows them. */
 const CALENDAR_VIEWS: { value: CalendarView; labelKey: string }[] = [
@@ -69,6 +70,9 @@ const CALENDAR_VIEWS: { value: CalendarView; labelKey: string }[] = [
   { value: 'Semana', labelKey: 'home.viewWeek' },
   { value: 'Mes', labelKey: 'home.viewMonth' },
 ];
+
+/** Room between the header, the body, the toast and the create button. */
+const SCREEN_GAP = 10;
 
 /** Room between the calendar box and the list under it. */
 const BODY_GAP = 10;
@@ -310,6 +314,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <ToastSlot gap={SCREEN_GAP} />
+
         <Cta
           label={t('home.createButtonLabel')}
           onPress={() => router.push('/create')}
@@ -338,7 +344,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: space.screen,
-    gap: 10,
+    gap: SCREEN_GAP,
   },
   header: {
     /**

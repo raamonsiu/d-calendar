@@ -29,6 +29,7 @@ import {
 import { Field } from '@/ui/Field';
 import { Sheet } from '@/ui/Sheet';
 import { Tabs } from '@/ui/Tabs';
+import { ToastSlot } from '@/ui/Toast';
 import { Cta, Divider, OptionRow } from '@/ui/controls';
 import { TrashIcon, XIcon } from '@/ui/icons';
 import { useDateTimePicker } from '@/ui/pickers';
@@ -61,6 +62,9 @@ const COPY_KEYS: Record<ItemKind, { placeholder: string; cta: string }> = {
 
 /** Side of the close button in the top bar. */
 const CLOSE_SIZE = 30;
+
+/** Gap between the form's top bar, its scroll, the toast and its button. */
+const SCREEN_GAP = 10;
 
 /** Delay before scrolling down: gives the new row time to mount. */
 const REVEAL_DELAY_MS = 60;
@@ -270,6 +274,8 @@ export function ItemForm({ editing }: { editing?: Editing }) {
           ) : null}
         </ScrollView>
 
+        <ToastSlot gap={SCREEN_GAP} />
+
         {form.isEditing ? (
           /**
            * No slot is reserved for this: the ScrollView above has no fixed
@@ -443,7 +449,7 @@ function TitleBlock({ form }: { form: ItemFormState }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.background },
-  screen: { flex: 1, paddingHorizontal: space.screen, gap: 10 },
+  screen: { flex: 1, paddingHorizontal: space.screen, gap: SCREEN_GAP },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
