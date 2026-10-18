@@ -5,6 +5,8 @@ import { AppText } from '@/theme/Text';
 import { useAccent } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
+import { CaretRightIcon } from '@/ui/icons';
+import { CHIP_HEIGHT } from './allDayBand';
 
 /**
  * Events with no hour, drawn as a chip instead of as a block on the grid.
@@ -18,39 +20,12 @@ import type { CalEvent } from '@/types';
  * places handoff §6 allows the accent. Nothing else here has colour.
  */
 
-/** Height of one chip, and the gap between two of them. */
-export const CHIP_HEIGHT = 20;
-export const CHIP_GAP = 3;
-
-/**
- * How much room `count` chips add above a grid, capped at `maxRows`.
- *
- * The caller needs this before drawing, because what the chips take is taken
- * from the grid underneath and the grid has to be told how much is left. Each
- * row counts its own gap, which is the one separating it from whatever sits
- * above it: the heading for the first, the previous chip for the rest.
- *
- * Postcondition: 0 for a day with nothing, so a day with no all-day events adds
- * no room at all rather than an empty strip.
- *
- * @param count How many all-day events the day holds.
- * @param maxRows Most chips that may be drawn.
- */
-export function allDayHeight(count: number, maxRows: number) {
-  return Math.min(count, maxRows) * (CHIP_HEIGHT + CHIP_GAP);
-}
-
-/**
- * One all-day event. `extra` turns it into the last chip of a band that did not
- * fit, which says how many are left instead of naming one of them.
- */
+/** One all-day event, named, which opens it. */
 export function AllDayChip({
   event,
-  extra,
   onPress,
 }: {
   event: CalEvent;
-  extra?: number;
   onPress: (event: CalEvent) => void;
 }) {
   const { t } = useTranslation();
@@ -59,22 +34,48 @@ export function AllDayChip({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={
-        extra
-          ? t('home.allDayMore', { count: extra })
-          : t('home.allDayLabel', { title: event.title })
-      }
+      accessibilityLabel={t('home.allDayLabel', { title: event.title })}
       onPress={() => onPress(event)}
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor: pressed ? color.cardPressed : color.cardHover },
       ]}>
-      {extra ? null : (
-        <View style={[styles.dot, { backgroundColor: accent }]} />
-      )}
+      <View style={[styles.dot, { backgroundColor: accent }]} />
       <AppText numberOfLines={1} style={styles.title}>
-        {extra ? `+${extra}` : event.title}
+        {event.title}
       </AppText>
+    </Pressable>
+  );
+}
+
+/**
+ * The last chip of a band that did not fit: how many are left, and the way to
+ * see them. It is outlined and ends in a caret, unlike the flat chips above
+ * it, so it reads as something to tap and not as one more event.
+ */
+export function AllDayMoreChip({
+  count,
+  onPress,
+}: {
+  count: number;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('home.allDayMore', { count })}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        styles.moreChip,
+        { backgroundColor: pressed ? color.cardPressed : color.hairline },
+      ]}>
+      <AppText numberOfLines={1} style={styles.moreLabel}>
+        {t('home.allDayMoreChip', { count })}
+      </AppText>
+      <CaretRightIcon size={10} color={color.textMuted} />
     </Pressable>
   );
 }
@@ -89,6 +90,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     overflow: 'hidden',
   },
+  moreChip: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: color.edge,
+    paddingHorizontal: 9,
+  },
   dot: { width: 5, height: 5, borderRadius: 2.5 },
   title: { flex: 1, fontSize: 10, color: color.textSoft },
+  moreLabel: { fontSize: 9, letterSpacing: 1, color: color.textStrong },
 });

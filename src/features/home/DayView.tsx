@@ -27,7 +27,8 @@ import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import { color, radius } from '@/theme/tokens';
 import type { CalEvent } from '@/types';
-import { AllDayChip, CHIP_GAP, allDayHeight } from './AllDayChip';
+import { AllDayChip, AllDayMoreChip } from './AllDayChip';
+import { CHIP_GAP, allDayBand, allDayHeight } from './allDayBand';
 import {
   DAY_HEIGHT,
   HOUR_GUTTER_WIDTH,
@@ -58,10 +59,18 @@ const HEADER_HEIGHT = 26;
 const ALL_DAY_FOOT = 5;
 
 /**
- * Chips of all-day events the heading draws before collapsing the rest into a
- * count. Two, because the heading takes its room from the hours underneath.
+ * Rows of all-day chips the heading takes at most: three named, or two and a
+ * "+N" that opens them all. The heading takes its room from the hours
+ * underneath, so it stops there.
  */
-const MAX_ALL_DAY_ROWS = 2;
+const MAX_ALL_DAY_ROWS = 3;
+
+/**
+ * Below this height a card has no room for its time and its title on separate
+ * lines - roughly anything under 45 minutes - so the two share one line
+ * instead of the title being cut off under the time.
+ */
+const INLINE_CARD_HEIGHT = 38;
 
 /** Hour the vertical scroll starts at: the beginning of the working day. */
 const OPEN_HOUR = 8;
@@ -77,6 +86,8 @@ type DayViewProps = {
   /** Reports the day the view has been paged to. */
   onShowDay: (day: Date) => void;
   onPressEvent: (event: CalEvent) => void;
+  /** Opens the full list of a day's all-day events, from its "+N" chip. */
+  onPressMoreAllDay: (day: Date) => void;
 };
 
 /**
@@ -98,6 +109,7 @@ export function DayView({
   initialDay,
   onShowDay,
   onPressEvent,
+  onPressMoreAllDay,
 }: DayViewProps) {
   const [box, setBox] = useState({ width: 0, height: 0 });
   const scrollY = useSharedValue(0);
@@ -220,6 +232,7 @@ export function DayView({
                   width={pageWidth}
                   allDay={allDayByDay[index]}
                   onPressEvent={onPressEvent}
+                  onPressMore={() => onPressMoreAllDay(day)}
                 />
               ))}
             </View>
@@ -255,7 +268,8 @@ export function DayView({
 
 /**
  * Name and number of a day, in the row pinned above the hours, with whatever
- * the day holds that has no hour underneath.
+ * the day holds that has no hour underneath: up to three chips, or two and a
+ * "+N" chip that opens the whole list (`allDayBand`).
  *
  * This is where an all-day event belongs in this view: the row does not scroll
  * with the hours, so the chip stays in sight wherever the hours have been
@@ -266,16 +280,18 @@ function DayHeading({
   width,
   allDay,
   onPressEvent,
+  onPressMore,
 }: {
   day: Date;
   width: number;
   allDay: CalEvent[];
   onPressEvent: (event: CalEvent) => void;
+  onPressMore: () => void;
 }) {
   const accent = useAccent();
   const { language } = usePrefs();
   const today = isToday(day);
-  const hidden = allDay.length - MAX_ALL_DAY_ROWS;
+  const { shown, more } = allDayBand(allDay, MAX_ALL_DAY_ROWS);
 
   return (
     <View style={[styles.heading, { width }]}>
@@ -297,23 +313,18 @@ function DayHeading({
         </AppText>
       </View>
 
-      {allDay.slice(0, MAX_ALL_DAY_ROWS).map((event, index) => (
-        <AllDayChip
-          key={event.id}
-          event={event}
-          extra={
-            index === MAX_ALL_DAY_ROWS - 1 && hidden > 0 ? hidden + 1 : undefined
-          }
-          onPress={onPressEvent}
-        />
+      {shown.map((event) => (
+        <AllDayChip key={event.id} event={event} onPress={onPressEvent} />
       ))}
+      {more > 0 ? <AllDayMoreChip count={more} onPress={onPressMore} /> : null}
     </View>
   );
 }
 
 /**
  * One day of the view: its own vertical strip, with the events placed by hour
- * and the "now" line when the day is today.
+ * and the "now" line when the day is today. A card too short for two lines
+ * (`INLINE_CARD_HEIGHT`) puts its time and title side by side.
  */
 function DayPage({
   day,
@@ -345,6 +356,7 @@ function DayPage({
           onPress={() => onPressEvent(event)}
           style={({ pressed }) => [
             styles.card,
+            height < INLINE_CARD_HEIGHT && styles.cardInline,
             {
               top,
               height,
@@ -355,7 +367,12 @@ function DayPage({
             },
           ]}>
           <AppText style={styles.cardTime}>{startLabel}</AppText>
-          <AppText numberOfLines={3} style={styles.cardTitle}>
+          <AppText
+            numberOfLines={height < INLINE_CARD_HEIGHT ? 1 : 3}
+            style={[
+              styles.cardTitle,
+              height < INLINE_CARD_HEIGHT && styles.cardTitleInline,
+            ]}>
             {event.title}
           </AppText>
         </Pressable>
@@ -407,6 +424,12 @@ const styles = StyleSheet.create({
     gap: 1,
     overflow: 'hidden',
   },
+  cardInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 0,
+  },
   cardTime: { fontSize: 8.5, letterSpacing: 0.6, color: color.textSubtle },
   cardTitle: {
     fontSize: 10,
@@ -414,4 +437,5 @@ const styles = StyleSheet.create({
     lineHeight: 12.5,
     color: color.textBody,
   },
+  cardTitleInline: { flex: 1 },
 });

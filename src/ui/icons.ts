@@ -8,8 +8,6 @@
 export { ArrowLeftIcon } from 'phosphor-react-native/src/icons/ArrowLeft';
 export { ArrowUpRightIcon } from 'phosphor-react-native/src/icons/ArrowUpRight';
 export { ArrowsClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowsClockwise';
-export { ArrowsInSimpleIcon } from 'phosphor-react-native/src/icons/ArrowsInSimple';
-export { ArrowsOutSimpleIcon } from 'phosphor-react-native/src/icons/ArrowsOutSimple';
 export { BellIcon } from 'phosphor-react-native/src/icons/Bell';
 export { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank';
 export { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
