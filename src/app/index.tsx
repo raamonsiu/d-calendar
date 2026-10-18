@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddSourceSheet } from '@/features/calendars/AddSourceSheet';
 import { AgendaList } from '@/features/home/AgendaList';
+import { AllDayDialog } from '@/features/home/AllDayDialog';
 import { DayView } from '@/features/home/DayView';
 import { MonthView } from '@/features/home/MonthView';
 import { SideDrawer } from '@/features/home/SideDrawer';
@@ -44,7 +45,12 @@ import { homeHeaderCopy } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
 import { dayEndClock, rolledOverHabits } from '@/lib/habits';
 import { calendarBoxHeight, settledHeight } from '@/lib/layout';
-import { eventCountsByDay, eventsByDay, tasksForHome } from '@/store/selectors';
+import {
+  eventCountsByDay,
+  eventsByDay,
+  splitAllDay,
+  tasksForHome,
+} from '@/store/selectors';
 import { useAppStore } from '@/store/useAppStore';
 import { useShownEvents } from '@/store/useShownEvents';
 import { AppText } from '@/theme/Text';
@@ -113,6 +119,14 @@ export default function HomeScreen() {
    * view is already the one on screen, scrolled somewhere else.
    */
   const [dayViewKey, setDayViewKey] = useState(0);
+
+  /**
+   * The day whose all-day list is open, from the "+N" chip of the day view.
+   * It is kept after closing so the dialog still has its list while it
+   * animates out.
+   */
+  const [allDayOpen, setAllDayOpen] = useState(false);
+  const [allDayDay, setAllDayDay] = useState<Date | null>(null);
 
   /**
    * The calendar box takes whatever the list under it leaves free, between
@@ -211,8 +225,15 @@ export default function HomeScreen() {
     setCalendarView('Día');
   };
 
+  /**
+   * Whether today is already what the box shows in the day view, which is
+   * where "Hoy" would land: then there is nowhere to go and the button rests.
+   */
+  const showingToday = calendarView === 'Día' && isSameDay(shownDay, today);
+
   /** The "Hoy" button: today, in the day view, whatever was on screen. */
   const goToToday = () => {
+    if (showingToday) return;
     setShownDay(startOfDay(new Date()));
     setCalendarView('Día');
     setDayViewKey((current) => current + 1);
@@ -270,7 +291,7 @@ export default function HomeScreen() {
                 value={calendarView}
                 onChange={setCalendarView}
               />
-              <TodayButton onPress={goToToday} />
+              <TodayButton disabled={showingToday} onPress={goToToday} />
             </View>
 
             <View style={styles.boxContent}>
@@ -281,6 +302,10 @@ export default function HomeScreen() {
                   initialDay={shownDay}
                   onShowDay={setShownDay}
                   onPressEvent={(event) => openItem(event.id)}
+                  onPressMoreAllDay={(day) => {
+                    setAllDayDay(day);
+                    setAllDayOpen(true);
+                  }}
                 />
               ) : calendarView === 'Semana' ? (
                 <WeekView
@@ -334,6 +359,17 @@ export default function HomeScreen() {
       <AddSourceSheet
         open={addSourceOpen}
         onClose={() => setAddSourceOpen(false)}
+      />
+      <AllDayDialog
+        open={allDayOpen}
+        onClose={() => setAllDayOpen(false)}
+        day={allDayDay}
+        events={
+          allDayDay
+            ? splitAllDay(byDay.get(dayKey(allDayDay)) ?? []).allDay
+            : []
+        }
+        onPressEvent={(event) => openItem(event.id)}
       />
     </View>
   );

@@ -486,7 +486,7 @@ function CalendarRow({
           },
         ]}>
         {calendar.visible ? (
-          <CheckIcon size={11} color={color.text} weight="bold" />
+          <CheckIcon size={11} color={color.background} weight="bold" />
         ) : null}
       </View>
 
