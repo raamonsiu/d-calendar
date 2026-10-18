@@ -39,7 +39,7 @@ type ToastMessage = {
 type ToastApi = {
   /** Plain toast; it goes away on its own. */
   show: (message: string) => void;
-  /** Toast with "DESHACER" for as long as it stays on screen. */
+  /** Toast with an undo button for as long as it stays on screen. */
   showUndo: (message: string, onUndo: () => void) => void;
 };
 
@@ -163,8 +163,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
  * It takes no room while there is no toast. When one appears it grows to the
  * toast's height, pushing the components around it aside, and when the toast
  * leaves it shrinks back, so what was moved glides home instead of jumping.
- * While the screen is not the one in view it stays out of the way and the
- * toast floats instead.
+ * Only the slot of the screen in view counts as a place to draw: one on a
+ * screen left underneath in the stack still follows the toast, out of sight,
+ * but the provider only floats the toast when no screen in view has a slot.
  *
  * Put it as a child of a container that spaces its children with `gap`, and
  * pass that same gap: the slot cancels it out while closed, so the layout is
@@ -222,7 +223,7 @@ export function ToastSlot({ gap }: { gap: number }) {
 }
 
 /**
- * The toast itself: message, "DESHACER" when there is something to undo, and
+ * The toast itself: message, the undo button when there is something to undo, and
  * along its bottom edge a bar crossing the whole toast that shrinks and fades
  * as the toast runs out of time.
  *

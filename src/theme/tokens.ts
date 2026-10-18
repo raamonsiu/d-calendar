@@ -240,7 +240,10 @@ export const layer = {
   header: 2,
   /** Side menu and bottom sheets, together with their overlay. */
   panel: 30,
-  /** Toasts, over the panels as well. */
+  /**
+   * The floating toast of a screen without a `ToastSlot`, over the panels as
+   * well. A toast inside a slot is part of its screen and stays under them.
+   */
   toast: 40,
   /**
    * The welcome overlay shown on a cold start, over every screen and panel:
