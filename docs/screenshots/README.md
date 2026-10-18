@@ -13,6 +13,6 @@ the README references them by path:
 | `help.png` | Help and feedback |
 | `about.png` | About (not in the README grid, kept for release notes) |
 
-Taken on a 412×892 device, which is the size the design is laid out for.
-Replace them from the same device when the interface changes, so the six keep
-looking like one set.
+Taken at 412×892, which is the size the design is laid out for, from the web
+build of the app, and set in the same phone frame. Replace them the same way
+when the interface changes, so the six keep looking like one set.
