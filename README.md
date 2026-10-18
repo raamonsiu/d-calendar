@@ -39,10 +39,16 @@ closed.
 The interface ships in **Spanish, English and Catalan**, picked up from the
 device language at first launch and changeable in Settings.
 
-> **Alpha 1.3.0.** The app is complete and usable, but this is still an early
+> **Alpha 1.3.1.** The app is complete and usable, but this is still an early
 > public build. Expect rough edges, and please
 > [open an issue](https://github.com/raamonsiu/d-calendar/issues/new) when you
 > find one.
+
+### What's new in 1.3.1
+
+- The snackbar no longer overlaps the screen: it makes room and counts down.
+- Refreshed day, week and month views.
+- Better optimised: lighter and smoother calendar.
 
 ---
 

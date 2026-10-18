@@ -15,8 +15,8 @@ export type Release = {
   notes: Record<Language, string[]>;
 };
 
-export const APP_VERSION = '1.3.0-alpha';
-export const APP_BUILD = '8';
+export const APP_VERSION = '1.3.1-alpha';
+export const APP_BUILD = '9';
 
 /** Every release up to 1.1.1 came out in the same month. */
 const AUGUST_2026: Record<Language, string> = {
@@ -39,6 +39,27 @@ const OCTOBER_2026: Record<Language, string> = {
 
 /** Newest first: that is the order they are drawn in. */
 export const RELEASES: Release[] = [
+  {
+    version: '1.3.1-alpha',
+    date: OCTOBER_2026,
+    notes: {
+      es: [
+        'El aviso de abajo ya no tapa nada: se abre hueco en la pantalla y una barra marca el tiempo que le queda.',
+        'Vistas de día, semana y mes renovadas.',
+        'Más optimizada: el calendario va más ligero y fluido.',
+      ],
+      en: [
+        'The notice at the bottom no longer covers anything: it makes room on the screen, and a bar shows how long it has left.',
+        'Refreshed day, week and month views.',
+        'Better optimised: the calendar is lighter and smoother.',
+      ],
+      ca: [
+        'L’avís de baix ja no tapa res: s’obre lloc a la pantalla i una barra marca el temps que li queda.',
+        'Vistes de dia, setmana i mes renovades.',
+        'Més optimitzada: el calendari va més lleuger i fluid.',
+      ],
+    },
+  },
   {
     version: '1.3.0-alpha',
     date: OCTOBER_2026,
