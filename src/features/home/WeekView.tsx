@@ -22,82 +22,56 @@ import {
 } from '@/lib/date';
 import { groupRadius } from '@/lib/groupRadius';
 import { indexOfDay } from '@/lib/layout';
-import { weekColumnItems } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
 import { useAccent, usePrefs } from '@/theme/prefs';
 import { alpha, color, tint } from '@/theme/tokens';
-import type { CalEvent } from '@/types';
 import { Bridge } from '@/ui/Bridge';
+import { EventDots } from './EventDots';
 import { useShownIndex } from './useShownIndex';
 
-/** Gap between columns, which is also the inner radius of the group. */
-const COLUMN_GAP = 6;
+/** Gap between cells, which is also the inner radius of the group. */
+const CELL_GAP = 6;
 
-/** Outer radius of the column group. */
+/** Outer radius of the cell group. */
 const OUTER_RADIUS = 17;
 
 const DAYS_PER_WEEK = 7;
 
 /**
- * Room between one week and the next.
- *
- * It is only seen while the view is moving: a week at rest still fills the box
- * edge to edge, because the snap counts the gap in and lands on the week itself.
- * Without it the last day of one week and the first of the next sit together as
- * if they belonged to the same row.
+ * Weeks the view shows at once. Two, because a single row of seven cells is
+ * far shorter than the box, and two of them fill it the way a week would.
  */
-const WEEK_GAP = 18;
+const WEEKS_ON_SCREEN = 2;
 
-/** How many weeks the list keeps mounted around the visible one. */
-const WINDOW_SIZE = 3;
+/** Room between one week and the one under it. */
+const WEEK_GAP = 8;
 
-/**
- * Height of the top of a column - its initial and its number - and of each
- * event row under it, with the gap between rows and the padding the column
- * leaves at its foot. Together they decide how many rows a column has room
- * for, which is what makes a taller box show more of each day.
- */
-const COLUMN_HEAD_HEIGHT = 40;
-const ROW_HEIGHT = 15;
-const ROW_GAP = 3;
-const COLUMN_FOOT = 6;
+/** How many weeks the list keeps mounted around the visible ones. */
+const WINDOW_SIZE = 5;
 
 type WeekViewProps = {
-  /** Events of every day, from `eventsByDay`. */
-  eventsByDay: Map<string, CalEvent[]>;
-  /** Week the view opens on is the one holding this day. Read once. */
+  /** Events per day, from `eventCountsByDay`. */
+  counts: Map<string, number>;
+  /** The top week is the one holding this day. Read once. */
   initialDay: Date;
-  /** Reports the first day of the week the view has been paged to. */
+  /** Reports the first day of the week at the top of the view. */
   onShowWeek: (day: Date) => void;
   /** Opens a day in the day view. */
   onPressDay: (day: Date) => void;
 };
 
 /**
- * Rows of events a column has room for at a given height.
- *
- * Postcondition: never negative, and 0 while the view has not been measured.
- *
- * @param height Height of a column in px.
- */
-function rowsThatFit(height: number) {
-  const available = height - COLUMN_HEAD_HEIGHT - COLUMN_FOOT;
-  return Math.max(0, Math.floor((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
-}
-
-/**
- * Week view: seven columns joined with the "gap Nothing" bridge (handoff §4b),
- * today tinted in the accent, each one listing the titles of its day's events
- * from the top down - as many as the height of the box lets in, with a "+N"
- * for the rest.
+ * Week view: weeks stacked top to bottom, two on screen at a time, each one
+ * seven cells joined with the "gap Nothing" bridge (handoff §4b), borderless,
+ * with today tinted in the accent and the dots for each day's events.
  *
  * It snaps a week at a time rather than scrolling freely: a week is the unit
- * being read, and stopping between two of them shows neither. The label above
- * names the week that is showing and the days it runs between, which is what
- * tells one week from the next once they all look alike.
+ * being read, and stopping between two of them shows neither cleanly. The
+ * label above names the two weeks on screen and the days they run between,
+ * which is what tells one pair from the next once they all look alike.
  */
 export function WeekView({
-  eventsByDay,
+  counts,
   initialDay,
   onShowWeek,
   onPressDay,
@@ -107,15 +81,17 @@ export function WeekView({
   const initials = weekdayInitials(weekStart, language);
 
   /**
-   * A week is exactly the view: its width is what the snap is measured from,
-   * and its height is what the columns stretch to and fill with rows, which a
-   * horizontal list does not hand over on its own.
+   * The view is measured to share its height between the weeks on screen,
+   * which is what the snap is measured from too.
    */
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  const maxRows = rowsThatFit(size.height);
+  const [height, setHeight] = useState(0);
+  const weekHeight = Math.max(
+    0,
+    (height - WEEK_GAP * (WEEKS_ON_SCREEN - 1)) / WEEKS_ON_SCREEN,
+  );
 
   /**
-   * The weeks the view pages through, which are the ones that were read. The
+   * The weeks the view scrolls through, which are the ones that were read. The
    * count is rounded up, so the weeks at either end are complete even when the
    * window cuts them in half: a week drawn with three of its days missing would
    * be stranger than one whose last days are outside what was asked for.
@@ -155,56 +131,51 @@ export function WeekView({
     onShowWeek(weeks[index][0]);
   });
 
-  /** Distance from one week to the next: a page plus the room between them. */
-  const stride = size.width + WEEK_GAP;
+  /** Distance from one week to the next: a week plus the room under it. */
+  const stride = weekHeight + WEEK_GAP;
 
   /**
    * Snapping makes this exact: the view settles on a whole number of strides,
-   * so the index is a division and not a guess.
+   * so the index of the week at the top is a division and not a guess.
    */
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (size.width === 0) return;
+    if (stride <= WEEK_GAP) return;
 
     reportIndex(
       Math.min(
         weeks.length - 1,
-        Math.max(0, Math.round(event.nativeEvent.contentOffset.x / stride)),
+        Math.max(0, Math.round(event.nativeEvent.contentOffset.y / stride)),
       ),
     );
   };
 
-  const shownWeek = weeks[shownIndex];
+  const topWeek = weeks[shownIndex];
+  const bottomWeek = weeks[Math.min(weeks.length - 1, shownIndex + 1)];
 
   return (
     <View style={styles.wrap}>
       <AppText numberOfLines={1} style={styles.weekLabel}>
-        {t('home.weekLabel', {
-          number: isoWeek(shownWeek[0]),
-          start: formatShortDate(shownWeek[0], language),
-          end: formatShortDate(shownWeek[DAYS_PER_WEEK - 1], language),
+        {t('home.weekPairLabel', {
+          first: isoWeek(topWeek[0]),
+          second: isoWeek(bottomWeek[0]),
+          start: formatShortDate(topWeek[0], language),
+          end: formatShortDate(bottomWeek[DAYS_PER_WEEK - 1], language),
         })}
       </AppText>
 
       <View
         style={styles.pages}
-        onLayout={(event) =>
-          setSize({
-            width: event.nativeEvent.layout.width,
-            height: event.nativeEvent.layout.height,
-          })
-        }>
-        {size.width > 0 ? (
+        onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
+        {weekHeight > 0 ? (
           <FlatList
-            horizontal
             data={weeks}
             keyExtractor={(week) => dayKey(week[0])}
-            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             initialScrollIndex={openingIndex}
             /**
              * `snapToInterval` and not `pagingEnabled`: paging snaps to the
-             * width of the list, which knows nothing about the room left
-             * between one week and the next and would settle a little further
-             * off on every week gone past.
+             * height of the list, which here holds two weeks and the room
+             * between them, not one.
              */
             snapToInterval={stride}
             snapToAlignment="start"
@@ -218,15 +189,14 @@ export function WeekView({
             onScroll={onScroll}
             scrollEventThrottle={32}
             renderItem={({ item: week }) => (
-              <View style={[styles.row, size]}>
+              <View style={[styles.row, { height: weekHeight }]}>
                 {week.map((day, index) => (
-                  <WeekColumn
+                  <WeekCell
                     key={dayKey(day)}
                     day={day}
                     initial={initials[index]}
                     index={index}
-                    events={eventsByDay.get(dayKey(day)) ?? []}
-                    maxRows={maxRows}
+                    eventCount={counts.get(dayKey(day)) ?? 0}
                     onPress={() => onPressDay(day)}
                   />
                 ))}
@@ -239,33 +209,23 @@ export function WeekView({
   );
 }
 
-/**
- * One day of the week: its initial and number on top and the titles of its
- * events underneath, one per row, the last row turned into "+N" when they do
- * not all fit.
- *
- * The whole column is a single touch target that opens the day: a column is
- * about 40px wide, too narrow for each title to be a target of its own.
- */
-function WeekColumn({
+/** One day of a week: its initial, its number and the dots for its events. */
+function WeekCell({
   day,
   initial,
   index,
-  events,
-  maxRows,
+  eventCount,
   onPress,
 }: {
   day: Date;
   initial: string;
   index: number;
-  events: CalEvent[];
-  maxRows: number;
+  eventCount: number;
   onPress: () => void;
 }) {
   const { t } = useTranslation();
   const accent = useAccent();
   const today = isToday(day);
-  const { shown, hidden } = weekColumnItems(events, maxRows);
 
   return (
     <Pressable
@@ -273,12 +233,12 @@ function WeekColumn({
       accessibilityLabel={t('home.dayCellLabel', {
         initial,
         day: day.getDate(),
-        count: events.length,
+        count: eventCount,
       })}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.column,
-        groupRadius(index, DAYS_PER_WEEK, OUTER_RADIUS, COLUMN_GAP, 'horizontal'),
+        styles.cell,
+        groupRadius(index, DAYS_PER_WEEK, OUTER_RADIUS, CELL_GAP, 'horizontal'),
         {
           backgroundColor: today
             ? alpha(accent, pressed ? tint.todayPressed : tint.today)
@@ -290,39 +250,27 @@ function WeekColumn({
       {index > 0 ? (
         <Bridge
           axis="horizontal"
-          gap={COLUMN_GAP}
+          gap={CELL_GAP}
           surface={color.cardHover}
           behind={color.box}
         />
       ) : null}
 
-      <View style={styles.head}>
-        <AppText
-          style={[styles.initial, { color: today ? accent : color.textDim }]}>
-          {initial}
-        </AppText>
-        <AppText
-          weight={400}
-          style={[
-            styles.dayNumber,
-            { color: today ? color.text : color.textStrong },
-          ]}>
-          {day.getDate()}
-        </AppText>
-      </View>
+      <AppText
+        style={[styles.initial, { color: today ? accent : color.textDim }]}>
+        {initial}
+      </AppText>
+      <AppText
+        weight={400}
+        style={[
+          styles.dayNumber,
+          { color: today ? color.text : color.textStrong },
+        ]}>
+        {day.getDate()}
+      </AppText>
 
-      <View style={styles.rows}>
-        {shown.map((event) => (
-          <View key={event.id} style={styles.eventRow}>
-            <View style={[styles.dot, { backgroundColor: accent }]} />
-            <AppText numberOfLines={1} style={styles.eventTitle}>
-              {event.title}
-            </AppText>
-          </View>
-        ))}
-        {hidden > 0 ? (
-          <AppText style={styles.more}>{`+${hidden}`}</AppText>
-        ) : null}
+      <View style={styles.dots}>
+        <EventDots count={eventCount} dotSize={4} fontSize={8.5} />
       </View>
     </Pressable>
   );
@@ -332,30 +280,28 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, minWidth: 0, gap: 8 },
   weekLabel: { fontSize: 9, letterSpacing: 1.4, color: color.textDim },
   pages: { flex: 1 },
-  row: { flexDirection: 'row', gap: COLUMN_GAP, marginRight: WEEK_GAP },
-  column: { flex: 1, minWidth: 0, paddingBottom: COLUMN_FOOT },
-  head: {
-    height: COLUMN_HEAD_HEIGHT,
+  row: { flexDirection: 'row', gap: CELL_GAP, marginBottom: WEEK_GAP },
+  cell: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
+    paddingTop: 9,
+    gap: 4,
   },
   initial: { fontSize: 8, letterSpacing: 1.2 },
   dayNumber: { fontSize: 15 },
-  rows: { gap: ROW_GAP, paddingHorizontal: 3 },
-  eventRow: {
-    height: ROW_HEIGHT,
+  /**
+   * A fixed height, so the dots sit on the same line whether a "+N" follows
+   * them or not.
+   */
+  dots: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    bottom: 7,
+    height: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
-  },
-  dot: { width: 3, height: 3, borderRadius: 1.5 },
-  eventTitle: { flex: 1, fontSize: 8, color: color.textSoft },
-  more: {
-    height: ROW_HEIGHT,
-    fontSize: 8,
-    letterSpacing: 0.6,
-    color: color.textDim,
-    textAlign: 'center',
   },
 });

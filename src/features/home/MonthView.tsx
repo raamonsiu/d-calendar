@@ -267,11 +267,17 @@ const styles = StyleSheet.create({
     paddingTop: 5,
     overflow: 'hidden',
   },
+  /**
+   * A fixed height, so the dots sit on the same line whether a "+N" follows
+   * them or not: left to size itself, the row grows to the height of that text
+   * and centres the dots higher than on a day with only dots.
+   */
   cellDots: {
     position: 'absolute',
     left: 5,
     right: 4,
     bottom: 4,
+    height: 11,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,

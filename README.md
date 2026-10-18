@@ -64,9 +64,9 @@ device language at first launch and changeable in Settings.
 ### Calendar
 
 - **Day, week and month on one screen** - picked with a selector at the top
-  of the calendar box and remembered across launches. The day reads its hours
-  top to bottom and pages a day at a time; the week lists each day's events in
-  its own column.
+  of the calendar box and remembered across launches, with a "Today" button
+  next to it. The day reads its hours top to bottom and pages a day at a time;
+  the week scrolls down two weeks at a time.
 - **A calendar box that makes room for itself** - it takes whatever the task
   and habit list leaves free, from 40% of the screen up to 70%.
 - **Every day an event touches** - one that repeats is drawn on each day it

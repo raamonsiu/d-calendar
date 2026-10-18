@@ -38,6 +38,7 @@ import { AgendaList } from '@/features/home/AgendaList';
 import { DayView } from '@/features/home/DayView';
 import { MonthView } from '@/features/home/MonthView';
 import { SideDrawer } from '@/features/home/SideDrawer';
+import { TodayButton } from '@/features/home/TodayButton';
 import { WeekView } from '@/features/home/WeekView';
 import { homeHeaderCopy } from '@/features/home/homeHeader';
 import { dayKey, isSameDay, startOfDay, weekDays } from '@/lib/date';
@@ -101,6 +102,13 @@ export default function HomeScreen() {
    * day instead of jumping back to today.
    */
   const [shownDay, setShownDay] = useState(() => startOfDay(new Date()));
+
+  /**
+   * Bumped by the "Hoy" button to remount the day view. A view reads its day
+   * only when it mounts, and the button has to land on today even when the day
+   * view is already the one on screen, scrolled somewhere else.
+   */
+  const [dayViewKey, setDayViewKey] = useState(0);
 
   /**
    * The calendar box takes whatever the list under it leaves free, between
@@ -199,6 +207,13 @@ export default function HomeScreen() {
     setCalendarView('Día');
   };
 
+  /** The "Hoy" button: today, in the day view, whatever was on screen. */
+  const goToToday = () => {
+    setShownDay(startOfDay(new Date()));
+    setCalendarView('Día');
+    setDayViewKey((current) => current + 1);
+  };
+
   /**
    * Everything opens in the app, whoever it belongs to. The detail screen is
    * the one that decides whether it can be changed.
@@ -225,32 +240,39 @@ export default function HomeScreen() {
             <AppText weight={500} numberOfLines={1} style={styles.headerTitle}>
               {header.title}
             </AppText>
-            <AppText style={styles.headerMeta}>{header.subtitle}</AppText>
+            <AppText
+              numberOfLines={1}
+              style={[styles.headerMeta, styles.headerSubtitle]}>
+              {header.subtitle}
+            </AppText>
+            {header.right ? (
+              <AppText style={styles.headerMeta}>{header.right}</AppText>
+            ) : null}
           </View>
-
-          {header.right ? (
-            <AppText style={styles.headerMeta}>{header.right}</AppText>
-          ) : null}
         </View>
 
         <View
           style={styles.body}
           onLayout={(event) => setBodyHeight(event.nativeEvent.layout.height)}>
           <Animated.View style={[styles.box, boxHeightStyle]}>
-            <Tabs
-              compact
-              accessibilityLabel={t('home.calendarViewLabel')}
-              options={CALENDAR_VIEWS.map(({ value, labelKey }) => ({
-                value,
-                label: t(labelKey),
-              }))}
-              value={calendarView}
-              onChange={setCalendarView}
-            />
+            <View style={styles.boxTop}>
+              <Tabs
+                compact
+                accessibilityLabel={t('home.calendarViewLabel')}
+                options={CALENDAR_VIEWS.map(({ value, labelKey }) => ({
+                  value,
+                  label: t(labelKey),
+                }))}
+                value={calendarView}
+                onChange={setCalendarView}
+              />
+              <TodayButton onPress={goToToday} />
+            </View>
 
             <View style={styles.boxContent}>
               {calendarView === 'Día' ? (
                 <DayView
+                  key={dayViewKey}
                   eventsByDay={byDay}
                   initialDay={shownDay}
                   onShowDay={setShownDay}
@@ -258,7 +280,7 @@ export default function HomeScreen() {
                 />
               ) : calendarView === 'Semana' ? (
                 <WeekView
-                  eventsByDay={byDay}
+                  counts={counts}
                   initialDay={shownDay}
                   onShowWeek={setShownDay}
                   onPressDay={openDay}
@@ -343,6 +365,11 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   headerTitle: { fontSize: 19, lineHeight: 26, letterSpacing: -0.3 },
+  /**
+   * Takes the rest of the row, which pushes the event counter to the right
+   * edge while it stays on the title's baseline.
+   */
+  headerSubtitle: { flex: 1 },
   headerMeta: {
     fontSize: 10,
     letterSpacing: 1.6,
@@ -360,6 +387,7 @@ const styles = StyleSheet.create({
     gap: 10,
     overflow: 'hidden',
   },
+  boxTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   boxContent: { flex: 1, minHeight: 0 },
   agendaBox: {
     flex: 1,

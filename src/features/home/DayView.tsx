@@ -20,7 +20,7 @@ import {
   decimalHours,
   isToday,
   startOfDay,
-  weekdayInitial,
+  weekdayName,
 } from '@/lib/date';
 import { layoutDayColumn, splitAllDay } from '@/store/selectors';
 import { AppText } from '@/theme/Text';
@@ -53,6 +53,9 @@ const MAX_DAYS_AFTER = 60;
 
 /** Height of the row naming the day. */
 const HEADER_HEIGHT = 26;
+
+/** Room under the all-day chips, above the line that closes the heading. */
+const ALL_DAY_FOOT = 5;
 
 /**
  * Chips of all-day events the heading draws before collapsing the rest into a
@@ -127,9 +130,13 @@ export function DayView({
     return Math.max(0, hourToTop(hour) - OPEN_MARGIN);
   }, [openingDay]);
 
-  const reportIndex = useShownIndex(daysBefore, (index) =>
-    onShowDay(days[index]),
-  );
+  /** Page on screen, which is the day the heading is sized for. */
+  const [shownIndex, setShownIndex] = useState(daysBefore);
+
+  const reportIndex = useShownIndex(daysBefore, (index) => {
+    setShownIndex(index);
+    onShowDay(days[index]);
+  });
 
   const onScrollVertical = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
@@ -153,10 +160,10 @@ export function DayView({
   };
 
   /**
-   * The heading is as tall as the busiest day needs, and every page gets that
-   * height whether it uses it or not: the pages share one vertical scroll, so
-   * a heading that grew only where there was something would leave the hours
-   * underneath starting at different heights.
+   * The heading is as tall as the day on screen needs: just its name on a day
+   * with nothing all-day, so the hours get every pixel left. The pages share
+   * one vertical scroll, so every page takes that same height; the one next
+   * door, seen only while swiping, may have its chips cut until it settles.
    */
   const allDayByDay = useMemo(
     () =>
@@ -165,12 +172,11 @@ export function DayView({
       ),
     [days, eventsByDay],
   );
+  const shownAllDay = allDayByDay[shownIndex]?.length ?? 0;
   const headerHeight =
     HEADER_HEIGHT +
-    allDayHeight(
-      allDayByDay.reduce((most, allDay) => Math.max(most, allDay.length), 0),
-      MAX_ALL_DAY_ROWS,
-    );
+    allDayHeight(shownAllDay, MAX_ALL_DAY_ROWS) +
+    (shownAllDay > 0 ? ALL_DAY_FOOT : 0);
 
   const bodyHeight = Math.max(0, box.height - headerHeight);
 
@@ -184,7 +190,7 @@ export function DayView({
         })
       }>
       <View style={styles.gutter}>
-        <View style={{ height: headerHeight }} />
+        <View style={[styles.gutterHead, { height: headerHeight }]} />
         <View style={[styles.gutterClip, { height: bodyHeight }]}>
           <Animated.View style={gutterStyle}>
             <HourGutter />
@@ -248,8 +254,8 @@ export function DayView({
 }
 
 /**
- * Initial and number of a day, in the row pinned above the hours, with
- * whatever the day holds that has no hour underneath.
+ * Name and number of a day, in the row pinned above the hours, with whatever
+ * the day holds that has no hour underneath.
  *
  * This is where an all-day event belongs in this view: the row does not scroll
  * with the hours, so the chip stays in sight wherever the hours have been
@@ -276,10 +282,10 @@ function DayHeading({
       <View style={styles.headingRow}>
         <AppText
           style={[
-            styles.headingInitial,
+            styles.headingName,
             { color: today ? accent : color.textDim },
           ]}>
-          {weekdayInitial(day, language)}
+          {weekdayName(day, language).toUpperCase()}
         </AppText>
         <AppText
           weight={400}
@@ -361,8 +367,15 @@ function DayPage({
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row' },
   gutter: { width: HOUR_GUTTER_WIDTH, backgroundColor: color.box, zIndex: 2 },
+  gutterHead: { borderBottomWidth: 1, borderBottomColor: color.line },
   gutterClip: { overflow: 'hidden' },
-  header: { flexDirection: 'row', backgroundColor: color.box },
+  header: {
+    flexDirection: 'row',
+    backgroundColor: color.box,
+    borderBottomWidth: 1,
+    borderBottomColor: color.line,
+    overflow: 'hidden',
+  },
   heading: {
     gap: CHIP_GAP,
     paddingHorizontal: 3,
@@ -376,7 +389,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingLeft: 5,
   },
-  headingInitial: { fontSize: 8, letterSpacing: 1.4 },
+  headingName: { fontSize: 8, letterSpacing: 1.4 },
   headingNumber: { fontSize: 15 },
   body: { height: DAY_HEIGHT, flexDirection: 'row' },
   page: {

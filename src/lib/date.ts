@@ -49,6 +49,15 @@ export const weekdayInitial = (date: Date, language: Language) =>
   WEEKDAY_INITIALS[language][date.getDay()];
 
 /**
+ * Full name of the weekday a date falls on: "Domingo".
+ *
+ * @param date Date to take the name from.
+ * @param language Active language.
+ */
+export const weekdayName = (date: Date, language: Language) =>
+  WEEKDAY_LABELS[language][date.getDay()];
+
+/**
  * The seven initials in the order the grids draw them.
  *
  * Precondition: `weekStart` is one of the three options in Settings.
